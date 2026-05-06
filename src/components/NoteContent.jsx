@@ -4,31 +4,6 @@ import Avatar from "./Avatar.jsx";
 import MediaLightbox from "./MediaLightbox.jsx";
 import { parseNoteMediaSegments, groupNoteMediaSegments, displayName, relativeTime, nip19 } from "../utils.js";
 
-const PREVIEW_URL_RE = /https?:\/\/[^\s<>'"]+/gi;
-
-function trimUrlToken(url) {
-  return (url || "").replace(/[),.;:!?*»\]}]+$/, "");
-}
-
-function isMediaUrl(url) {
-  return /\.(jpe?g|png|gif|webp|avif|svg|mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(url);
-}
-
-function extractPreviewUrls(text) {
-  const found = (text || "").match(PREVIEW_URL_RE) || [];
-  const uniq = [];
-  const seen = new Set();
-  for (const raw of found) {
-    const u = trimUrlToken(raw);
-    if (!/^https?:\/\//i.test(u)) continue;
-    if (isMediaUrl(u)) continue;
-    if (seen.has(u)) continue;
-    seen.add(u);
-    uniq.push(u);
-  }
-  return uniq.slice(0, 2);
-}
-
 function splitNostrEventRefs(text) {
   const out = [];
   const re = /nostr:(nevent1[023456789acdefghjklmnpqrstuvwxyz]+)/ig;
@@ -112,72 +87,6 @@ function EmbeddedEventRef({ nevent }) {
   );
 }
 
-function LinkPreviewCard({ url }) {
-  const [meta, setMeta] = useState(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    const microlink = `https://api.microlink.io/?url=${encodeURIComponent(url)}&meta=true&screenshot=false&audio=false&video=false`;
-
-    const apply = data => {
-      if (cancelled || !data) return false;
-      if (data.status === "success" && data.data) {
-        setMeta(data.data);
-        return true;
-      }
-      if (data.ok && data.data) {
-        setMeta(data.data);
-        return true;
-      }
-      return false;
-    };
-
-    (async () => {
-      try {
-        const local = await fetch(`/api/link-preview?url=${encodeURIComponent(url)}`).then(r =>
-          r.ok ? r.json() : null
-        );
-        if (apply(local)) return;
-      } catch { /* use Microlink below */ }
-
-      try {
-        const data = await fetch(microlink).then(r => (r.ok ? r.json() : null));
-        if (!apply(data) && !cancelled) setFailed(true);
-      } catch {
-        if (!cancelled) setFailed(true);
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [url]);
-
-  const host = (() => {
-    try { return new URL(url).host.replace(/^www\./, ""); } catch { return url; }
-  })();
-
-  const title = meta?.title || url;
-  const description = meta?.description || "";
-  const image = meta?.image?.url || null;
-
-  return (
-    <a
-      className="note-link-card"
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={e => e.stopPropagation()}
-    >
-      {image && <img className="note-link-card-img" src={image} alt="" loading="lazy" decoding="async" />}
-      <div className="note-link-card-body">
-        <div className="note-link-card-host">{host}</div>
-        <div className="note-link-card-title">{title}</div>
-        {!failed && description && <div className="note-link-card-desc">{description}</div>}
-      </div>
-    </a>
-  );
-}
-
 function ImageMosaic({ urls, onImageClick }) {
   const c     = urls.length;
   const extra = c > 4 ? c - 4 : 0;
@@ -250,7 +159,6 @@ export default function NoteContent({
 
   const [lightbox, setLightbox] = useState(null);
   const [resolvedRefs, setResolvedRefs] = useState({});
-  const previewUrls = useMemo(() => extractPreviewUrls(content || ""), [content]);
 
   useEffect(() => {
     if (!allowEmbeds || !resolveEventById || typeof content !== "string" || !content.includes("nostr:nevent1")) return;
@@ -329,9 +237,6 @@ export default function NoteContent({
         }
         return null;
       })}
-      {previewUrls.map(u => (
-        <LinkPreviewCard key={u} url={u} />
-      ))}
 
       {lightbox && (
         <MediaLightbox
