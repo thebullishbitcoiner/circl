@@ -13,6 +13,7 @@ import {
   parseKind6EmbeddedEvent,
 } from "./utils.js";
 import useNDK from "./hooks/useNDK.js";
+import { nostrSubscribe } from "./nostr.js";
 import useFollows from "./hooks/useFollows.js";
 import useFeed from "./hooks/useFeed.js";
 import useNotifications from "./hooks/useNotifications.js";
@@ -34,6 +35,7 @@ import RepostCard from "./components/RepostCard.jsx";
 import ArticleReader from "./components/ArticleReader.jsx";
 import ComposeSheet from "./components/ComposeSheet.jsx";
 import ProfilePage from "./components/ProfilePage.jsx";
+import CirclePage from "./components/CirclePage.jsx";
 import ThreadView from "./components/ThreadView.jsx";
 import NotificationsFeed from "./components/NotificationsFeed.jsx";
 import { ZapsScreen, ReactionsScreen, RepostsScreen } from "./components/ListScreens.jsx";
@@ -100,77 +102,61 @@ export default function App() {
     if (!eventId) return null;
     const existing = mergedFeedPool.find(e => e.id === eventId);
     if (existing) return existing;
-    const instance = ndk?.current;
-    if (!instance || pendingEventFetches.current.has(eventId)) return null;
+    if (pendingEventFetches.current.has(eventId)) return null;
     pendingEventFetches.current.add(eventId);
     return new Promise(resolve => {
       let done = false;
-      const sub = instance.subscribe([{ ids: [eventId], limit: 1 }], {});
       const finish = ev => {
         if (done) return;
         done = true;
         pendingEventFetches.current.delete(eventId);
-        try { sub.stop(); } catch {}
         if (ev) prependEvent(ev);
         resolve(ev || null);
       };
-      const timeout = setTimeout(() => finish(null), 5000);
-      sub.on("event", e => {
-        clearTimeout(timeout);
-        finish(e.rawEvent());
-      });
-      sub.on("eose", () => {
-        clearTimeout(timeout);
-        finish(null);
-      });
+      const timer = setTimeout(() => finish(null), 5000);
+      const sub = nostrSubscribe(
+        [{ ids: [eventId], limit: 1 }],
+        {
+          closeOnEose: true,
+          onEvent: e => { clearTimeout(timer); finish(e.rawEvent()); },
+          onEose: () => { clearTimeout(timer); finish(null); },
+        }
+      );
+      setTimeout(() => sub.stop(), 5500);
     });
-  }, [mergedFeedPool, ndk, prependEvent]);
+  }, [mergedFeedPool, prependEvent]);
 
   const allPks = useMemo(() => {
-    const s = new Set();
+    const seen = new Set();
+    const result = [];
+    const add = pk => {
+      const k = normPubkey(pk);
+      if (isHexPubkey(k) && !seen.has(k)) { seen.add(k); result.push(k); }
+    };
+    // Priority 1: logged-in user — bottom nav avatar fetched first
+    if (pubkey) add(pubkey);
+    // Priority 2: authors of the first visible feed events (above the fold)
+    for (const e of events.slice(0, 15)) add(e.pubkey);
+    // Priority 3: everything else
     for (const e of mergedFeedPool) {
-      const k = normPubkey(e.pubkey);
-      if (isHexPubkey(k)) s.add(k);
+      add(e.pubkey);
       for (const t of e.tags || []) {
-        if (t[0] === "p" && t[1]) {
-          const pk = normPubkey(t[1]);
-          if (isHexPubkey(pk)) s.add(pk);
-        }
+        if (t[0] === "p" && t[1]) add(t[1]);
       }
       if (e.kind === 6 && typeof e.content === "string" && e.content.trim().startsWith("{")) {
-        try {
-          const reposted = JSON.parse(e.content);
-          const rk = normPubkey(reposted?.pubkey);
-          if (isHexPubkey(rk)) s.add(rk);
-        } catch {}
+        try { add(JSON.parse(e.content)?.pubkey); } catch {}
       }
     }
     for (const zaps of Object.values(zapsByEvent)) {
-      for (const z of zaps) {
-        const zk = normPubkey(z?.zapper);
-        if (isHexPubkey(zk)) s.add(zk);
-      }
+      for (const z of zaps) add(z?.zapper);
     }
     for (const reacts of Object.values(reactionsByEvent)) {
-      for (const r of reacts) {
-        const rk = normPubkey(typeof r === "string" ? r : r?.pk);
-        if (isHexPubkey(rk)) s.add(rk);
-      }
+      for (const r of reacts) add(typeof r === "string" ? r : r?.pk);
     }
-    for (const f of follows) {
-      const k = normPubkey(f);
-      if (isHexPubkey(k)) s.add(k);
-    }
-    if (pubkey) {
-      const k = normPubkey(pubkey);
-      if (isHexPubkey(k)) s.add(k);
-    }
-    for (const n of notificationEvents) {
-      const k = normPubkey(n.pubkey);
-      if (isHexPubkey(k)) s.add(k);
-    }
-    return [...s].sort();
-  }, [mergedFeedPool, follows, pubkey, zapsByEvent, reactionsByEvent, notificationEvents]);
+    for (const f of follows) add(f);
+    for (const n of notificationEvents) add(n.pubkey);
+    return result;
+  }, [mergedFeedPool, events, follows, pubkey, zapsByEvent, reactionsByEvent, notificationEvents]);
   const { profiles } = useProfiles({ ndk, pubkeys: allPks });
   const { publish, publishEvent } = usePublish({ signAndPublish, pubkey });
   const isMobile = useIsMobile();
@@ -195,6 +181,8 @@ export default function App() {
   })();
 
   const handleOpenProfile = pk => pushNav({ type: "profile", payload: pk });
+  const handleOpenCircle = ({ pubkey: cpk, follows: cFollows }) =>
+    pushNav({ type: "circle", payload: { pubkey: cpk, follows: cFollows } });
   const handleOpenNote = event => pushNav({ type: "note", payload: event });
   const handleOpenThread = event => pushNav({ type: "thread", payload: event });
   const handleOpenZaps = ({ eventId, zaps }) => pushNav({ type: "zaps", payload: { eventId, zaps } });
@@ -588,7 +576,21 @@ export default function App() {
                         setLocalReaction={setLocalReaction}
                         onRequestModal={setPanelModal}
                         onDismissModal={() => setPanelModal(null)}
-                    resolveEventById={resolveEventById}
+                        resolveEventById={resolveEventById}
+                        onOpenCircle={handleOpenCircle}
+                      />
+                    );
+                  }
+
+                  if (top.type === "circle") {
+                    return (
+                      <CirclePage
+                        key={top.payload.pubkey}
+                        pubkey={top.payload.pubkey}
+                        follows={top.payload.follows}
+                        profiles={profiles}
+                        onOpenProfile={handleOpenProfile}
+                        onBack={handleBack}
                       />
                     );
                   }

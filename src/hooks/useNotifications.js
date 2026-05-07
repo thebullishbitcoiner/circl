@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { isHexPubkey, normPubkey, parseBolt11Msats, isQuoteRepost, fmtSats, parseArticle } from "../utils.js";
+import { pool, eventStore } from "../nostr.js";
+import { RELAYS } from "../constants.js";
 
 const NOTIF_KINDS = [1, 6, 7, 9735, 30023];
 const SINCE_SEC = 60 * 60 * 24 * 30;
@@ -13,7 +15,6 @@ function compareDesc(a, b) {
   return ia < ib ? 1 : ia > ib ? -1 : 0;
 }
 
-/** User-facing summary for a notification event (kinds 1, 6, 7, 9735 with #p). */
 export function getNotificationSummary(ev) {
   const kind = ev?.kind;
   if (kind === 7) {
@@ -40,19 +41,14 @@ export function getNotificationSummary(ev) {
   return { headline: "Activity", detail: "", kind: "other" };
 }
 
-/**
- * Subscribes to notes, reposts, reactions, and zaps that tag the user in `p`
- * (mentions, replies, reactions to your notes, zaps, reposts).
- */
 export default function useNotifications({ ndk, pubkey }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const seen = useRef(new Set());
 
   useEffect(() => {
-    const instance = ndk?.current;
     const pk = normPubkey(pubkey);
-    if (!instance || !isHexPubkey(pk)) {
+    if (!isHexPubkey(pk)) {
       setItems([]);
       setLoading(false);
       return;
@@ -62,33 +58,27 @@ export default function useNotifications({ ndk, pubkey }) {
     seen.current = new Set();
     setLoading(true);
 
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
     const since = Math.floor(Date.now() / 1000) - SINCE_SEC;
-    const sub = instance.subscribe(
-      [{ kinds: NOTIF_KINDS, "#p": [pk], limit: 500, since }],
-      {}
-    );
 
-    sub.on("event", e => {
-      const raw = e.rawEvent();
-      if (normPubkey(raw.pubkey) === pk) return;
-      if (seen.current.has(raw.id)) return;
-      seen.current.add(raw.id);
-      setItems(prev => sortMerge(prev, raw));
+    const sub = pool.subscription(relayUrls, [{ kinds: NOTIF_KINDS, "#p": [pk], limit: 500, since }]).subscribe({
+      next: raw => {
+        eventStore.add(raw);
+        if (normPubkey(raw.pubkey) === pk) return;
+        if (seen.current.has(raw.id)) return;
+        seen.current.add(raw.id);
+        setItems(prev => [...prev, raw].sort(compareDesc));
+        setLoading(false);
+      },
     });
 
-    sub.on("eose", () => {
-      setLoading(false);
-    });
+    const eoseTimer = setTimeout(() => setLoading(false), 10000);
 
     return () => {
-      try {
-        sub.stop();
-      } catch {}
+      clearTimeout(eoseTimer);
+      sub.unsubscribe();
     };
-  }, [ndk, pubkey]);
-  return { items, loading };
-}
+  }, [pubkey]);
 
-function sortMerge(prev, raw) {
-  return [...prev, raw].sort(compareDesc);
+  return { items, loading };
 }

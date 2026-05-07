@@ -1,34 +1,36 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import NDK, { NDKNip07Signer, NDKEvent } from "@nostr-dev-kit/ndk";
+import { firstValueFrom, filter as rxFilter, timeout, catchError, of } from "rxjs";
 import { RELAYS, NOSTR_CLIENT_TAG } from "../constants.js";
 import { isHexPubkey, normPubkey } from "../utils.js";
+import { pool, nostrSubscribe } from "../nostr.js";
 
 function withTimeout(promise, ms, message) {
   let timer;
-  const timeout = new Promise((_, reject) => {
+  const race = new Promise((_, reject) => {
     timer = setTimeout(() => reject(new Error(message)), ms);
   });
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+  return Promise.race([promise, race]).finally(() => clearTimeout(timer));
 }
 
+// Compat shim: exposes the same .subscribe(filters, opts) interface as the old ndk instance
+const nostrShim = { subscribe: nostrSubscribe };
+
 export default function useNDK() {
-  const ndkRef = useRef(null);
+  const nostrRef = useRef(nostrShim);
   const [pubkey, setPubkey] = useState(null);
   const [status, setStatus] = useState("idle");
-  const [error,  setError]  = useState(null);
+  const [error, setError] = useState(null);
 
-  // Restore session from sessionStorage
+  // Restore session
   useEffect(() => {
     const saved = sessionStorage.getItem("circl_pk");
     if (!saved) return;
     const pk = normPubkey(saved);
     if (!isHexPubkey(pk)) return;
+    // Eagerly open relay connections so first sub doesn't wait for WS handshake
+    for (const url of RELAYS) pool.relay(url);
     setPubkey(pk);
     setStatus("ready");
-    const signer   = new NDKNip07Signer();
-    const instance = new NDK({ explicitRelayUrls: RELAYS, signer });
-    instance.connect();
-    ndkRef.current = instance;
   }, []);
 
   const login = useCallback(async () => {
@@ -36,55 +38,57 @@ export default function useNDK() {
     setError(null);
     try {
       if (!window.nostr) throw new Error("No Nostr extension found. Install Alby or nos2x.");
-      const signer   = new NDKNip07Signer();
-      const instance = new NDK({ explicitRelayUrls: RELAYS, signer });
-      await withTimeout(
-        instance.connect(),
-        12000,
-        "Connection timed out. Check your network/relay reachability and try again."
-      );
-      const user = await withTimeout(
-        signer.user(),
+      const raw = await withTimeout(
+        window.nostr.getPublicKey(),
         10000,
         "Extension did not respond in time. Reopen your Nostr wallet/extension and try again."
       );
-      const pk   = normPubkey(user.pubkey);
+      const pk = normPubkey(raw);
       if (!isHexPubkey(pk)) throw new Error("Extension returned an invalid pubkey.");
-      ndkRef.current = instance;
+      for (const url of RELAYS) pool.relay(url);
       setPubkey(pk);
       setStatus("ready");
       sessionStorage.setItem("circl_pk", pk);
     } catch (e) {
       setError(e?.message || "Failed to connect.");
-      try { ndkRef.current?.pool?.close?.(); } catch {}
-      ndkRef.current = null;
       setStatus("idle");
     }
   }, []);
 
   const logout = useCallback(() => {
-    ndkRef.current?.pool?.close?.();
-    ndkRef.current = null;
+    for (const url of RELAYS) {
+      try { pool.remove(url); } catch {}
+    }
     setPubkey(null);
     setStatus("idle");
     sessionStorage.removeItem("circl_pk");
   }, []);
 
   const signAndPublish = useCallback(async tmpl => {
-    const ndk = ndkRef.current;
-    if (!ndk?.signer) throw new Error("Not connected");
+    if (!pubkey || !window.nostr) throw new Error("Not connected");
     const { tags: incomingTags, ...rest } = tmpl;
     const tags = [...(incomingTags || []).filter(t => t?.[0] !== "client"), NOSTR_CLIENT_TAG];
-    const ev = new NDKEvent(ndk, {
+    const unsigned = {
       ...rest,
       tags,
       created_at: Math.floor(Date.now() / 1000),
       pubkey,
-    });
-    await ev.sign();
-    await ev.publish();
-    return ev.rawEvent();
+    };
+    const signed = await withTimeout(
+      window.nostr.signEvent(unsigned),
+      10000,
+      "Extension did not sign in time."
+    );
+    // Publish and wait for at least one relay to confirm (8s timeout)
+    await firstValueFrom(
+      pool.publish(RELAYS, signed).pipe(
+        rxFilter(r => r.ok),
+        timeout({ first: 8000 }),
+        catchError(() => of(null))
+      )
+    );
+    return signed;
   }, [pubkey]);
 
-  return { ndk: ndkRef, pubkey, status, error, login, logout, signAndPublish };
+  return { ndk: nostrRef, pubkey, status, error, login, logout, signAndPublish };
 }

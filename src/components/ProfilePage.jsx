@@ -6,15 +6,17 @@ import NoteCard from "./NoteCard.jsx";
 import NoteActions from "./NoteActions.jsx";
 import ProfileText from "./ProfileText.jsx";
 import { Bk, Ck } from "./icons.jsx";
-import { displayName, nip05OrNpub, relativeTime, shortNpub, avatarUrl, isQuoteRepost, replyCount, repostAndQuoteCount, normPubkey, directReplyParentId, parseKind6EmbeddedEvent } from "../utils.js";
+import { displayName, nip05OrNpub, relativeTime, shortNpub, truncNpub, avatarUrl, isQuoteRepost, isHexPubkey, replyCount, repostAndQuoteCount, normPubkey, directReplyParentId, parseKind6EmbeddedEvent } from "../utils.js";
 import { nip19 } from "../utils.js";
 import useInteractions from "../hooks/useInteractions.js";
+import { pool, eventStore } from "../nostr.js";
+import { RELAYS } from "../constants.js";
+import SkelCard from "./SkelCard.jsx";
 
 function NpubCopy({ pubkey }) {
   const [copied, setCopied] = useState(false);
-  const npub    = nip19.npubEncode(pubkey);
-  const clean   = npub.includes("…") ? npub.replace("…", "") : npub;
-  const truncated = `${clean.slice(0, 11)}…${clean.slice(-11)}`;
+  const npub      = nip19.npubEncode(pubkey);
+  const truncated = truncNpub(pubkey);
 
   const handleCopy = e => {
     e.stopPropagation();
@@ -96,9 +98,13 @@ export default function ProfilePage({
   myProfile, onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal, ndk, backLabel = "Your Circle", resolveEventById,
+  onOpenCircle,
 }) {
   const [tab, setTab] = useState("notes");
   const [profileEvents, setProfileEvents] = useState([]);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [subjectFollows, setSubjectFollows] = useState([]);
+  const [circleLoading, setCircleLoading] = useState(true);
   const [profileNotesMenuId, setProfileNotesMenuId] = useState(null);
   const [profileNotesJsonEvent, setProfileNotesJsonEvent] = useState(null);
   const [profileNotesJsonCopied, setProfileNotesJsonCopied] = useState(false);
@@ -123,88 +129,55 @@ export default function ProfilePage({
   }, [pubkey]);
 
   useEffect(() => {
-    const instance = ndk?.current;
     if (!pubkey) return;
 
     let cancelled = false;
+    const activeSubs = [];
+    setProfileEvents([]);
+    setProfileLoading(true);
+    setCircleLoading(!isOwn);
 
-    const fetchRelayAll = () => new Promise(resolve => {
-      if (!instance) {
-        resolve([]);
-        return;
-      }
-      const fetchBatch = until => new Promise(res => {
-        const rows = [];
-        const sub = instance.subscribe(
-          [{ kinds: [1, 6, 30023], authors: [pubkey], limit: 200, until }],
-          {}
-        );
-        sub.on("event", ev => rows.push(ev.rawEvent()));
-        sub.on("eose", () => {
-          sub.stop();
-          res(rows);
-        });
-      });
-      (async () => {
-        const byId = new Map();
-        let cursor = Math.floor(Date.now() / 1000) + 1;
-        while (!cancelled) {
-          const batch = await fetchBatch(cursor);
-          if (!batch.length) break;
-          for (const ev of batch) byId.set(ev.id, ev);
-          const oldest = batch.reduce((m, ev) => Math.min(m, ev.created_at || m), cursor);
-          if (!Number.isFinite(oldest) || oldest >= cursor) break;
-          if (batch.length < 200) break;
-          cursor = oldest - 1;
-        }
-        resolve(Array.from(byId.values()));
-      })();
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const byId = new Map();
+
+    const flush = () => {
+      if (!cancelled) setProfileEvents(Array.from(byId.values()).sort((a, b) => b.created_at - a.created_at));
+    };
+
+    // Phase 1 — notes first (default tab); clears loading state when done
+    const notesSub = pool.request(relayUrls, [{ kinds: [1], authors: [pubkey], limit: 200 }]).subscribe({
+      next: raw => { eventStore.add(raw); byId.set(raw.id, raw); },
+      complete: () => { flush(); if (!cancelled) setProfileLoading(false); },
+      error:    () => { if (!cancelled) setProfileLoading(false); },
     });
+    activeSubs.push(notesSub);
 
-    const isReplyFn = e =>
-      e.kind === 1 && e.tags.some(t => t[0] === "e") && !isQuoteRepost(e);
-    const topLevelFn = e =>
-      e.kind === 6 || isQuoteRepost(e) || (e.kind === 1 && !e.tags.some(t => t[0] === "e"));
+    // Phase 2 — reposts + longform in parallel; merges into same byId
+    const otherSub = pool.request(relayUrls, [{ kinds: [6, 30023], authors: [pubkey], limit: 100 }]).subscribe({
+      next: raw => { eventStore.add(raw); byId.set(raw.id, raw); },
+      complete: flush,
+    });
+    activeSubs.push(otherSub);
 
-    (async () => {
-      let apiNotes = null;
-      let apiReplies = null;
-      try {
-        apiNotes = await fetchArchiveProfilePath(pubkey, "notes");
-      } catch {
-        apiNotes = null;
-      }
-      try {
-        apiReplies = await fetchArchiveProfilePath(pubkey, "replies");
-      } catch {
-        apiReplies = null;
-      }
+    // Fetch subject's contact list for circle count (skip for own profile)
+    if (!isOwn) {
+      const followsSub = pool.request(relayUrls, [{ kinds: [3], authors: [pubkey], limit: 1 }]).subscribe({
+        next: raw => {
+          if (cancelled) return;
+          const pks = raw.tags.filter(t => t[0] === "p" && isHexPubkey(t[1])).map(t => t[1]);
+          setSubjectFollows(pks);
+        },
+        complete: () => { if (!cancelled) setCircleLoading(false); },
+        error:    () => { if (!cancelled) setCircleLoading(false); },
+      });
+      activeSubs.push(followsSub);
+    }
 
-      let relay = [];
-      if (apiNotes === null || apiReplies === null) {
-        relay = await fetchRelayAll();
-      }
-
-      const byId = new Map();
-      const add = arr => {
-        for (const ev of arr || []) {
-          if (ev?.id) byId.set(ev.id, ev);
-        }
-      };
-
-      if (apiNotes !== null) add(apiNotes);
-      else add(relay.filter(e => e.pubkey === pubkey && topLevelFn(e)));
-
-      if (apiReplies !== null) add(apiReplies);
-      else add(relay.filter(e => e.pubkey === pubkey && isReplyFn(e)));
-
-      if (!cancelled) {
-        setProfileEvents(Array.from(byId.values()).sort((a, b) => b.created_at - a.created_at));
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [ndk, pubkey]);
+    return () => {
+      cancelled = true;
+      for (const sub of activeSubs) { try { sub.unsubscribe(); } catch {} }
+    };
+  }, [pubkey, isOwn]);
 
   const mergedEvents = useMemo(() => {
     const byId = new Map();
@@ -271,7 +244,7 @@ export default function ProfilePage({
         </button>
       </div>
 
-      <div className="profile-identity">
+      <div className="profile-identity" style={{ paddingBottom: 16 }}>
         <div className="profile-av-wrap">
           <div className="profile-av">
             {p.picture
@@ -283,6 +256,24 @@ export default function ProfilePage({
         <div className="profile-name">{name}</div>
         {p.nip05 && <div className="profile-nip05"><div className="profile-nip05-dot" /><Ck s={9} />{p.nip05}</div>}
         <NpubCopy pubkey={pubkey} />
+        {(() => {
+          const circleFollows = isOwn ? follows : subjectFollows;
+          if (circleLoading || circleFollows.length === 0) return null;
+          return (
+            <button
+              onClick={() => !circleLoading && onOpenCircle?.({ pubkey, follows: circleFollows })}
+              style={{
+                display: "flex", alignItems: "center", gap: 5,
+                background: "none", border: "none", padding: "2px 0", marginBottom: 8,
+                cursor: circleLoading ? "default" : "pointer", color: "var(--primary)",
+                fontSize: 14, fontWeight: 600, fontFamily: "'DM Sans',sans-serif",
+              }}
+            >
+              <div style={{ width: 9, height: 9, borderRadius: "50%", flexShrink: 0, ...(circleLoading ? { border: "1.5px solid var(--primary-soft)", borderTopColor: "var(--primary)", animation: "spin .7s linear infinite" } : { border: "1.5px solid var(--primary)" }) }} />
+              {!circleLoading && circleFollows.length > 0 && circleFollows.length}
+            </button>
+          );
+        })()}
         {p.about && <ProfileText className="profile-about" text={p.about} />}
         {websiteHref && (
           <a
@@ -299,67 +290,25 @@ export default function ProfilePage({
 
       <div className="profile-stats">
         <div className={`profile-stat ${tab === "notes" ? "active" : ""}`} onClick={() => setTab("notes")}>
-          <div className="profile-stat-val">{topLevel.length}</div>
           <div className="profile-stat-label">Notes</div>
         </div>
         <div className={`profile-stat ${tab === "replies" ? "active" : ""}`} onClick={() => setTab("replies")}>
-          <div className="profile-stat-val">{replies.length}</div>
           <div className="profile-stat-label">Replies</div>
         </div>
-        {isOwn && (
-          <div className={`profile-stat ${tab === "circle" ? "active" : ""}`} onClick={() => setTab("circle")}>
-            <div className="profile-stat-val">{follows.length}</div>
-            <div className="profile-stat-label">Circle</div>
-          </div>
-        )}
         {!isOwn && (
           <div className={`profile-stat ${tab === "between" ? "active" : ""}`} onClick={() => setTab("between")}>
-            <div className="profile-stat-val">{ixLoading ? "…" : betweenUs.length}</div>
             <div className="profile-stat-label">Between us</div>
           </div>
         )}
       </div>
 
-      {/* Circle tab */}
-      {tab === "circle" && isOwn && (
-        <>
-          <div className="circle-header">
-            <div className="circle-headline">
-              <span>{follows.length}</span> {follows.length === 1 ? "fren" : "frens"}<br />in your circle
-            </div>
-            <div className="circle-subline">The people whose signal you've chosen to follow</div>
-          </div>
-          <div className="circle-grid">
-            {follows.map((pk, i) => {
-              const fp = profiles?.[pk] || {};
-              const fn = displayName(pk, profiles);
-              return (
-                <div className="circle-card" key={pk} style={{ animationDelay: `${i * 0.04}s` }} onClick={() => onOpenProfile?.(pk)}>
-                  <div className="circle-card-inner">
-                    <div className="circle-card-av">
-                      {fp.picture
-                        ? <img src={fp.picture} alt={fn} onError={e => { e.target.style.display = "none"; }} />
-                        : fn[0]?.toUpperCase()}
-                    </div>
-                    <div className="circle-card-info">
-                      <div className="circle-card-name">{fn}</div>
-                      {fp.nip05 && <div className="circle-card-nip05"><Ck s={8} />{fp.nip05}</div>}
-                      {fp.about && <ProfileText className="circle-card-about" text={fp.about} clampLines={2} />}
-                      <div className="circle-card-npub">{shortNpub(pk)}</div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-
       {/* Notes tab */}
       {tab === "notes" && (
-        topLevel.length === 0
-          ? <div className="empty-state"><div className="empty-state-title">No notes yet</div><div className="empty-state-sub">Notes, reposts, and quote reposts will appear here</div></div>
-          : topLevel.sort((a, b) => b.created_at - a.created_at).map((e, i) => {
+        profileLoading && topLevel.length === 0
+          ? [0, 1, 2].map(i => <SkelCard key={i} />)
+          : topLevel.length === 0
+            ? <div className="empty-state"><div className="empty-state-title">No notes yet</div><div className="empty-state-sub">Notes, reposts, and quote reposts will appear here</div></div>
+            : topLevel.sort((a, b) => b.created_at - a.created_at).map((e, i) => {
               const isRepost      = e.kind === 6;
               const isQuote       = isQuoteRepost(e);
               const threadId      = threadTargetId(e);
@@ -372,7 +321,7 @@ export default function ProfilePage({
               const displayEv     = isRepost && repostedEvent ? repostedEvent : e;
 
               return (
-                <div className="note-card" key={e.id} style={{ animationDelay: `${i * 0.04}s` }}
+                <div className="note-card" key={e.id}
                   onClick={() => onOpenThread?.(isRepost && repostedEvent ? repostedEvent : e)}>
                   {isRepost && (
                     <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--text-faint)", marginBottom: 8, paddingLeft: 2 }}>
@@ -476,9 +425,11 @@ export default function ProfilePage({
 
       {/* Replies tab */}
       {tab === "replies" && (
-        replies.length === 0
-          ? <div className="empty-state"><div className="empty-state-title">No replies yet</div><div className="empty-state-sub">Replies to other notes will appear here</div></div>
-          : replies.map((e, i) => {
+        profileLoading && replies.length === 0
+          ? [0, 1, 2].map(i => <SkelCard key={i} />)
+          : replies.length === 0
+            ? <div className="empty-state"><div className="empty-state-title">No replies yet</div><div className="empty-state-sub">Replies to other notes will appear here</div></div>
+            : replies.map((e, i) => {
               const parentId = directReplyParentId(e);
               const parentEv = parentId ? mergedEvents.find(ev => ev.id === parentId) : null;
               let replyingToPk = parentEv?.pubkey ?? null;
@@ -500,7 +451,7 @@ export default function ProfilePage({
                   onPublish={onPublish} publishEvent={publishEvent} onPrepend={onPrepend}
                   getLocalZaps={getLocalZaps} addLocalZap={addLocalZap}
                   getLocalReactions={getLocalReactions} setLocalReaction={setLocalReaction}
-                  delay={i * 0.04}
+                  delay={0}
                 />
               );
             })
@@ -550,7 +501,7 @@ export default function ProfilePage({
                   onOpenThread={onOpenThread}
                   resolveEventById={resolveEventById}
                   allEvents={allEvents}
-                  delay={i * 0.04}
+                  delay={0}
                 />
               ))
       )}

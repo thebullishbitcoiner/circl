@@ -1,0 +1,64 @@
+import { EventStore } from "applesauce-core";
+import { RelayPool } from "applesauce-relay";
+import { RELAYS } from "./constants.js";
+
+export const eventStore = new EventStore();
+export const pool = new RelayPool();
+
+// ── Profile localStorage cache ──────────────────────────────────────────────
+// Seeded synchronously at module init so profiles are in EventStore before
+// the first React render — eliminates the npub flash on repeat visits.
+
+const PROFILE_CACHE_KEY = "circl_profiles_v1";
+const MAX_PROFILES = 500;
+
+function loadProfileCache() {
+  try {
+    const raw = localStorage.getItem(PROFILE_CACHE_KEY);
+    if (!raw) return;
+    const events = JSON.parse(raw);
+    for (const ev of Object.values(events)) eventStore.add(ev);
+  } catch {}
+}
+
+function saveProfileToCache(event) {
+  try {
+    const raw = localStorage.getItem(PROFILE_CACHE_KEY);
+    const cache = raw ? JSON.parse(raw) : {};
+    cache[event.pubkey] = event;
+    // Trim to MAX_PROFILES most recently seen (by object insertion order)
+    const keys = Object.keys(cache);
+    if (keys.length > MAX_PROFILES) {
+      for (const k of keys.slice(0, keys.length - MAX_PROFILES)) delete cache[k];
+    }
+    localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(cache));
+  } catch {}
+}
+
+// Seed on module load (sync) then persist new profiles reactively
+loadProfileCache();
+eventStore.insert$.subscribe(event => {
+  if (event.kind === 0) saveProfileToCache(event);
+});
+
+// ── NDK-compat subscribe wrapper ────────────────────────────────────────────
+
+export function nostrSubscribe(filters, opts = {}) {
+  const { onEvent, onEose, closeOnEose } = opts;
+  const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+  const wrap = ev => ({ ...ev, rawEvent: () => ev });
+
+  if (closeOnEose) {
+    const sub = pool.request(relayUrls, filters).subscribe({
+      next: ev => { eventStore.add(ev); onEvent?.(wrap(ev)); },
+      complete: () => onEose?.(),
+      error: () => onEose?.(),
+    });
+    return { stop: () => sub.unsubscribe() };
+  }
+
+  const sub = pool.subscription(relayUrls, filters).subscribe({
+    next: ev => { eventStore.add(ev); onEvent?.(wrap(ev)); },
+  });
+  return { stop: () => sub.unsubscribe() };
+}
