@@ -17,18 +17,21 @@ export const nip19 = {
   decode:     str => nip19Lib.decode(str),
 };
 
-export const shortNpub = pk => {
+export const truncNpub = pk => {
   const h = normPubkey(pk);
-  try { return nip19.npubEncode(h); } catch { return pk?.slice(0, 12) + "…"; }
+  try {
+    const npub = nip19.npubEncode(h);
+    return `${npub.slice(0, 11)}...${npub.slice(-11)}`;
+  } catch { return (pk?.slice(0, 8) ?? "") + "…"; }
 };
+
+export const shortNpub = truncNpub;
 
 export const nip05OrNpub = (pk, profiles) => {
   const k = normPubkey(pk);
   const nip05 = profiles?.[k]?.nip05;
   if (nip05) return nip05;
-  const npub  = nip19.npubEncode(k);
-  const clean = npub.includes("…") ? npub.replace("…", "") : npub;
-  return `${clean.slice(0, 11)}…${clean.slice(-6)}`;
+  return truncNpub(k);
 };
 
 export const relativeTime = ts => {

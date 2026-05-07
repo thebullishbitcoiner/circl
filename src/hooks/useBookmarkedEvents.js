@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { isHexPubkey, normPubkey } from "../utils.js";
+import { pool, eventStore } from "../nostr.js";
+import { RELAYS } from "../constants.js";
 
-/** Parse NIP-33 `a` value: `<kind>:<hex pubkey>:<d>`. */
 function parseAddressTag(val) {
   if (typeof val !== "string") return null;
   const m = val.match(/^(\d+):([0-9a-fA-F]{64}):([\s\S]+)$/);
@@ -13,97 +14,99 @@ function parseAddressTag(val) {
   return { kind, pubkey: pk, d };
 }
 
-/**
- * Resolve bookmark tag tuples into full events (notes by id, articles by address).
- * Order matches `bookmarkTags`. Omits entries relays do not return.
- */
 export default function useBookmarkedEvents({ ndk, bookmarkTags, localEvents = [] }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const instance = ndk?.current;
-    if (!instance) {
-      setEvents([]);
-      setLoading(false);
-      return;
-    }
-    if (!bookmarkTags?.length) {
-      setEvents([]);
-      setLoading(false);
-      return;
-    }
+    if (!bookmarkTags?.length) { setEvents([]); setLoading(false); return; }
 
     let cancelled = false;
     setLoading(true);
 
-    (async () => {
-      const localPool = [];
-      // Prefer already-loaded app events before hitting relays.
-      // This avoids false "missing" bookmarks when an event is present in another tab.
-      for (const ev of localEvents || []) {
-        if (ev?.id) localPool.push(ev);
-      }
-      const localById = new Map(localPool.map(ev => [ev.id, ev]));
-      const localArticleByAddr = new Map(
-        localPool
-          .filter(ev => ev?.kind === 30023 && ev?.id)
-          .map(ev => {
-            const d = ev.tags?.find(t => t[0] === "d")?.[1];
-            if (!d) return null;
-            const pk = normPubkey(ev.pubkey);
-            if (!isHexPubkey(pk)) return null;
-            return [`30023:${pk}:${d}`, ev];
-          })
-          .filter(Boolean)
-      );
-      const tags = bookmarkTags.filter(t => Array.isArray(t) && t.length >= 2);
-      const results = await Promise.all(
-        tags.map(async t => {
-          try {
-            if (t[0] === "e" && t[1]) {
-              const local = localById.get(t[1]);
-              if (local) return local;
-              const ev = await instance.fetchEvent({ ids: [t[1]], limit: 1 }, { closeOnEose: true });
-              return ev?.rawEvent() ?? null;
-            }
-            if (t[0] === "a" && t[1]) {
-              const addr = parseAddressTag(t[1]);
-              if (!addr || addr.kind !== 30023) return null;
-              const local = localArticleByAddr.get(t[1]);
-              if (local) return local;
-              const ev = await instance.fetchEvent(
-                { kinds: [30023], authors: [addr.pubkey], "#d": [addr.d], limit: 1 },
-                { closeOnEose: true }
-              );
-              return ev?.rawEvent() ?? null;
-            }
-          } catch {
-            return null;
-          }
-          return null;
+    const localPool = (localEvents || []).filter(ev => ev?.id);
+    const resolvedById = new Map(localPool.map(ev => [ev.id, ev]));
+    const resolvedByAddr = new Map(
+      localPool
+        .filter(ev => ev?.kind === 30023)
+        .flatMap(ev => {
+          const d = ev.tags?.find(t => t[0] === "d")?.[1];
+          const pk = normPubkey(ev.pubkey);
+          if (!d || !isHexPubkey(pk)) return [];
+          return [[`30023:${pk}:${d}`, ev]];
         })
-      );
+    );
 
-      if (cancelled) return;
+    const tags = bookmarkTags.filter(t => Array.isArray(t) && t.length >= 2);
 
-      const ordered = [];
-      const seen = new Set();
-      for (let i = 0; i < results.length; i++) {
-        const r = results[i];
-        if (r?.id && !seen.has(r.id)) {
-          seen.add(r.id);
-          ordered.push(r);
+    const missingE = [];
+    const missingA = [];
+    for (const t of tags) {
+      if (t[0] === "e" && t[1] && !resolvedById.has(t[1])) {
+        missingE.push(t[1]);
+      } else if (t[0] === "a" && t[1]) {
+        const addr = parseAddressTag(t[1]);
+        if (addr?.kind === 30023 && !resolvedByAddr.has(t[1])) {
+          missingA.push({ pubkey: addr.pubkey, d: addr.d });
         }
       }
-      setEvents(ordered);
-      setLoading(false);
-    })();
+    }
+
+    const buildOrdered = () => {
+      const seen = new Set();
+      const result = [];
+      for (const t of tags) {
+        let ev = null;
+        if (t[0] === "e") ev = resolvedById.get(t[1]);
+        else if (t[0] === "a") ev = resolvedByAddr.get(t[1]);
+        if (ev?.id && !seen.has(ev.id)) {
+          seen.add(ev.id);
+          result.push(ev);
+        }
+      }
+      return result;
+    };
+
+    if (!missingE.length && !missingA.length) {
+      if (!cancelled) { setEvents(buildOrdered()); setLoading(false); }
+      return;
+    }
+
+    const filters = [];
+    if (missingE.length) filters.push({ ids: missingE });
+    for (const { pubkey, d } of missingA) {
+      filters.push({ kinds: [30023], authors: [pubkey], "#d": [d] });
+    }
+
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+
+    const sub = pool.request(relayUrls, filters).subscribe({
+      next: raw => {
+        eventStore.add(raw);
+        resolvedById.set(raw.id, raw);
+        if (raw.kind === 30023) {
+          const d = raw.tags?.find(t => t[0] === "d")?.[1];
+          const pk = normPubkey(raw.pubkey);
+          if (d && isHexPubkey(pk)) resolvedByAddr.set(`30023:${pk}:${d}`, raw);
+        }
+      },
+      complete: () => {
+        if (cancelled) return;
+        setEvents(buildOrdered());
+        setLoading(false);
+      },
+      error: () => {
+        if (cancelled) return;
+        setEvents(buildOrdered());
+        setLoading(false);
+      },
+    });
 
     return () => {
       cancelled = true;
+      sub.unsubscribe();
     };
-  }, [ndk, bookmarkTags, localEvents]);
+  }, [bookmarkTags, localEvents]);
 
   return { events, loading };
 }

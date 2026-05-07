@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { isHexPubkey, normPubkey } from "../utils.js";
+import { pool, eventStore } from "../nostr.js";
+import { RELAYS } from "../constants.js";
 
-/** NIP-51 standard bookmark list (replaceable). */
 const BOOKMARK_LIST_KIND = 10003;
 
-/** Build NIP-51 tag for an event: `e` for notes, `a` for kind 30023 articles. */
 export function bookmarkTagFromEvent(event) {
   if (!event?.id || !event.pubkey) return null;
   const pk = normPubkey(event.pubkey);
@@ -51,51 +51,32 @@ function hasNip44() {
   );
 }
 
-/**
- * NIP-51 bookmarks (kind 10003) with NIP-44 encrypted `content` (JSON array of tags).
- * Public `e` / `a` tags on the event are merged for interoperability.
- */
 export default function useBookmarks({ ndk, pubkey, signAndPublish } = {}) {
   const [items, setItems] = useState([]);
   const itemsRef = useRef([]);
-  useEffect(() => {
-    itemsRef.current = items;
-  }, [items]);
+  useEffect(() => { itemsRef.current = items; }, [items]);
 
   useEffect(() => {
-    const instance = ndk?.current;
     const pk = normPubkey(pubkey);
-    if (!instance || !isHexPubkey(pk)) {
-      setItems([]);
-      return;
-    }
+    if (!isHexPubkey(pk)) { setItems([]); return; }
 
     let cancelled = false;
     setItems([]);
     const received = [];
-    const sub = instance.subscribe(
-      [{ kinds: [BOOKMARK_LIST_KIND], authors: [pk] }],
-      { closeOnEose: true }
-    );
 
-    sub.on("event", e => {
-      received.push(e.rawEvent());
-    });
-    sub.on("eose", () => {
-      if (cancelled) return;
-      try {
-        sub.stop();
-      } catch {}
-      const latest =
-        received.length === 0
-          ? null
-          : [...received].sort((a, b) => (b.created_at || 0) - (a.created_at || 0))[0];
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
 
-      const apply = async () => {
-        if (cancelled || !latest) {
-          if (!cancelled) setItems([]);
-          return;
-        }
+    const sub = pool.request(relayUrls, [{ kinds: [BOOKMARK_LIST_KIND], authors: [pk] }]).subscribe({
+      next: raw => { eventStore.add(raw); received.push(raw); },
+      complete: async () => {
+        if (cancelled) return;
+        const latest =
+          received.length === 0
+            ? null
+            : [...received].sort((a, b) => (b.created_at || 0) - (a.created_at || 0))[0];
+
+        if (!latest) { if (!cancelled) setItems([]); return; }
+
         let decrypted = [];
         const content = (latest.content || "").trim();
         if (content && hasNip44()) {
@@ -103,22 +84,18 @@ export default function useBookmarks({ ndk, pubkey, signAndPublish } = {}) {
             const plain = await window.nostr.nip44.decrypt(latest.pubkey, latest.content);
             const parsed = JSON.parse(plain);
             if (Array.isArray(parsed)) decrypted = parsed;
-          } catch {
-            /* wrong key, legacy cipher, or corrupt */
-          }
+          } catch {}
         }
         if (!cancelled) setItems(mergeBookmarkTags(decrypted, latest.tags));
-      };
-      void apply();
+      },
+      error: () => { if (!cancelled) setItems([]); },
     });
 
     return () => {
       cancelled = true;
-      try {
-        sub.stop();
-      } catch {}
+      sub.unsubscribe();
     };
-  }, [ndk, pubkey]);
+  }, [pubkey]);
 
   const persist = useCallback(
     async nextItems => {
