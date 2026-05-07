@@ -356,12 +356,12 @@ export default function App() {
                     {activeNav === "notifications" && "Notifications"}
                     {activeNav === "profile" && "Profile"}
                   </div>
-                  {activeNav === "bookmarks" && bookmarkItems.length > 0 && (
+                  {activeNav === "bookmarks" && bookmarkFeedEvents.length > 0 && (
                     <span style={{
                       background: "var(--primary)", color: "white",
                       borderRadius: 50, fontSize: 11, fontWeight: 500,
                       padding: "1px 8px", fontFamily: "'DM Sans',sans-serif",
-                    }}>{bookmarkItems.length}</span>
+                    }}>{bookmarkFeedEvents.length}</span>
                   )}
                 </div>
               </div>

@@ -3,6 +3,14 @@ import NDK, { NDKNip07Signer, NDKEvent } from "@nostr-dev-kit/ndk";
 import { RELAYS, NOSTR_CLIENT_TAG } from "../constants.js";
 import { isHexPubkey, normPubkey } from "../utils.js";
 
+function withTimeout(promise, ms, message) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 export default function useNDK() {
   const ndkRef = useRef(null);
   const [pubkey, setPubkey] = useState(null);
@@ -30,15 +38,26 @@ export default function useNDK() {
       if (!window.nostr) throw new Error("No Nostr extension found. Install Alby or nos2x.");
       const signer   = new NDKNip07Signer();
       const instance = new NDK({ explicitRelayUrls: RELAYS, signer });
-      await instance.connect();
-      const user = await signer.user();
+      await withTimeout(
+        instance.connect(),
+        12000,
+        "Connection timed out. Check your network/relay reachability and try again."
+      );
+      const user = await withTimeout(
+        signer.user(),
+        10000,
+        "Extension did not respond in time. Reopen your Nostr wallet/extension and try again."
+      );
       const pk   = normPubkey(user.pubkey);
+      if (!isHexPubkey(pk)) throw new Error("Extension returned an invalid pubkey.");
       ndkRef.current = instance;
       setPubkey(pk);
       setStatus("ready");
       sessionStorage.setItem("circl_pk", pk);
     } catch (e) {
-      setError(e.message);
+      setError(e?.message || "Failed to connect.");
+      try { ndkRef.current?.pool?.close?.(); } catch {}
+      ndkRef.current = null;
       setStatus("idle");
     }
   }, []);
