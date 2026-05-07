@@ -128,7 +128,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
               <Avatar pk={replyTo.pubkey} profiles={profiles} size={24} />
               <div>
                 <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted)" }}>{displayName(replyTo.pubkey, profiles)}</span>
-                <p style={{ fontFamily: "'Lora',serif", fontSize: 12.5, color: "var(--text-muted)", margin: "2px 0 0", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12.5, color: "var(--text-muted)", margin: "2px 0 0", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                   {replyTo.content}
                 </p>
               </div>
@@ -210,7 +210,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
                 <Avatar pk={quotedEvent.pubkey} profiles={profiles} size={20} />
                 <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text)" }}>{displayName(quotedEvent.pubkey, profiles)}</span>
               </div>
-              <p style={{ fontFamily: "'Lora',serif", fontSize: 13, color: "var(--text-muted)", margin: 0, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+              <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: "var(--text-muted)", margin: 0, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                 {quotedEvent.content}
               </p>
             </div>

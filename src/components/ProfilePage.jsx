@@ -5,7 +5,7 @@ import NoteContent from "./NoteContent.jsx";
 import NoteCard from "./NoteCard.jsx";
 import NoteActions from "./NoteActions.jsx";
 import { Bk, Ck } from "./icons.jsx";
-import { displayName, nip05OrNpub, relativeTime, shortNpub, avatarUrl, isQuoteRepost, replyCount, repostAndQuoteCount, normPubkey, directReplyParentId } from "../utils.js";
+import { displayName, nip05OrNpub, relativeTime, shortNpub, avatarUrl, isQuoteRepost, replyCount, repostAndQuoteCount, normPubkey, directReplyParentId, parseKind6EmbeddedEvent } from "../utils.js";
 import { nip19 } from "../utils.js";
 import useInteractions from "../hooks/useInteractions.js";
 
@@ -33,18 +33,6 @@ function NpubCopy({ pubkey }) {
       </button>
     </div>
   );
-}
-
-/** Kind 6 content often embeds the full reposted note as JSON (NIP-18). */
-function parseKind6EmbeddedEvent(e) {
-  if (e?.kind !== 6 || typeof e.content !== "string") return null;
-  const t = e.content.trim();
-  if (!t.startsWith("{")) return null;
-  try {
-    const j = JSON.parse(t);
-    if (j?.id && j?.pubkey && typeof j.kind === "number" && Array.isArray(j.tags)) return j;
-  } catch {}
-  return null;
 }
 
 function threadTargetId(e) {
@@ -415,7 +403,7 @@ export default function ProfilePage({
                       </div>
                       {isQuote && e.content && <NoteContent content={e.content.replace(/\nnostr:\S+/g, "").trim()} profiles={profiles} onOpenProfile={onOpenProfile} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} style={{ marginBottom: 8 }} />}
                       {isRepost && repostedEvent && <NoteContent content={repostedEvent.content} profiles={profiles} onOpenProfile={onOpenProfile} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} />}
-                      {isRepost && !repostedEvent && <p style={{ fontFamily: "'Lora',serif", fontSize: 13, color: "var(--text-faint)", fontStyle: "italic" }}>Original note not in feed</p>}
+                      {isRepost && !repostedEvent && <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: "var(--text-faint)" }}>Original note not in feed</p>}
                       {!isRepost && !isQuote && <NoteContent content={e.content} profiles={profiles} onOpenProfile={onOpenProfile} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} />}
                       {isQuote && (
                         repostedEvent ? (
@@ -469,7 +457,7 @@ export default function ProfilePage({
                   events={mergedEvents}
                   resolveEventById={resolveEventById}
                   replyingToPubkey={replyingToPk}
-                  liked={false} bookmarked={isBookmarked?.(e.id) || false} likeCount={0}
+                  liked={false} bookmarked={isBookmarked?.(e) || false} likeCount={0}
                   replyCount={replyCount(e.id, mergedEvents)} repostCount={repostAndQuoteCount(e.id, mergedEvents)}
                   myPubkey={myPubkey} myProfile={myProfile}
                   onLike={() => {}} onBookmark={onBookmark}

@@ -30,7 +30,7 @@ export default function ZapBadges({ zaps, eventId, profiles, onOpenProfile, onOp
             <div className="zap-badge-top-amt">
               {fmtSats(top.amount)}
               {top.comment && (
-                <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 5, fontFamily: "'Lora',serif", fontStyle: "italic", fontSize: 10.5 }}>
+                <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 5, fontFamily: "'DM Sans',sans-serif", fontSize: 10.5 }}>
                   {top.comment}
                 </span>
               )}

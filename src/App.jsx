@@ -10,10 +10,12 @@ import {
   isHexPubkey,
   normPubkey,
   nip19,
+  parseKind6EmbeddedEvent,
 } from "./utils.js";
 import useNDK from "./hooks/useNDK.js";
 import useFollows from "./hooks/useFollows.js";
 import useFeed from "./hooks/useFeed.js";
+import useNotifications from "./hooks/useNotifications.js";
 import useProfiles from "./hooks/useProfiles.js";
 import useBookmarks from "./hooks/useBookmarks.js";
 import usePublish from "./hooks/usePublish.js";
@@ -32,6 +34,7 @@ import ArticleReader from "./components/ArticleReader.jsx";
 import ComposeSheet from "./components/ComposeSheet.jsx";
 import ProfilePage from "./components/ProfilePage.jsx";
 import ThreadView from "./components/ThreadView.jsx";
+import NotificationsFeed from "./components/NotificationsFeed.jsx";
 import { ZapsScreen, ReactionsScreen, RepostsScreen } from "./components/ListScreens.jsx";
 import SwipePanel from "./components/SwipePanel.jsx";
 import Avatar from "./components/Avatar.jsx";
@@ -76,6 +79,7 @@ export default function App() {
     setLocalReaction,
     addLocalZap,
   });
+  const { items: notificationEvents, loading: notifLoading } = useNotifications({ ndk, pubkey });
   const pendingEventFetches = useRef(new Set());
   const resolveEventById = useCallback(async eventId => {
     if (!eventId) return null;
@@ -146,11 +150,15 @@ export default function App() {
       const k = normPubkey(pubkey);
       if (isHexPubkey(k)) s.add(k);
     }
+    for (const n of notificationEvents) {
+      const k = normPubkey(n.pubkey);
+      if (isHexPubkey(k)) s.add(k);
+    }
     return [...s].sort();
-  }, [events, follows, pubkey, zapsByEvent, reactionsByEvent]);
+  }, [events, follows, pubkey, zapsByEvent, reactionsByEvent, notificationEvents]);
   const { profiles } = useProfiles({ ndk, pubkeys: allPks });
 
-  const { toggle: toggleBm, isBookmarked } = useBookmarks();
+  const { toggle: toggleBm, isBookmarked } = useBookmarks({ ndk, pubkey, signAndPublish });
   const { publish, publishEvent } = usePublish({ signAndPublish, pubkey });
   const isMobile = useIsMobile();
   const { dark, toggle: toggleDark } = useDarkMode();
@@ -208,16 +216,55 @@ export default function App() {
     toastRef.current = setTimeout(() => setToast(t => ({ ...t, show: false })), 2200);
   };
 
+  const handleOpenNotification = async ev => {
+    if (ev.kind === 30023) {
+      setOpenArticle(ev);
+      return;
+    }
+    if (ev.kind === 1) {
+      handleOpenThread(ev);
+      return;
+    }
+    if (ev.kind === 6) {
+      const emb = parseKind6EmbeddedEvent(ev);
+      if (emb) {
+        handleOpenThread(emb);
+        return;
+      }
+      const id = ev.tags?.find(t => t[0] === "e")?.[1];
+      if (id) {
+        const r = await resolveEventById(id);
+        if (r) handleOpenThread(r);
+        else showToast("Could not load that note");
+      }
+      return;
+    }
+    if (ev.kind === 7 || ev.kind === 9735) {
+      const id = ev.tags?.find(t => t[0] === "e")?.[1];
+      if (!id) {
+        showToast("No note linked to this event");
+        return;
+      }
+      const r = await resolveEventById(id);
+      if (r) handleOpenThread(r);
+      else showToast("Could not load that note");
+    }
+  };
+
   const getLike = (id, def = 0) => likes[id] || { liked: false, count: def };
   const handleLike = id =>
     setLikes(p => {
       const c = p[id] || { liked: false, count: 0 };
       return { ...p, [id]: { liked: !c.liked, count: c.liked ? c.count - 1 : c.count + 1 } };
     });
-  const handleBookmark = id => {
-    const was = isBookmarked(id);
-    toggleBm(id);
-    showToast(was ? "Removed from bookmarks" : "Saved to bookmarks");
+  const handleBookmark = async event => {
+    try {
+      const was = isBookmarked(event);
+      await toggleBm(event);
+      showToast(was ? "Removed from bookmarks" : "Saved to bookmarks");
+    } catch (e) {
+      showToast(e?.message || "Could not update bookmarks");
+    }
   };
 
   const navigate = nav => {
@@ -229,7 +276,7 @@ export default function App() {
     if (nav === "profile") pushNav({ type: "profile", payload: pubkey });
   };
 
-  const bmEvents = events.filter(e => isBookmarked(e.id));
+  const bmEvents = events.filter(e => isBookmarked(e));
   const displayEvs = activeNav === "bookmarks" ? bmEvents : events;
   const isLoading = fl || el;
   const anyPanelOpen = settingsOpen || !!openArticle || navStack.length > 0;
@@ -336,7 +383,7 @@ export default function App() {
                                     event={ev}
                                     profiles={profiles}
                                     liked={getLike(ev.id).liked}
-                                    bookmarked={isBookmarked(ev.id)}
+                                    bookmarked={isBookmarked(ev)}
                                     likeCount={getLike(ev.id).count}
                                     onLike={handleLike}
                                     onBookmark={handleBookmark}
@@ -382,7 +429,7 @@ export default function App() {
                                       resolveEventById={resolveEventById}
                                       profiles={profiles}
                                       liked={getLike(ev.id).liked}
-                                      bookmarked={isBookmarked(ev.id)}
+                                      bookmarked={isBookmarked(ev)}
                                       likeCount={getLike(ev.id).count}
                                       replyCount={replyCount(ev.id, events)}
                                       repostCount={repostAndQuoteCount(ev.id, events)}
@@ -416,10 +463,23 @@ export default function App() {
                       })()
                 )}
                 {activeNav === "notifications" && (
-                  <div className="empty-state">
-                    <div className="empty-state-title">Coming soon</div>
-                    <div className="empty-state-sub">Mentions and replies will appear here</div>
-                  </div>
+                  notifLoading && notificationEvents.length === 0
+                    ? [0, 1, 2, 3].map(i => <SkelCard key={i} />)
+                    : (
+                      <>
+                        <NotificationsFeed
+                          items={notificationEvents.slice(0, visibleCount)}
+                          profiles={profiles}
+                          onOpenProfile={handleOpenProfile}
+                          onOpenNotification={handleOpenNotification}
+                        />
+                        {visibleCount < notificationEvents.length && (
+                          <div style={{ padding: "20px", textAlign: "center" }}>
+                            <div style={{ width: 20, height: 20, border: "2px solid var(--border)", borderTopColor: "var(--primary)", borderRadius: "50%", animation: "spin .7s linear infinite", margin: "0 auto" }} />
+                          </div>
+                        )}
+                      </>
+                    )
                 )}
               </div>
               {(activeNav === "home" || activeNav === "profile") && !anyPanelOpen && !openArticle && (
@@ -436,15 +496,15 @@ export default function App() {
                       background: "var(--primary)",
                       color: "white",
                       border: "none",
-                      boxShadow: "0 4px 16px rgba(212,113,58,.45)",
+                      boxShadow: "0 4px 16px rgba(109,40,217,.45)",
                       cursor: "pointer",
                       display: "flex", alignItems: "center", justifyContent: "center",
                       fontSize: 26, fontWeight: 300,
                       zIndex: 150,
                       transition: "transform .15s, box-shadow .15s",
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.boxShadow = "0 6px 24px rgba(212,113,58,.55)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 4px 16px rgba(212,113,58,.45)"; }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.boxShadow = "0 6px 24px rgba(109,40,217,.55)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 4px 16px rgba(109,40,217,.45)"; }}
                   >+
                   </button>
                   {floatingCompose && (
@@ -467,7 +527,7 @@ export default function App() {
                     event={openArticle}
                     profiles={profiles}
                     liked={getLike(openArticle.id).liked}
-                    bookmarked={isBookmarked(openArticle.id)}
+                    bookmarked={isBookmarked(openArticle)}
                     likeCount={getLike(openArticle.id).count}
                     onLike={handleLike}
                     onBookmark={handleBookmark}

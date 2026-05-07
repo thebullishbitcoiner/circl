@@ -80,7 +80,7 @@ export default function LongformCard({ event, profiles, liked, bookmarked, likeC
                 <span className="lf-readtime"><Cl />{art.readtime}</span>
                 <div className="lf-actions">
                   <button className={`action-btn ${liked ? "liked" : ""}`} onClick={e => { e.stopPropagation(); onLike(event.id); }}><Hi f={liked} />{likeCount}</button>
-                  <button className={`action-btn ${bookmarked ? "saved" : ""}`} onClick={e => { e.stopPropagation(); onBookmark(event.id); }}><Bi f={bookmarked} /></button>
+                  <button className={`action-btn ${bookmarked ? "saved" : ""}`} onClick={e => { e.stopPropagation(); onBookmark(event); }}><Bi f={bookmarked} /></button>
                 </div>
               </div>
             </div>

@@ -17,7 +17,7 @@ function ListScreen({ title, subtitle, children, onBack }) {
       <div className="panel-bar">
         <button className="back-btn" onClick={onBack}><Bk s={16} /></button>
         <div>
-          <span style={{ fontFamily: "'Fraunces',serif", fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{title}</span>
+          <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{title}</span>
           {subtitle && <span style={{ fontSize: 11, color: "var(--text-faint)", marginLeft: 8 }}>{subtitle}</span>}
         </div>
       </div>

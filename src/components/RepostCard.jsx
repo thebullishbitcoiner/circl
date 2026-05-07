@@ -65,7 +65,7 @@ export default function RepostCard({
           </div>
         </div>
       ) : (
-        <div style={{ fontFamily: "'Lora',serif", fontSize: 13, color: "var(--text-faint)", fontStyle: "italic", padding: "4px 0" }}>
+        <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: "var(--text-faint)", padding: "4px 0" }}>
           Original note not available
         </div>
       )}

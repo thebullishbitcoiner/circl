@@ -91,7 +91,7 @@ export default function NoteActions({
           >
             {reaction && reaction !== "🧡"
               ? <span style={{ fontSize: 14, lineHeight: 1 }}>{reaction}</span>
-              : <svg width={14} height={14} viewBox="0 0 24 24" fill={reaction ? "#D4713A" : "none"} stroke={reaction ? "#D4713A" : "currentColor"} strokeWidth={2}><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
+              : <svg width={14} height={14} viewBox="0 0 24 24" fill={reaction ? "var(--primary)" : "none"} stroke={reaction ? "var(--primary)" : "currentColor"} strokeWidth={2}><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
             }
             {reactions.length || ""}
           </button>
@@ -103,9 +103,9 @@ export default function NoteActions({
             onClick={e => { e.stopPropagation(); openModal(<RepostSheet event={event} profiles={profiles} publishEvent={publishEvent} onPrepend={onPrepend} onQuoteRepost={() => openModal(<ComposeSheet quotedEvent={event} profiles={profiles} myPubkey={myPubkey} myProfile={myProfile} events={allEvents} publishEvent={publishEvent} onPrepend={onPrepend} onDismiss={dismiss} />)} onDismiss={dismiss} />); }}>
             <Rpi />{repostAndQuoteCount(event.id, allEvents) || ""}
           </button>
-          <button className={`action-btn${isBookmarked?.(event.id) ? " saved" : ""}`}
-            onClick={e => { e.stopPropagation(); onBookmark?.(event.id); }}>
-            <Bi f={!!isBookmarked?.(event.id)} />
+          <button className={`action-btn${isBookmarked?.(event) ? " saved" : ""}`}
+            onClick={e => { e.stopPropagation(); onBookmark?.(event); }}>
+            <Bi f={!!isBookmarked?.(event)} />
           </button>
         </div>
       </div>

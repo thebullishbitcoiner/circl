@@ -201,6 +201,29 @@ export const parseBolt11Msats = bolt11 => {
   return Math.round(sats * 1000);
 };
 
+/** Kind 6 content often embeds the full reposted note as JSON (NIP-18). */
+export function parseKind6EmbeddedEvent(e) {
+  if (e?.kind !== 6 || typeof e.content !== "string") return null;
+  const t = e.content.trim();
+  if (!t.startsWith("{")) return null;
+  try {
+    const j = JSON.parse(t);
+    if (j?.id && j?.pubkey && typeof j.kind === "number" && Array.isArray(j.tags)) return j;
+  } catch {}
+  return null;
+}
+
+/** Zap comment text from kind 9735 `description` tag (JSON). */
+export function zapCommentFromKind9735(ev) {
+  const desc = ev?.tags?.find(t => t[0] === "description")?.[1];
+  if (!desc) return "";
+  try {
+    return String(JSON.parse(desc)?.content || "").trim();
+  } catch {
+    return "";
+  }
+}
+
 const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp|avif|svg)(\?|#|$)/i;
 const VIDEO_EXT_RE = /\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i;
 

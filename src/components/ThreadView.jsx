@@ -221,7 +221,7 @@ export default function ThreadView({
     <div ref={containerRef} className="slide-panel-scroll">
       <div className="panel-bar">
         <button className="back-btn" onClick={onBack}><Bk s={16} /></button>
-        <span style={{ fontFamily: "'Fraunces',serif", fontSize: 15, fontWeight: 600, color: "var(--text)" }}>Thread</span>
+        <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 15, fontWeight: 600, color: "var(--text)" }}>Thread</span>
       </div>
 
       {parents.map(e => (

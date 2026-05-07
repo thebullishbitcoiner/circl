@@ -41,7 +41,7 @@ export default function ArticleReader({
         <span className="panel-bar-logo">Circl</span>
         <div style={{ display: "flex", gap: 3 }}>
           <button className={`icon-btn ${liked ? "r-liked" : ""}`} onClick={() => onLike(event.id)}><Hi f={liked} /></button>
-          <button className={`icon-btn ${bookmarked ? "r-saved" : ""}`} onClick={() => onBookmark(event.id)}><Bi f={bookmarked} /></button>
+          <button className={`icon-btn ${bookmarked ? "r-saved" : ""}`} onClick={() => onBookmark(event)}><Bi f={bookmarked} /></button>
           <button className="icon-btn"><Sh /></button>
         </div>
       </div>
@@ -88,7 +88,7 @@ export default function ArticleReader({
             <button className={`rx-btn rx-liked ${liked ? "rx-active" : ""}`} onClick={() => onLike(event.id)}><Hi f={liked} />{likeCount}</button>
             <button className="rx-btn"><Ri /> Reply</button>
             <button className="rx-btn"><Zi /> Zap</button>
-            <button className={`rx-btn ${bookmarked ? "rx-active" : ""}`} onClick={() => onBookmark(event.id)} style={{ marginLeft: "auto" }}><Bi f={bookmarked} />{bookmarked ? "Saved" : "Save"}</button>
+            <button className={`rx-btn ${bookmarked ? "rx-active" : ""}`} onClick={() => onBookmark(event)} style={{ marginLeft: "auto" }}><Bi f={bookmarked} />{bookmarked ? "Saved" : "Save"}</button>
           </div>
           <div className="author-card" style={{ cursor: "pointer" }} onClick={() => onOpenProfile?.(event.pubkey)}>
             <div className="author-card-av"><Avatar pk={event.pubkey} profiles={profiles} size={44} /></div>
