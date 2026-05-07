@@ -163,6 +163,9 @@ export default function App() {
   const { dark, toggle: toggleDark } = useDarkMode();
 
   const [activeNav, setActiveNav] = useState("home");
+  const [lastNotifSeenAt, setLastNotifSeenAt] = useState(() => {
+    try { return parseInt(localStorage.getItem("circl_notif_seen_v1") || "0", 10); } catch { return 0; }
+  });
   const [openArticle, setOpenArticle] = useState(null);
   const [navStack, setNavStack] = useState([]);
 
@@ -268,6 +271,8 @@ export default function App() {
     }
   };
 
+  const hasUnread = (notificationEvents[0]?.created_at ?? 0) > lastNotifSeenAt;
+
   const navigate = nav => {
     setActiveNav(nav);
     setOpenArticle(null);
@@ -275,6 +280,11 @@ export default function App() {
     setSettingsOpen(false);
     clearNav();
     if (nav === "profile") pushNav({ type: "profile", payload: pubkey });
+    if (nav === "notifications") {
+      const now = Math.floor(Date.now() / 1000);
+      setLastNotifSeenAt(now);
+      try { localStorage.setItem("circl_notif_seen_v1", String(now)); } catch {}
+    }
   };
 
   const displayEvs = activeNav === "bookmarks" ? bookmarkFeedEvents : events;
@@ -315,8 +325,11 @@ export default function App() {
           <div className="logo"><div className="logo-dot" />Circl</div>
           {navItems.map(item => (
             <button key={item.id} className={`nav-item ${activeNav === item.id ? "active" : ""}`} onClick={() => navigate(item.id)}>
-              {item.SbIcon}{item.label}
-              {item.id === "bookmarks" && ""}
+              <div style={{ position: "relative", display: "inline-flex" }}>
+                {item.SbIcon}
+                {item.id === "notifications" && hasUnread && <div className="notif-unread-dot" />}
+              </div>
+              {item.label}
             </button>
           ))}
           <button className={`nav-item ${settingsOpen ? "active" : ""}`} onClick={() => { setOpenArticle(null); clearNav(); setSettingsOpen(true); }}>
@@ -475,6 +488,7 @@ export default function App() {
                           profiles={profiles}
                           onOpenProfile={handleOpenProfile}
                           onOpenNotification={handleOpenNotification}
+                          allEvents={mergedFeedPool}
                         />
                         {visibleCount < notificationEvents.length && (
                           <div style={{ padding: "20px", textAlign: "center" }}>
@@ -790,7 +804,10 @@ export default function App() {
         <div className="bottom-nav-inner">
           {navItems.slice(0, 2).map(item => (
             <button key={item.id} type="button" className={`bottom-nav-item ${!settingsOpen && activeNav === item.id ? "active" : ""}`} onClick={() => navigate(item.id)}>
-              {item.NavIcon}
+              <div style={{ position: "relative", display: "inline-flex" }}>
+                {item.NavIcon}
+                {item.id === "notifications" && hasUnread && <div className="notif-unread-dot" />}
+              </div>
               <span className="bottom-nav-label">{item.label}</span>
             </button>
           ))}
