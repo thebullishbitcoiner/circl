@@ -368,11 +368,13 @@ export default function App() {
                         </div>
                       )
                       : (() => {
-                        const filtered = displayEvs.filter(ev =>
-                          ev.kind === 30023 ||
-                          ev.kind === 6 ||
-                          !ev.tags.some(t => t[0] === "e" && t[3] !== "mention")
-                        );
+                        const filtered = activeNav === "bookmarks"
+                          ? displayEvs
+                          : displayEvs.filter(ev =>
+                              ev.kind === 30023 ||
+                              ev.kind === 6 ||
+                              !ev.tags.some(t => t[0] === "e" && t[3] !== "mention")
+                            );
                         const visible = filtered.slice(0, visibleCount);
                         return (
                           <>
