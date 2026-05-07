@@ -18,6 +18,7 @@ import useFeed from "./hooks/useFeed.js";
 import useNotifications from "./hooks/useNotifications.js";
 import useProfiles from "./hooks/useProfiles.js";
 import useBookmarks from "./hooks/useBookmarks.js";
+import useBookmarkedEvents from "./hooks/useBookmarkedEvents.js";
 import usePublish from "./hooks/usePublish.js";
 import useIsMobile from "./hooks/useIsMobile.js";
 import useDarkMode from "./hooks/useDarkMode.js";
@@ -80,10 +81,22 @@ export default function App() {
     addLocalZap,
   });
   const { items: notificationEvents, loading: notifLoading } = useNotifications({ ndk, pubkey });
+  const { toggle: toggleBm, isBookmarked, bookmarkItems } = useBookmarks({ ndk, pubkey, signAndPublish });
+  const { events: bookmarkFeedEvents, loading: bookmarkFeedLoading } = useBookmarkedEvents({
+    ndk,
+    bookmarkTags: bookmarkItems,
+  });
+
+  const mergedFeedPool = useMemo(() => {
+    const m = new Map(events.map(e => [e.id, e]));
+    for (const e of bookmarkFeedEvents) m.set(e.id, e);
+    return [...m.values()];
+  }, [events, bookmarkFeedEvents]);
+
   const pendingEventFetches = useRef(new Set());
   const resolveEventById = useCallback(async eventId => {
     if (!eventId) return null;
-    const existing = events.find(e => e.id === eventId);
+    const existing = mergedFeedPool.find(e => e.id === eventId);
     if (existing) return existing;
     const instance = ndk?.current;
     if (!instance || pendingEventFetches.current.has(eventId)) return null;
@@ -109,11 +122,11 @@ export default function App() {
         finish(null);
       });
     });
-  }, [events, ndk, prependEvent]);
+  }, [mergedFeedPool, ndk, prependEvent]);
 
   const allPks = useMemo(() => {
     const s = new Set();
-    for (const e of events) {
+    for (const e of mergedFeedPool) {
       const k = normPubkey(e.pubkey);
       if (isHexPubkey(k)) s.add(k);
       for (const t of e.tags || []) {
@@ -155,10 +168,8 @@ export default function App() {
       if (isHexPubkey(k)) s.add(k);
     }
     return [...s].sort();
-  }, [events, follows, pubkey, zapsByEvent, reactionsByEvent, notificationEvents]);
+  }, [mergedFeedPool, follows, pubkey, zapsByEvent, reactionsByEvent, notificationEvents]);
   const { profiles } = useProfiles({ ndk, pubkeys: allPks });
-
-  const { toggle: toggleBm, isBookmarked } = useBookmarks({ ndk, pubkey, signAndPublish });
   const { publish, publishEvent } = usePublish({ signAndPublish, pubkey });
   const isMobile = useIsMobile();
   const { dark, toggle: toggleDark } = useDarkMode();
@@ -276,8 +287,7 @@ export default function App() {
     if (nav === "profile") pushNav({ type: "profile", payload: pubkey });
   };
 
-  const bmEvents = events.filter(e => isBookmarked(e));
-  const displayEvs = activeNav === "bookmarks" ? bmEvents : events;
+  const displayEvs = activeNav === "bookmarks" ? bookmarkFeedEvents : events;
   const isLoading = fl || el;
   const anyPanelOpen = settingsOpen || !!openArticle || navStack.length > 0;
   const myProfile = profiles[pubkey];
@@ -346,18 +356,19 @@ export default function App() {
                     {activeNav === "notifications" && "Notifications"}
                     {activeNav === "profile" && "Profile"}
                   </div>
-                  {activeNav === "bookmarks" && bmEvents.length > 0 && (
+                  {activeNav === "bookmarks" && bookmarkItems.length > 0 && (
                     <span style={{
                       background: "var(--primary)", color: "white",
                       borderRadius: 50, fontSize: 11, fontWeight: 500,
                       padding: "1px 8px", fontFamily: "'DM Sans',sans-serif",
-                    }}>{bmEvents.length}</span>
+                    }}>{bookmarkItems.length}</span>
                   )}
                 </div>
               </div>
               <div className="feed-scroll" ref={feedScrollRef} onScroll={handleFeedScroll}>
                 {(activeNav === "home" || activeNav === "bookmarks") && (
-                  isLoading && events.length === 0
+                  (activeNav === "home" && isLoading && events.length === 0) ||
+                  (activeNav === "bookmarks" && bookmarkFeedLoading && bookmarkItems.length > 0)
                     ? [0, 1, 2, 3].map(i => <SkelCard key={i} />)
                     : displayEvs.length === 0
                       ? (
@@ -398,7 +409,7 @@ export default function App() {
                                       key={ev.id}
                                       event={ev}
                                       profiles={profiles}
-                                      events={events}
+                                      events={mergedFeedPool}
                                       resolveEventById={resolveEventById}
                                       myPubkey={pubkey}
                                       myProfile={myProfile}
@@ -425,14 +436,14 @@ export default function App() {
                                     <NoteCard
                                       key={ev.id}
                                       event={ev}
-                                      events={events}
+                                      events={mergedFeedPool}
                                       resolveEventById={resolveEventById}
                                       profiles={profiles}
                                       liked={getLike(ev.id).liked}
                                       bookmarked={isBookmarked(ev)}
                                       likeCount={getLike(ev.id).count}
-                                      replyCount={replyCount(ev.id, events)}
-                                      repostCount={repostAndQuoteCount(ev.id, events)}
+                                      replyCount={replyCount(ev.id, mergedFeedPool)}
+                                      repostCount={repostAndQuoteCount(ev.id, mergedFeedPool)}
                                       myPubkey={pubkey}
                                       myProfile={myProfile}
                                       onLike={handleLike}
@@ -533,7 +544,7 @@ export default function App() {
                     onBookmark={handleBookmark}
                     onBack={() => setOpenArticle(null)}
                     onOpenProfile={pk => { setOpenArticle(null); handleOpenProfile(pk); }}
-                    allEvents={events}
+                    allEvents={mergedFeedPool}
                     onOpenThread={handleOpenThread}
                     resolveEventById={resolveEventById}
                   />
@@ -552,7 +563,7 @@ export default function App() {
                         myPubkey={pubkey}
                         profiles={profiles}
                         follows={follows}
-                        events={events}
+                        events={mergedFeedPool}
                         ndk={ndk}
                         isOwn={top.payload === pubkey}
                         backLabel={backLabel}
@@ -585,7 +596,7 @@ export default function App() {
                       <ThreadView
                         key={top.payload.id}
                         focusedEvent={top.payload}
-                        events={events}
+                        events={mergedFeedPool}
                         profiles={profiles}
                         onBack={handleBack}
                         onOpenProfile={handleOpenProfile}
@@ -647,7 +658,7 @@ export default function App() {
                         onBack={handleBack}
                         onOpenProfile={handleOpenProfile}
                         onOpenThread={handleOpenThread}
-                    allEvents={events}
+                    allEvents={mergedFeedPool}
                     resolveEventById={resolveEventById}
                       />
                     );
@@ -657,7 +668,7 @@ export default function App() {
                     const ev = top.payload;
                     const isQ = isQuoteRepost(ev);
                     const repostedId = ev.tags.find(t => t[0] === "e")?.[1];
-                    const repostedEv = repostedId ? events.find(e => e.id === repostedId) : null;
+                    const repostedEv = repostedId ? mergedFeedPool.find(e => e.id === repostedId) : null;
                     return (
                       <div className="slide-panel-scroll">
                         <div className="panel-bar">
@@ -680,7 +691,7 @@ export default function App() {
                                     content={ev.content.replace(/\nnostr:\S+/g, "").trim()}
                                     profiles={profiles}
                                     onOpenProfile={handleOpenProfile}
-                                    allEvents={events}
+                                    allEvents={mergedFeedPool}
                                     onOpenThread={handleOpenThread}
                                     resolveEventById={resolveEventById}
                                   />
@@ -690,7 +701,7 @@ export default function App() {
                                     content={ev.content}
                                     profiles={profiles}
                                     onOpenProfile={handleOpenProfile}
-                                    allEvents={events}
+                                    allEvents={mergedFeedPool}
                                     onOpenThread={handleOpenThread}
                                     resolveEventById={resolveEventById}
                                   />
@@ -711,7 +722,7 @@ export default function App() {
                                       content={repostedEv.content}
                                       profiles={profiles}
                                       onOpenProfile={handleOpenProfile}
-                                  allEvents={events}
+                                  allEvents={mergedFeedPool}
                                   onOpenThread={handleOpenThread}
                                   resolveEventById={resolveEventById}
                                       className="note-text"

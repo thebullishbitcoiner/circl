@@ -54,6 +54,7 @@ export default function useNotifications({ ndk, pubkey }) {
     const pk = normPubkey(pubkey);
     if (!instance || !isHexPubkey(pk)) {
       setItems([]);
+      setLoading(false);
       return;
     }
 
@@ -73,10 +74,11 @@ export default function useNotifications({ ndk, pubkey }) {
       if (seen.current.has(raw.id)) return;
       seen.current.add(raw.id);
       setItems(prev => sortMerge(prev, raw));
-      setLoading(false);
     });
 
-    sub.on("eose", () => setLoading(false));
+    sub.on("eose", () => {
+      setLoading(false);
+    });
 
     return () => {
       try {
