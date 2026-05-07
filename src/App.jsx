@@ -82,9 +82,11 @@ export default function App() {
   });
   const { items: notificationEvents, loading: notifLoading } = useNotifications({ ndk, pubkey });
   const { toggle: toggleBm, isBookmarked, bookmarkItems } = useBookmarks({ ndk, pubkey, signAndPublish });
+  const bookmarkLocalPool = useMemo(() => [...events, ...notificationEvents], [events, notificationEvents]);
   const { events: bookmarkFeedEvents, loading: bookmarkFeedLoading } = useBookmarkedEvents({
     ndk,
     bookmarkTags: bookmarkItems,
+    localEvents: bookmarkLocalPool,
   });
 
   const mergedFeedPool = useMemo(() => {
@@ -368,7 +370,7 @@ export default function App() {
               <div className="feed-scroll" ref={feedScrollRef} onScroll={handleFeedScroll}>
                 {(activeNav === "home" || activeNav === "bookmarks") && (
                   (activeNav === "home" && isLoading && events.length === 0) ||
-                  (activeNav === "bookmarks" && bookmarkFeedLoading && bookmarkItems.length > 0)
+                  (activeNav === "bookmarks" && bookmarkFeedLoading && bookmarkFeedEvents.length > 0)
                     ? [0, 1, 2, 3].map(i => <SkelCard key={i} />)
                     : displayEvs.length === 0
                       ? (

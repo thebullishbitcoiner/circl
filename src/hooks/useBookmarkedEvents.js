@@ -17,7 +17,7 @@ function parseAddressTag(val) {
  * Resolve bookmark tag tuples into full events (notes by id, articles by address).
  * Order matches `bookmarkTags`. Omits entries relays do not return.
  */
-export default function useBookmarkedEvents({ ndk, bookmarkTags }) {
+export default function useBookmarkedEvents({ ndk, bookmarkTags, localEvents = [] }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -38,17 +38,40 @@ export default function useBookmarkedEvents({ ndk, bookmarkTags }) {
     setLoading(true);
 
     (async () => {
+      const localPool = [];
+      // Prefer already-loaded app events before hitting relays.
+      // This avoids false "missing" bookmarks when an event is present in another tab.
+      for (const ev of localEvents || []) {
+        if (ev?.id) localPool.push(ev);
+      }
+      const localById = new Map(localPool.map(ev => [ev.id, ev]));
+      const localArticleByAddr = new Map(
+        localPool
+          .filter(ev => ev?.kind === 30023 && ev?.id)
+          .map(ev => {
+            const d = ev.tags?.find(t => t[0] === "d")?.[1];
+            if (!d) return null;
+            const pk = normPubkey(ev.pubkey);
+            if (!isHexPubkey(pk)) return null;
+            return [`30023:${pk}:${d}`, ev];
+          })
+          .filter(Boolean)
+      );
       const tags = bookmarkTags.filter(t => Array.isArray(t) && t.length >= 2);
       const results = await Promise.all(
         tags.map(async t => {
           try {
             if (t[0] === "e" && t[1]) {
+              const local = localById.get(t[1]);
+              if (local) return local;
               const ev = await instance.fetchEvent({ ids: [t[1]], limit: 1 }, { closeOnEose: true });
               return ev?.rawEvent() ?? null;
             }
             if (t[0] === "a" && t[1]) {
               const addr = parseAddressTag(t[1]);
               if (!addr || addr.kind !== 30023) return null;
+              const local = localArticleByAddr.get(t[1]);
+              if (local) return local;
               const ev = await instance.fetchEvent(
                 { kinds: [30023], authors: [addr.pubkey], "#d": [addr.d], limit: 1 },
                 { closeOnEose: true }
@@ -80,7 +103,7 @@ export default function useBookmarkedEvents({ ndk, bookmarkTags }) {
     return () => {
       cancelled = true;
     };
-  }, [ndk, bookmarkTags]);
+  }, [ndk, bookmarkTags, localEvents]);
 
   return { events, loading };
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import Avatar from "./Avatar.jsx";
 import ArticleBody from "./ArticleBody.jsx";
+import ProfileText from "./ProfileText.jsx";
 import { Bk, Hi, Bi, Sh, Cl, Ri, Zi } from "./icons.jsx";
 import { displayName, nip05OrNpub, relativeTime, parseArticle, avatarUrl } from "../utils.js";
 import { nip19 } from "../utils.js";
@@ -95,7 +96,7 @@ export default function ArticleReader({
             <div>
               <div className="author-card-label">Written by</div>
               <div className="author-card-name">{name}</div>
-              {about && <div className="author-card-bio">{about}</div>}
+              {about && <ProfileText className="author-card-bio" text={about} />}
               <button className="follow-author-btn">Follow on Nostr</button>
             </div>
           </div>

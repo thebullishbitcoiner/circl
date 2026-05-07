@@ -4,7 +4,7 @@ export default function LoginScreen({ onLogin, status, error }) {
   return (
     <div className="login-shell">
       <div className="login-card">
-        <div className="login-logo"><div className="login-logo-dot" />Circl</div>
+        <div className="login-logo">Circl</div>
         <div className="login-tagline">Your follows. Your signal.<br />Nothing else.</div>
         <div className="login-features">
           {[
@@ -27,6 +27,7 @@ export default function LoginScreen({ onLogin, status, error }) {
           NIP-07 · Your private key never leaves the extension<br />
           <a href="https://getalby.com" target="_blank" rel="noreferrer">Get Alby →</a>
         </div>
+        <div className="login-version-footer">{__APP_VERSION__}</div>
       </div>
     </div>
   );

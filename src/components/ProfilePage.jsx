@@ -4,6 +4,7 @@ import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteCard from "./NoteCard.jsx";
 import NoteActions from "./NoteActions.jsx";
+import ProfileText from "./ProfileText.jsx";
 import { Bk, Ck } from "./icons.jsx";
 import { displayName, nip05OrNpub, relativeTime, shortNpub, avatarUrl, isQuoteRepost, replyCount, repostAndQuoteCount, normPubkey, directReplyParentId, parseKind6EmbeddedEvent } from "../utils.js";
 import { nip19 } from "../utils.js";
@@ -33,6 +34,19 @@ function NpubCopy({ pubkey }) {
       </button>
     </div>
   );
+}
+
+function normalizeWebsite(url) {
+  if (typeof url !== "string" || !url.trim()) return null;
+  const raw = url.trim();
+  const href = raw.startsWith("http://") || raw.startsWith("https://") ? raw : `https://${raw}`;
+  try {
+    const parsed = new URL(href);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
 }
 
 function threadTargetId(e) {
@@ -90,6 +104,8 @@ export default function ProfilePage({
   const [profileNotesJsonCopied, setProfileNotesJsonCopied] = useState(false);
   const p    = profiles?.[pubkey] || {};
   const name = displayName(pubkey, profiles);
+  const websiteHref = normalizeWebsite(p.website);
+  const websiteLabel = websiteHref ? websiteHref.replace(/^https?:\/\//, "").replace(/\/$/, "") : "";
 
   const { extras, loading: ixLoading } = useInteractions({ ndk, myPubkey, otherPubkey: pubkey, feedEvents: events });
 
@@ -242,7 +258,14 @@ export default function ProfilePage({
   return (
     <div className="slide-panel-scroll">
       <div className="profile-banner" style={{ position: "relative" }}>
-        <div className="profile-banner-glyph">◎</div>
+        {p.banner ? (
+          <>
+            <img className="profile-banner-image" src={p.banner} alt="" onError={e => { e.target.style.display = "none"; }} />
+            <div className="profile-banner-overlay" />
+          </>
+        ) : (
+          <div className="profile-banner-glyph">◎</div>
+        )}
         <button className="back-btn" onClick={onBack} style={{ position: "absolute", top: 12, left: 12, background: "rgba(0,0,0,.25)", backdropFilter: "blur(8px)", color: "white" }}>
           <Bk s={16} />
         </button>
@@ -260,7 +283,18 @@ export default function ProfilePage({
         <div className="profile-name">{name}</div>
         {p.nip05 && <div className="profile-nip05"><div className="profile-nip05-dot" /><Ck s={9} />{p.nip05}</div>}
         <NpubCopy pubkey={pubkey} />
-        {p.about && <div className="profile-about">{p.about}</div>}
+        {p.about && <ProfileText className="profile-about" text={p.about} />}
+        {websiteHref && (
+          <a
+            className="profile-website"
+            href={websiteHref}
+            target="_blank"
+            rel="noreferrer"
+            onClick={e => e.stopPropagation()}
+          >
+            {websiteLabel}
+          </a>
+        )}
       </div>
 
       <div className="profile-stats">
@@ -310,7 +344,7 @@ export default function ProfilePage({
                     <div className="circle-card-info">
                       <div className="circle-card-name">{fn}</div>
                       {fp.nip05 && <div className="circle-card-nip05"><Ck s={8} />{fp.nip05}</div>}
-                      {fp.about && <div className="circle-card-about">{fp.about}</div>}
+                      {fp.about && <ProfileText className="circle-card-about" text={fp.about} clampLines={2} />}
                       <div className="circle-card-npub">{shortNpub(pk)}</div>
                     </div>
                   </div>
