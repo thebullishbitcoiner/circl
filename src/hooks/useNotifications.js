@@ -25,7 +25,8 @@ export function getNotificationSummary(ev) {
     const bolt11 = ev.tags?.find(t => t[0] === "bolt11")?.[1];
     const msats = parseBolt11Msats(bolt11);
     const amt = fmtSats(msats);
-    return { headline: `Zapped you ${amt}`, detail: "", kind: "zap" };
+    const unit = msats === 1000 ? "sat" : "sats";
+    return { headline: `zapped you ${amt} ${unit}`, detail: "", kind: "zap" };
   }
   if (kind === 6) return { headline: "Reposted your note", detail: "", kind: "repost" };
   if (kind === 30023) {

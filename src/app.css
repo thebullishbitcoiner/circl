@@ -509,12 +509,9 @@
   .thread-reply-note{padding:13px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;}
 
   /* ── Notifications ── */
-  .notif-row{display:flex;flex-direction:column;gap:6px;padding:14px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;animation:fadeUp .35s ease both;}
+  .notif-row{position:relative;display:flex;flex-direction:column;gap:6px;padding:14px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;animation:fadeUp .35s ease both;}
   @media(hover:hover){.notif-row:hover{background:rgba(245,237,224,.35);}.dark .notif-row:hover{background:rgba(255,255,255,.03);}}
-  .notif-header{display:flex;align-items:center;justify-content:space-between;}
-  .notif-av-col{flex-shrink:0;}
   .notif-text{font-size:13.5px;line-height:1.4;color:var(--text);}
-  .notif-time{flex-shrink:0;font-size:11px;color:var(--text-faint);white-space:nowrap;}
   .notif-name-btn{display:inline;font-weight:600;color:var(--text);cursor:pointer;}
   @media(hover:hover){.notif-name-btn:hover{color:var(--primary);}}
   .notif-action{color:var(--text-muted);font-weight:400;}

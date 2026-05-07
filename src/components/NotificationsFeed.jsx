@@ -6,6 +6,7 @@ import { getNotificationSummary } from "../hooks/useNotifications.js";
 const AV_SIZE = 36;
 const MAX_AV = 4;
 const AV_OVERLAP = 10;
+const ROW_PAD = 18;
 
 function groupItems(items) {
   const seen = new Map();
@@ -79,6 +80,8 @@ function NotePreview({ ev, profiles }) {
   );
 }
 
+const timeStyle = { position: "absolute", top: 14, right: ROW_PAD, fontSize: 11, color: "var(--text-faint)", whiteSpace: "nowrap" };
+
 export default function NotificationsFeed({ items, profiles, onOpenProfile, onOpenNotification, allEvents }) {
   if (!items.length) {
     return (
@@ -96,6 +99,7 @@ export default function NotificationsFeed({ items, profiles, onOpenProfile, onOp
     <>
       {grouped.map((entry, i) => {
         const delay = { animationDelay: `${Math.min(i, 12) * 0.03}s` };
+        const rowStyle = { ...delay, position: "relative", display: "flex", flexDirection: "column", paddingRight: ROW_PAD + 44 };
 
         if (entry.type === "group") {
           const { kind, targetId, actors, latestAt } = entry;
@@ -106,41 +110,33 @@ export default function NotificationsFeed({ items, profiles, onOpenProfile, onOp
           const single = pubkeys.length === 1;
 
           return (
-            <div key={`${kind}:${targetId}`} className="notif-row" style={{ ...delay, display: "flex", flexDirection: "column" }}
+            <div key={`${kind}:${targetId}`} className="notif-row" style={rowStyle}
               onClick={() => onOpenNotification?.(actors[0])} role="button" tabIndex={0}
               onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenNotification?.(actors[0]); } }}
             >
+              <span style={timeStyle}>{relativeTime(latestAt)}</span>
               {single ? (
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                   <div onClick={e => e.stopPropagation()} style={{ flexShrink: 0 }}>
                     <AvatarStack pubkeys={pubkeys} profiles={profiles} onOpenProfile={onOpenProfile} />
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                      <div className="notif-text" style={{ margin: 0 }}>
-                        <ActorNames actors={actors} profiles={profiles} onOpenProfile={onOpenProfile} />
-                        {" "}<span className="notif-action">{verb}</span>
-                      </div>
-                      <span className="notif-time" style={{ flexShrink: 0 }}>{relativeTime(latestAt)}</span>
-                    </div>
-                    <NotePreview ev={targetEv} profiles={profiles} />
+                  <div className="notif-text" style={{ margin: 0 }}>
+                    <ActorNames actors={actors} profiles={profiles} onOpenProfile={onOpenProfile} />
+                    {" "}<span className="notif-action">{verb}</span>
                   </div>
                 </div>
               ) : (
                 <>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, width: "100%" }}>
-                    <div onClick={e => e.stopPropagation()}>
-                      <AvatarStack pubkeys={pubkeys} profiles={profiles} onOpenProfile={onOpenProfile} />
-                    </div>
-                    <span className="notif-time">{relativeTime(latestAt)}</span>
+                  <div onClick={e => e.stopPropagation()} style={{ marginBottom: 6 }}>
+                    <AvatarStack pubkeys={pubkeys} profiles={profiles} onOpenProfile={onOpenProfile} />
                   </div>
                   <div className="notif-text">
                     <ActorNames actors={actors} profiles={profiles} onOpenProfile={onOpenProfile} />
                     {" "}<span className="notif-action">{verb}</span>
                   </div>
-                  <NotePreview ev={targetEv} profiles={profiles} />
                 </>
               )}
+              <NotePreview ev={targetEv} profiles={profiles} />
             </div>
           );
         }
@@ -153,9 +149,12 @@ export default function NotificationsFeed({ items, profiles, onOpenProfile, onOp
           const bolt11 = ev.tags?.find(t => t[0] === "bolt11")?.[1];
           const msats = parseBolt11Msats(bolt11);
           const comment = zapCommentFromKind9735(ev);
+          const satsStr = fmtSats(msats);
+          const satsLabel = msats === 1000 ? "sat" : "sats";
           preview = (
             <div className="notif-preview notif-zap-preview">
-              <span className="notif-zap-amt">{fmtSats(msats)}</span>
+              <span className="notif-zap-amt">{satsStr}</span>
+              <span className="notif-action"> {satsLabel}</span>
               {comment && <span className="notif-action"> · {comment}</span>}
             </div>
           );
@@ -164,30 +163,26 @@ export default function NotificationsFeed({ items, profiles, onOpenProfile, onOp
         }
 
         return (
-          <div key={ev.id} className="notif-row" style={{ ...delay, display: "flex", flexDirection: "column" }}
+          <div key={ev.id} className="notif-row" style={rowStyle}
             onClick={() => onOpenNotification?.(ev)} role="button" tabIndex={0}
             onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenNotification?.(ev); } }}
           >
+            <span style={timeStyle}>{relativeTime(ev.created_at)}</span>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
               <div onClick={e => e.stopPropagation()} style={{ flexShrink: 0 }}>
                 <AvatarStack pubkeys={[ev.pubkey]} profiles={profiles} onOpenProfile={onOpenProfile} />
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                  <div className="notif-text" style={{ margin: 0 }}>
-                    <span className="notif-name-btn"
-                      role="button" tabIndex={0}
-                      onClick={e => { e.stopPropagation(); onOpenProfile?.(ev.pubkey); }}
-                      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenProfile?.(ev.pubkey); } }}>
-                      {displayName(ev.pubkey, profiles)}
-                    </span>
-                    <span className="notif-action"> {headline}{detail ? ` · ${detail}` : ""}</span>
-                  </div>
-                  <span className="notif-time" style={{ flexShrink: 0 }}>{relativeTime(ev.created_at)}</span>
-                </div>
-                {preview}
+              <div className="notif-text" style={{ margin: 0 }}>
+                <span className="notif-name-btn"
+                  role="button" tabIndex={0}
+                  onClick={e => { e.stopPropagation(); onOpenProfile?.(ev.pubkey); }}
+                  onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenProfile?.(ev.pubkey); } }}>
+                  {displayName(ev.pubkey, profiles)}
+                </span>
+                <span className="notif-action"> {headline}{detail ? ` · ${detail}` : ""}</span>
               </div>
             </div>
+            {preview}
           </div>
         );
       })}
