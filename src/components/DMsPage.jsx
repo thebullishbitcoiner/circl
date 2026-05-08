@@ -69,8 +69,8 @@ function ConversationView({ pubkey, conversationId, participants, profiles, onSe
   const bottomRef = useRef(null);
 
   const messages$ = useMemo(
-    () => eventStore.model(WrappedMessagesGroup, pubkey, conversationId),
-    [pubkey, conversationId]
+    () => eventStore.model(WrappedMessagesGroup, pubkey, participants),
+    [pubkey, participants]
   );
   const messages = useObservableState(messages$);
 

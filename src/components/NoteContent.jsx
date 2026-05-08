@@ -141,7 +141,7 @@ export default function NoteContent({
   style = {},
 }) {
   const segments = useMemo(
-    () => groupNoteMediaSegments(parseNoteMediaSegments(content || "")),
+    () => groupNoteMediaSegments(parseNoteMediaSegments((content || "").replace(/\n{2,}/g, "\n"))),
     [content]
   );
   const normalizedSegments = useMemo(() => {

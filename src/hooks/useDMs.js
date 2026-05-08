@@ -4,6 +4,7 @@ import { SendWrappedMessage } from "applesauce-actions/actions";
 import { ExtensionSigner } from "applesauce-signers";
 import { unlockGiftWrap, isGiftWrapUnlocked } from "applesauce-common/helpers/gift-wrap";
 import { mapEventsToStore } from "applesauce-core/observable/map-events-to-store";
+import { tap } from "rxjs";
 import { kinds } from "nostr-tools";
 import { eventStore, pool } from "../nostr.js";
 import { RELAYS } from "../constants.js";
@@ -18,9 +19,6 @@ export default function useDMs({ pubkey }) {
   const [dmRelays, setDmRelays] = useState(RELAYS);
   const [unlocking, setUnlocking] = useState(false);
   const actionsRef = useRef(null);
-  const failedRef = useRef(new Set(
-    JSON.parse(localStorage.getItem("circl_failed_gift_wraps") || "[]")
-  ));
 
   // Build ActionRunner when pubkey is available
   useEffect(() => {
@@ -31,6 +29,12 @@ export default function useDMs({ pubkey }) {
       signer,
       async (event, relays) => {
         await pool.publish(relays || dmRelays, event);
+        // Add gift wraps addressed to self into the local store and unlock immediately
+        // so sent messages appear without waiting for the relay to echo them back
+        if (event.kind === kinds.GiftWrap && event.tags.some(t => t[0] === "p" && t[1] === pubkey)) {
+          const stored = eventStore.add(event);
+          unlockGiftWrap(stored, signer).catch(() => {});
+        }
       }
     );
   }, [pubkey, dmRelays]);
@@ -49,15 +53,26 @@ export default function useDMs({ pubkey }) {
     return () => sub.unsubscribe();
   }, [pubkey]);
 
-  // Subscribe to incoming gift wraps
+  // Subscribe to incoming gift wraps and unlock each one as it arrives.
+  // Always query both the user's DM relays AND the default RELAYS so that
+  // messages sent by other clients to any relay are picked up.
   useEffect(() => {
-    if (!pubkey || !dmRelays.length) return;
-    const since = Math.floor(Date.now() / 1000) - 60 * 60 * 24 * 30;
-    const sub = pool.subscription(dmRelays, {
+    if (!pubkey) return;
+    const signer = getSigner();
+    const since = Math.floor(Date.now() / 1000) - 60 * 60 * 24 * 365;
+    const relays = [...new Set([...RELAYS, ...dmRelays])];
+    const sub = pool.subscription(relays, {
       kinds: [kinds.GiftWrap],
       "#p": [pubkey],
       since,
-    }).pipe(mapEventsToStore(eventStore)).subscribe();
+    }).pipe(
+      mapEventsToStore(eventStore),
+      tap(ev => {
+        if (!isGiftWrapUnlocked(ev)) {
+          unlockGiftWrap(ev, signer).catch(() => {});
+        }
+      })
+    ).subscribe();
     return () => sub.unsubscribe();
   }, [pubkey, dmRelays]);
 
@@ -68,15 +83,8 @@ export default function useDMs({ pubkey }) {
     try {
       const locked = eventStore
         .getTimeline({ kinds: [kinds.GiftWrap] })
-        .filter(e => !isGiftWrapUnlocked(e) && !failedRef.current.has(e.id));
-      for (const gift of locked) {
-        try {
-          await unlockGiftWrap(gift, signer);
-        } catch {
-          failedRef.current.add(gift.id);
-          localStorage.setItem("circl_failed_gift_wraps", JSON.stringify([...failedRef.current]));
-        }
-      }
+        .filter(e => !isGiftWrapUnlocked(e));
+      await Promise.allSettled(locked.map(gift => unlockGiftWrap(gift, signer)));
     } finally {
       setUnlocking(false);
     }
