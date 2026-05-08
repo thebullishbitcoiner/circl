@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { firstValueFrom, filter as rxFilter, timeout, catchError, of } from "rxjs";
+import { useState, useEffect, useCallback } from "react";
 import { RELAYS, NOSTR_CLIENT_TAG } from "../constants.js";
 import { isHexPubkey, normPubkey } from "../utils.js";
-import { pool, nostrSubscribe } from "../nostr.js";
+import { pool } from "../nostr.js";
 
 function withTimeout(promise, ms, message) {
   let timer;
@@ -12,11 +11,7 @@ function withTimeout(promise, ms, message) {
   return Promise.race([promise, race]).finally(() => clearTimeout(timer));
 }
 
-// Compat shim: exposes the same .subscribe(filters, opts) interface as the old ndk instance
-const nostrShim = { subscribe: nostrSubscribe };
-
-export default function useNDK() {
-  const nostrRef = useRef(nostrShim);
+export default function useAuth() {
   const [pubkey, setPubkey] = useState(null);
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState(null);
@@ -27,7 +22,6 @@ export default function useNDK() {
     if (!saved) return;
     const pk = normPubkey(saved);
     if (!isHexPubkey(pk)) return;
-    // Eagerly open relay connections so first sub doesn't wait for WS handshake
     for (const url of RELAYS) pool.relay(url);
     setPubkey(pk);
     setStatus("ready");
@@ -79,16 +73,12 @@ export default function useNDK() {
       10000,
       "Extension did not sign in time."
     );
-    // Publish and wait for at least one relay to confirm (8s timeout)
-    await firstValueFrom(
-      pool.publish(RELAYS, signed).pipe(
-        rxFilter(r => r.ok),
-        timeout({ first: 8000 }),
-        catchError(() => of(null))
-      )
-    );
+    await Promise.race([
+      pool.publish(RELAYS, signed),
+      new Promise(resolve => setTimeout(resolve, 8000)),
+    ]).catch(() => null);
     return signed;
   }, [pubkey]);
 
-  return { ndk: nostrRef, pubkey, status, error, login, logout, signAndPublish };
+  return { pubkey, status, error, login, logout, signAndPublish };
 }

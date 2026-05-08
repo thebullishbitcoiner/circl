@@ -74,7 +74,7 @@ function flushRest() {
   }
 }
 
-export default function useProfiles({ ndk, pubkeys }) {
+export default function useProfiles({ pubkeys }) {
   const pubkeysKey = useMemo(() => pubkeysToKey(pubkeys), [pubkeys]);
 
   // Initialize synchronously from EventStore — avoids npub flash on remounts

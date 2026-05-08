@@ -3,7 +3,7 @@ import { isHexPubkey, normPubkey } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 
-export default function useInteractions({ ndk, myPubkey, otherPubkey, feedEvents }) {
+export default function useInteractions({ myPubkey, otherPubkey, feedEvents }) {
   const [extras, setExtras] = useState([]);
   const [loading, setLoading] = useState(false);
   const seen = useRef(new Set());

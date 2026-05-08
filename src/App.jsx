@@ -12,7 +12,7 @@ import {
   nip19,
   parseKind6EmbeddedEvent,
 } from "./utils.js";
-import useNDK from "./hooks/useNDK.js";
+import useAuth from "./hooks/useAuth.js";
 import { nostrSubscribe } from "./nostr.js";
 import useFollows from "./hooks/useFollows.js";
 import useFeed from "./hooks/useFeed.js";
@@ -48,8 +48,8 @@ import { SbHome, SbBell, SbBook, SbDM, SbSearch, NavHome, NavBell, NavBook, NavD
 import useDMs from "./hooks/useDMs.js";
 
 export default function App() {
-  const { ndk, pubkey, status, error, login, logout, signAndPublish } = useNDK();
-  const { follows, loading: fl } = useFollows({ ndk, pubkey });
+  const { pubkey, status, error, login, logout, signAndPublish } = useAuth();
+  const { follows, loading: fl } = useFollows({ pubkey });
 
   const [likes, setLikes] = useState({});
   const [zapsByEvent, setZapsByEvent] = useState({});
@@ -80,17 +80,15 @@ export default function App() {
   }, []);
 
   const { events, loading: el, prependEvent } = useFeed({
-    ndk,
     follows,
     setLocalReaction,
     addLocalZap,
   });
-  const { items: notificationEvents, loading: notifLoading } = useNotifications({ ndk, pubkey });
+  const { items: notificationEvents, loading: notifLoading } = useNotifications({ pubkey });
   const { dmRelays, unlock: dmUnlock, unlocking: dmUnlocking, sendMessage: dmSend } = useDMs({ pubkey });
-  const { toggle: toggleBm, isBookmarked, bookmarkItems } = useBookmarks({ ndk, pubkey, signAndPublish });
+  const { toggle: toggleBm, isBookmarked, bookmarkItems } = useBookmarks({ pubkey, signAndPublish });
   const bookmarkLocalPool = useMemo(() => [...events, ...notificationEvents], [events, notificationEvents]);
   const { events: bookmarkFeedEvents, loading: bookmarkFeedLoading } = useBookmarkedEvents({
-    ndk,
     bookmarkTags: bookmarkItems,
     localEvents: bookmarkLocalPool,
   });
@@ -161,7 +159,7 @@ export default function App() {
     for (const n of notificationEvents) add(n.pubkey);
     return result;
   }, [mergedFeedPool, events, follows, pubkey, zapsByEvent, reactionsByEvent, notificationEvents]);
-  const { profiles } = useProfiles({ ndk, pubkeys: allPks });
+  const { profiles } = useProfiles({ pubkeys: allPks });
   const { publish, publishEvent } = usePublish({ signAndPublish, pubkey });
   const isMobile = useIsMobile();
   const { dark, toggle: toggleDark } = useDarkMode();
@@ -600,7 +598,6 @@ export default function App() {
                         profiles={profiles}
                         follows={follows}
                         events={mergedFeedPool}
-                        ndk={ndk}
                         isOwn={top.payload === pubkey}
                         backLabel={backLabel}
                         onBack={handleBack}

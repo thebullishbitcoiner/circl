@@ -14,7 +14,7 @@ function parseAddressTag(val) {
   return { kind, pubkey: pk, d };
 }
 
-export default function useBookmarkedEvents({ ndk, bookmarkTags, localEvents = [] }) {
+export default function useBookmarkedEvents({ bookmarkTags, localEvents = [] }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -64,7 +64,7 @@ export default function useBookmarkedEvents({ ndk, bookmarkTags, localEvents = [
           result.push(ev);
         }
       }
-      return result;
+      return result.sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
     };
 
     if (!missingE.length && !missingA.length) {

@@ -42,7 +42,7 @@ export function getNotificationSummary(ev) {
   return { headline: "Activity", detail: "", kind: "other" };
 }
 
-export default function useNotifications({ ndk, pubkey }) {
+export default function useNotifications({ pubkey }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const seen = useRef(new Set());

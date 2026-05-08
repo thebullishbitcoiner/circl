@@ -97,7 +97,7 @@ export default function ProfilePage({
   onBack, onOpenProfile, onOpenNote, onOpenThread, onOpenZaps, onOpenReactions, onOpenReposts,
   myProfile, onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
-  onRequestModal, onDismissModal, ndk, backLabel = "Your Circle", resolveEventById,
+  onRequestModal, onDismissModal, backLabel = "Your Circle", resolveEventById,
   onOpenCircle,
 }) {
   const [tab, setTab] = useState("notes");
@@ -113,7 +113,7 @@ export default function ProfilePage({
   const websiteHref = normalizeWebsite(p.website);
   const websiteLabel = websiteHref ? websiteHref.replace(/^https?:\/\//, "").replace(/\/$/, "") : "";
 
-  const { extras, loading: ixLoading } = useInteractions({ ndk, myPubkey, otherPubkey: pubkey, feedEvents: events });
+  const { extras, loading: ixLoading } = useInteractions({ myPubkey, otherPubkey: pubkey, feedEvents: events });
 
   const [repostExtras, setRepostExtras] = useState({});
   const repostFetchRef = useRef(new Set());

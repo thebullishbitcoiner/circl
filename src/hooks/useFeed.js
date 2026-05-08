@@ -16,7 +16,7 @@ function sortFeedEventsChronological(events) {
   return [...events].sort(compareFeedEventsDesc);
 }
 
-export default function useFeed({ ndk, follows, setLocalReaction, addLocalZap }) {
+export default function useFeed({ follows, setLocalReaction, addLocalZap }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const seen = useRef(new Set());

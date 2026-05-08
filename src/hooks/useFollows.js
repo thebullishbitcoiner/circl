@@ -3,7 +3,7 @@ import { isHexPubkey, normPubkey } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 
-export default function useFollows({ ndk, pubkey }) {
+export default function useFollows({ pubkey }) {
   const [follows, setFollows] = useState([]);
   const [loading, setLoading] = useState(false);
 

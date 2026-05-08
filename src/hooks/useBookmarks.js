@@ -51,7 +51,7 @@ function hasNip44() {
   );
 }
 
-export default function useBookmarks({ ndk, pubkey, signAndPublish } = {}) {
+export default function useBookmarks({ pubkey, signAndPublish } = {}) {
   const [items, setItems] = useState([]);
   const itemsRef = useRef([]);
   useEffect(() => { itemsRef.current = items; }, [items]);
