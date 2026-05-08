@@ -86,7 +86,8 @@ export default function App() {
   });
   const { items: notificationEvents, loading: notifLoading } = useNotifications({ pubkey });
   const { dmRelays, unlock: dmUnlock, unlocking: dmUnlocking, sendMessage: dmSend } = useDMs({ pubkey });
-  const { toggle: toggleBm, isBookmarked, bookmarkItems } = useBookmarks({ pubkey, signAndPublish });
+  const [bookmarkRefreshKey, setBookmarkRefreshKey] = useState(0);
+  const { toggle: toggleBm, isBookmarked, bookmarkItems } = useBookmarks({ pubkey, signAndPublish, refreshKey: bookmarkRefreshKey });
   const bookmarkLocalPool = useMemo(() => [...events, ...notificationEvents], [events, notificationEvents]);
   const { events: bookmarkFeedEvents, loading: bookmarkFeedLoading } = useBookmarkedEvents({
     bookmarkTags: bookmarkItems,
@@ -267,6 +268,7 @@ export default function App() {
     try {
       const was = isBookmarked(event);
       await toggleBm(event);
+      setBookmarkRefreshKey(k => k + 1);
       showToast(was ? "Removed from bookmarks" : "Saved to bookmarks");
     } catch (e) {
       showToast(e?.message || "Could not update bookmarks");
@@ -519,7 +521,7 @@ export default function App() {
                 </div>
               )}
               {activeNav === "search" && (
-                <div style={{ flex: 1, overflow: "hidden", display: "flex" }}>
+                <div style={{ flex: 1, width: "100%", overflow: "hidden", display: "flex" }}>
                   <SearchPage
                     profiles={profiles}
                     onOpenProfile={handleOpenProfile}

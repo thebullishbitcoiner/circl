@@ -51,7 +51,7 @@ function hasNip44() {
   );
 }
 
-export default function useBookmarks({ pubkey, signAndPublish } = {}) {
+export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } = {}) {
   const [items, setItems] = useState([]);
   const itemsRef = useRef([]);
   useEffect(() => { itemsRef.current = items; }, [items]);
@@ -95,7 +95,7 @@ export default function useBookmarks({ pubkey, signAndPublish } = {}) {
       cancelled = true;
       sub.unsubscribe();
     };
-  }, [pubkey]);
+  }, [pubkey, refreshKey]);
 
   const persist = useCallback(
     async nextItems => {

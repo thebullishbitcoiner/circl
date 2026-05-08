@@ -1,7 +1,7 @@
 {
   "name": "circl",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.5.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,6 +11,7 @@
   "dependencies": {
     "@getalby/lightning-tools": "^8.1.1",
     "applesauce-core": "^6.0.0",
+    "applesauce-extra": "^6.0.0",
     "applesauce-loaders": "^6.0.0",
     "applesauce-react": "^6.0.0",
     "applesauce-relay": "^6.0.0",

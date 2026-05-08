@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { isHexPubkey, normPubkey } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
-import { RELAYS } from "../constants.js";
 
 function parseAddressTag(val) {
   if (typeof val !== "string") return null;
@@ -39,6 +38,14 @@ export default function useBookmarkedEvents({ bookmarkTags, localEvents = [] }) 
 
     const tags = bookmarkTags.filter(t => Array.isArray(t) && t.length >= 2);
 
+    // Pre-populate from eventStore for events not in the feed pool
+    for (const t of tags) {
+      if (t[0] === "e" && t[1] && !resolvedById.has(t[1])) {
+        const stored = eventStore.getTimeline({ ids: [t[1]] })[0];
+        if (stored) resolvedById.set(t[1], stored);
+      }
+    }
+
     const missingE = [];
     const missingA = [];
     for (const t of tags) {
@@ -52,10 +59,11 @@ export default function useBookmarkedEvents({ bookmarkTags, localEvents = [] }) 
       }
     }
 
+    // Iterate in reverse so most recently bookmarked (last tag) appears first
     const buildOrdered = () => {
       const seen = new Set();
       const result = [];
-      for (const t of tags) {
+      for (const t of [...tags].reverse()) {
         let ev = null;
         if (t[0] === "e") ev = resolvedById.get(t[1]);
         else if (t[0] === "a") ev = resolvedByAddr.get(t[1]);
@@ -64,7 +72,7 @@ export default function useBookmarkedEvents({ bookmarkTags, localEvents = [] }) 
           result.push(ev);
         }
       }
-      return result.sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
+      return result;
     };
 
     if (!missingE.length && !missingA.length) {

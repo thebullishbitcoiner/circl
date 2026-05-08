@@ -1,18 +1,47 @@
-import { useState, useCallback, useRef } from "react";
-import { pool } from "../nostr.js";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
+import { PrimalCache } from "applesauce-extra";
+import { eventStore } from "../nostr.js";
 import { displayName, relativeTime, nip19 } from "../utils.js";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 
-const SEARCH_RELAY = "wss://relay.primal.net";
+const ARCHIVES_API = "https://api.nostrarchives.com";
 
-function ProfileResult({ ev, profiles, onOpenProfile }) {
+async function searchRest(q, currentTab) {
+  const res = await fetch(
+    `${ARCHIVES_API}/v1/search?q=${encodeURIComponent(q)}&limit=30`,
+    { signal: AbortSignal.timeout(8000) }
+  );
+  if (!res.ok) throw new Error(res.statusText);
+  const data = await res.json();
+  if (currentTab === "people") {
+    return (data.profiles || []).map(p => ({
+      id: p.pubkey,
+      pubkey: p.pubkey,
+      kind: 0,
+      created_at: p.last_active_at || 0,
+      content: JSON.stringify({
+        name: p.name,
+        display_name: p.display_name,
+        picture: p.picture,
+        nip05: p.nip05,
+        lud16: p.lud16,
+        follower_count: p.follower_count,
+      }),
+      tags: [],
+      sig: "",
+    }));
+  }
+  return (data.notes || []).map(n => n.event).filter(Boolean);
+}
+
+function ProfileResult({ ev, onOpenProfile }) {
   let meta = {};
   try { meta = JSON.parse(ev.content); } catch {}
   const name = meta.display_name || meta.name || "";
-  const about = (meta.about || "").slice(0, 100);
-  const pic = meta.picture;
   const pk = ev.pubkey;
+  const npub = (() => { try { const n = nip19.npubEncode(pk); return n.slice(0, 8) + "…" + n.slice(-4); } catch { return ""; } })();
+  const followers = meta.follower_count != null ? meta.follower_count.toLocaleString() + " followers" : null;
 
   return (
     <div className="search-result" role="button" tabIndex={0}
@@ -20,11 +49,15 @@ function ProfileResult({ ev, profiles, onOpenProfile }) {
       onKeyDown={e => { if (e.key === "Enter" || e.key === " ") onOpenProfile?.(pk); }}
     >
       <div style={{ flexShrink: 0 }}>
-        <Avatar pk={pk} profiles={{ [pk]: meta }} size={40} />
+        <Avatar pk={pk} profiles={{ [pk]: meta }} size={44} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="search-result-name">{name || displayName(pk, {})}</div>
-        {about && <div className="search-result-sub">{about}</div>}
+        <div className="search-result-name">{name || npub}</div>
+        <div className="search-result-sub" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {meta.nip05 && <span>{meta.nip05}</span>}
+          {followers && <span>{followers}</span>}
+          {!meta.nip05 && npub && <span style={{ fontFamily: "monospace", fontSize: 11 }}>{npub}</span>}
+        </div>
       </div>
     </div>
   );
@@ -37,12 +70,12 @@ function NoteResult({ ev, profiles, onOpenProfile, onOpenThread }) {
       onKeyDown={e => { if (e.key === "Enter" || e.key === " ") onOpenThread?.(ev); }}
     >
       <div style={{ flexShrink: 0 }}>
-        <Avatar pk={ev.pubkey} profiles={profiles} size={32} />
+        <Avatar pk={ev.pubkey} profiles={profiles} size={36} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
           <span className="search-result-name" style={{ fontSize: 13 }}>{displayName(ev.pubkey, profiles)}</span>
-          <span style={{ fontSize: 11, color: "var(--text-faint)" }}>{relativeTime(ev.created_at)}</span>
+          <span style={{ fontSize: 11, color: "var(--text-faint)", flexShrink: 0 }}>{relativeTime(ev.created_at)}</span>
         </div>
         <NoteContent
           content={ev.content}
@@ -58,42 +91,63 @@ function NoteResult({ ev, profiles, onOpenProfile, onOpenThread }) {
 
 export default function SearchPage({ profiles, onOpenProfile, onOpenThread }) {
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useState("notes"); // "notes" | "people"
+  const [tab, setTab] = useState("notes");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const subRef = useRef(null);
+  const abortRef = useRef(null);
+const primal = useMemo(() => new PrimalCache(), []);
+  useEffect(() => () => primal.close(), [primal]);
 
-  const runSearch = useCallback((q, kind) => {
-    if (subRef.current) { subRef.current.unsubscribe(); subRef.current = null; }
-    if (!q.trim()) { setResults([]); return; }
+  const runSearch = useCallback(async (q, currentTab) => {
+    if (abortRef.current) abortRef.current.cancelled = true;
+    const abort = { cancelled: false };
+    abortRef.current = abort;
+
+    if (!q.trim()) { setResults([]); setLoading(false); return; }
 
     setLoading(true);
     setResults([]);
-    const seen = new Set();
-    const collected = [];
 
-    subRef.current = pool.request([SEARCH_RELAY], [{ kinds: [kind], search: q.trim(), limit: 30 }])
-      .subscribe({
-        next: ev => {
-          if (seen.has(ev.id)) return;
-          seen.add(ev.id);
-          collected.push(ev);
-          setResults([...collected]);
-        },
-        error: () => setLoading(false),
-        complete: () => setLoading(false),
-      });
-  }, []);
+    try {
+      let evs = [];
+      try {
+        evs = await searchRest(q.trim(), currentTab);
+      } catch {}
+
+      if (abort.cancelled) return;
+
+      if (!evs.length) {
+        evs = currentTab === "people"
+          ? await primal.userSearch(q.trim(), 30)
+          : await primal.search({ query: q.trim(), limit: 30 });
+      }
+
+      if (abort.cancelled) return;
+
+      for (const ev of evs) {
+        if (ev.sig) eventStore.add(ev);
+      }
+      setResults(evs);
+    } catch {
+      if (!abort.cancelled) setResults([]);
+    } finally {
+      if (!abort.cancelled) setLoading(false);
+    }
+  }, [primal]);
 
   const handleInput = e => {
     const q = e.target.value;
     setQuery(q);
-    runSearch(q, tab === "notes" ? 1 : 0);
+    if (!q.trim()) setResults([]);
+  };
+
+  const handleKeyDown = e => {
+    if (e.key === "Enter") runSearch(query, tab);
   };
 
   const handleTab = t => {
     setTab(t);
-    runSearch(query, t === "notes" ? 1 : 0);
+    runSearch(query, t);
   };
 
   return (
@@ -108,6 +162,7 @@ export default function SearchPage({ profiles, onOpenProfile, onOpenThread }) {
             placeholder="Search notes and people…"
             value={query}
             onChange={handleInput}
+            onKeyDown={handleKeyDown}
             autoFocus
           />
           {query && (
@@ -125,19 +180,19 @@ export default function SearchPage({ profiles, onOpenProfile, onOpenThread }) {
       </div>
 
       <div className="search-results">
-        {loading && !results.length && (
-          <div style={{ display: "flex", justifyContent: "center", padding: 32 }}>
-            <div style={{ width: 20, height: 20, border: "2px solid var(--border)", borderTopColor: "var(--primary)", borderRadius: "50%", animation: "spin .7s linear infinite" }} />
+        {loading && (
+          <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
+            <div style={{ width: 22, height: 22, border: "2px solid var(--border)", borderTopColor: "var(--primary)", borderRadius: "50%", animation: "spin .7s linear infinite" }} />
           </div>
         )}
         {!loading && query && !results.length && (
-          <div className="empty-state" style={{ paddingTop: 40 }}>
+          <div className="empty-state" style={{ paddingTop: 48 }}>
             <div className="empty-state-title">No results</div>
             <div className="empty-state-sub">Try a different search term</div>
           </div>
         )}
         {!query && (
-          <div className="empty-state" style={{ paddingTop: 48 }}>
+          <div className="empty-state" style={{ paddingTop: 56 }}>
             <div className="empty-state-title">Search Nostr</div>
             <div className="empty-state-sub">Find notes and people across the network</div>
           </div>
