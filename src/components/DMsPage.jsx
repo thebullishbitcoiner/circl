@@ -209,15 +209,6 @@ export default function DMsPage({ pubkey, profiles, unlock, unlocking, sendMessa
     <div className="dm-shell">
       {/* Sidebar — hidden on mobile when a conversation is open */}
       <div className={`dm-sidebar${selectedId ? " dm-sidebar-hidden" : ""}`}>
-        <div className="dm-sidebar-header">
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span className="dm-sidebar-title">Messages</span>
-            {unlocking && (
-              <div style={{ width: 12, height: 12, border: "1.5px solid var(--border)", borderTopColor: "var(--primary)", borderRadius: "50%", animation: "spin .7s linear infinite", flexShrink: 0 }} />
-            )}
-          </div>
-        </div>
-
         {showNew && (
           <form onSubmit={handleStartNew} className="dm-new-form">
             <input

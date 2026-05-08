@@ -268,7 +268,7 @@ export default function App() {
     try {
       const was = isBookmarked(event);
       await toggleBm(event);
-      setBookmarkRefreshKey(k => k + 1);
+      if (!was) setBookmarkRefreshKey(k => k + 1);
       showToast(was ? "Removed from bookmarks" : "Saved to bookmarks");
     } catch (e) {
       showToast(e?.message || "Could not update bookmarks");

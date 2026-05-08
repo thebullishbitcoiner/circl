@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useMemo } from "react";
 import { createPortal } from "react-dom";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
@@ -6,6 +6,8 @@ import NoteActions from "./NoteActions.jsx";
 import FocusedStatsRow from "./FocusedStatsRow.jsx";
 import { Bk } from "./icons.jsx";
 import { displayName, nip05OrNpub, relativeTime, isQuoteRepost, replyCount, buildParentChain, buildSelfReplyChain } from "../utils.js";
+import { pool, eventStore } from "../nostr.js";
+import { RELAYS } from "../constants.js";
 
 function ThreadNoteRow({
   event, variant = "normal", profiles, allEvents, onOpenProfile, onOpenThread,
@@ -172,9 +174,62 @@ export default function ThreadView({
   const [threadMenuId, setThreadMenuId]     = useState(null);
   const [threadJsonEvent, setThreadJsonEvent] = useState(null);
   const [threadJsonCopied, setThreadJsonCopied] = useState(false);
+  const [fetchedEvents, setFetchedEvents] = useState([]);
 
-  const parents    = buildParentChain(focusedEvent, events);
-  const selfChain  = buildSelfReplyChain(focusedEvent, events, authorPk);
+  const allEvents = useMemo(() => {
+    const map = new Map(events.map(e => [e.id, e]));
+    for (const e of fetchedEvents) map.set(e.id, e);
+    return [...map.values()];
+  }, [events, fetchedEvents]);
+
+  // Fetch ancestor chain and subscribe to replies whenever the focused event changes
+  useEffect(() => {
+    setFetchedEvents([]);
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const known = new Map(events.map(e => [e.id, e]));
+    const subs = [];
+
+    // Walk up ancestors: fetch missing parent IDs from e-tags, up to 5 levels
+    const fetchAncestors = (ev, depth) => {
+      if (depth <= 0) return;
+      const parentIds = ev.tags
+        .filter(t => t[0] === "e" && t[3] !== "mention" && t[1])
+        .map(t => t[1])
+        .filter(id => !known.has(id));
+      if (!parentIds.length) return;
+      const sub = pool.request(relayUrls, [{ ids: parentIds }]).subscribe({
+        next: fetched => {
+          if (known.has(fetched.id)) return;
+          known.set(fetched.id, fetched);
+          eventStore.add(fetched);
+          setFetchedEvents(prev => [...prev, fetched]);
+          fetchAncestors(fetched, depth - 1);
+        },
+      });
+      subs.push(sub);
+    };
+    fetchAncestors(focusedEvent, 5);
+
+    // Subscribe to replies
+    const replySub = pool.subscription(relayUrls, [{
+      kinds: [1],
+      "#e": [focusedEvent.id],
+      since: focusedEvent.created_at,
+    }]).subscribe({
+      next: ev => {
+        if (known.has(ev.id)) return;
+        known.set(ev.id, ev);
+        eventStore.add(ev);
+        setFetchedEvents(prev => [...prev, ev]);
+      },
+    });
+    subs.push(replySub);
+
+    return () => subs.forEach(s => s.unsubscribe());
+  }, [focusedEvent.id]); // eslint-disable-line
+
+  const parents    = buildParentChain(focusedEvent, allEvents);
+  const selfChain  = buildSelfReplyChain(focusedEvent, allEvents, authorPk);
 
   const chainIds = new Set([
     ...parents.map(e => e.id),
@@ -182,7 +237,7 @@ export default function ThreadView({
     ...selfChain.map(e => e.id),
   ]);
 
-  const otherReplies = events.filter(e =>
+  const otherReplies = allEvents.filter(e =>
     e.kind === 1 &&
     !chainIds.has(e.id) &&
     !isQuoteRepost(e) &&
@@ -193,7 +248,7 @@ export default function ThreadView({
   ).sort((a, b) => a.created_at - b.created_at);
 
   const rowProps = {
-    profiles, allEvents: events,
+    profiles, allEvents,
     onOpenProfile, onOpenThread, onOpenZaps, onOpenReactions, onOpenReposts,
     myPubkey, myProfile, onPublish, publishEvent, onPrepend,
     onBookmark, isBookmarked, getLocalZaps, addLocalZap,
