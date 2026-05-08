@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import Overlay from "./Overlay.jsx";
 import Avatar from "./Avatar.jsx";
-import { displayName, avatarInitial, replyTagsForPublish } from "../utils.js";
+import { displayName, avatarInitial, replyTagsForPublish, nip19 } from "../utils.js";
 import { TENOR_KEY, COMPOSE_EMOJIS } from "../constants.js";
 
 export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey, myProfile, onPost, onDismiss, publishEvent, onPrepend, events = [] }) {
@@ -29,8 +29,15 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
       if (replyTo) {
         for (const t of replyTagsForPublish(replyTo, events)) tags.push(t);
       }
-      if (quotedEvent)  { tags.push(["q", quotedEvent.id]); tags.push(["e", quotedEvent.id, "", "mention"]); tags.push(["p", quotedEvent.pubkey, "", "mention"]); }
-      const published = await publishEvent({ kind: 1, content: full, tags });
+      let finalContent = full;
+      if (quotedEvent) {
+        tags.push(["q", quotedEvent.id]);
+        tags.push(["e", quotedEvent.id, "", "mention"]);
+        tags.push(["p", quotedEvent.pubkey, "", "mention"]);
+        const noteUri = `nostr:${nip19.noteEncode(quotedEvent.id)}`;
+        finalContent = finalContent ? `${finalContent}\n${noteUri}` : noteUri;
+      }
+      const published = await publishEvent({ kind: 1, content: finalContent, tags });
       if (published) onPrepend?.(published);
     } else {
       onPost?.(full);
