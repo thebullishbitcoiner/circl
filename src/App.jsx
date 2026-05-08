@@ -38,11 +38,14 @@ import ProfilePage from "./components/ProfilePage.jsx";
 import CirclePage from "./components/CirclePage.jsx";
 import ThreadView from "./components/ThreadView.jsx";
 import NotificationsFeed from "./components/NotificationsFeed.jsx";
+import DMsPage from "./components/DMsPage.jsx";
+import SearchPage from "./components/SearchPage.jsx";
 import { ZapsScreen, ReactionsScreen, RepostsScreen } from "./components/ListScreens.jsx";
 import SwipePanel from "./components/SwipePanel.jsx";
 import Avatar from "./components/Avatar.jsx";
 import NoteContent from "./components/NoteContent.jsx";
-import { SbHome, SbBell, SbBook, NavHome, NavBell, NavBook, Bk, Zi, Hi, Ri, Rpi, Bi } from "./components/icons.jsx";
+import { SbHome, SbBell, SbBook, SbDM, SbSearch, NavHome, NavBell, NavBook, NavDM, NavSearch, Bk, Zi, Hi, Ri, Rpi, Bi } from "./components/icons.jsx";
+import useDMs from "./hooks/useDMs.js";
 
 export default function App() {
   const { ndk, pubkey, status, error, login, logout, signAndPublish } = useNDK();
@@ -83,6 +86,7 @@ export default function App() {
     addLocalZap,
   });
   const { items: notificationEvents, loading: notifLoading } = useNotifications({ ndk, pubkey });
+  const { dmRelays, unlock: dmUnlock, unlocking: dmUnlocking, sendMessage: dmSend } = useDMs({ pubkey });
   const { toggle: toggleBm, isBookmarked, bookmarkItems } = useBookmarks({ ndk, pubkey, signAndPublish });
   const bookmarkLocalPool = useMemo(() => [...events, ...notificationEvents], [events, notificationEvents]);
   const { events: bookmarkFeedEvents, loading: bookmarkFeedLoading } = useBookmarkedEvents({
@@ -302,9 +306,11 @@ export default function App() {
   })();
 
   const navItems = [
-    { id: "home", label: "Home", SbIcon: <SbHome />, NavIcon: <NavHome /> },
-    { id: "notifications", label: "Alerts", SbIcon: <SbBell />, NavIcon: <NavBell /> },
-    { id: "bookmarks", label: "Saved", SbIcon: <SbBook />, NavIcon: <NavBook /> },
+    { id: "home",          label: "Home",     SbIcon: <SbHome />,   NavIcon: <NavHome /> },
+    { id: "notifications", label: "Alerts",   SbIcon: <SbBell />,   NavIcon: <NavBell /> },
+    { id: "messages",      label: "Messages", SbIcon: <SbDM />,     NavIcon: <NavDM /> },
+    { id: "search",        label: "Search",   SbIcon: <SbSearch />, NavIcon: <NavSearch /> },
+    { id: "bookmarks",     label: "Saved",    SbIcon: <SbBook />,   NavIcon: <NavBook /> },
   ];
 
   useEffect(() => () => clearTimeout(toastRef.current), []);
@@ -357,6 +363,8 @@ export default function App() {
                     {activeNav === "home" && "Your Circle"}
                     {activeNav === "bookmarks" && "Saved"}
                     {activeNav === "notifications" && "Notifications"}
+                    {activeNav === "messages" && "Messages"}
+                    {activeNav === "search" && "Search"}
                     {activeNav === "profile" && "Profile"}
                   </div>
                   {activeNav === "bookmarks" && bookmarkFeedEvents.length > 0 && (
@@ -368,7 +376,8 @@ export default function App() {
                   )}
                 </div>
               </div>
-              <div className="feed-scroll" ref={feedScrollRef} onScroll={handleFeedScroll}>
+              <div className="feed-scroll" ref={feedScrollRef} onScroll={handleFeedScroll}
+                style={(activeNav === "messages" || activeNav === "search") ? { display: "none" } : undefined}>
                 {(activeNav === "home" || activeNav === "bookmarks") && (
                   (activeNav === "home" && isLoading && events.length === 0) ||
                   (activeNav === "bookmarks" && bookmarkFeedLoading && bookmarkFeedEvents.length > 0)
@@ -499,6 +508,27 @@ export default function App() {
                     )
                 )}
               </div>
+              {activeNav === "messages" && (
+                <div style={{ flex: 1, overflow: "hidden", display: "flex" }}>
+                  <DMsPage
+                    pubkey={pubkey}
+                    profiles={profiles}
+                    unlock={dmUnlock}
+                    unlocking={dmUnlocking}
+                    sendMessage={dmSend}
+                    onOpenProfile={handleOpenProfile}
+                  />
+                </div>
+              )}
+              {activeNav === "search" && (
+                <div style={{ flex: 1, overflow: "hidden", display: "flex" }}>
+                  <SearchPage
+                    profiles={profiles}
+                    onOpenProfile={handleOpenProfile}
+                    onOpenThread={handleOpenThread}
+                  />
+                </div>
+              )}
               {(activeNav === "home" || activeNav === "profile") && !anyPanelOpen && !openArticle && (
                 <>
                   <button
@@ -802,13 +832,12 @@ export default function App() {
 
       <div className="bottom-nav">
         <div className="bottom-nav-inner">
-          {navItems.slice(0, 2).map(item => (
+          {navItems.slice(0, 3).map(item => (
             <button key={item.id} type="button" className={`bottom-nav-item ${!settingsOpen && activeNav === item.id ? "active" : ""}`} onClick={() => navigate(item.id)}>
               <div style={{ position: "relative", display: "inline-flex" }}>
                 {item.NavIcon}
                 {item.id === "notifications" && hasUnread && <div className="notif-unread-dot" />}
               </div>
-              <span className="bottom-nav-label">{item.label}</span>
             </button>
           ))}
 
@@ -824,11 +853,9 @@ export default function App() {
             </div>
           </button>
 
-          {navItems.slice(2).map(item => (
+          {navItems.slice(3).map(item => (
             <button key={item.id} type="button" className={`bottom-nav-item ${!settingsOpen && activeNav === item.id ? "active" : ""}`} onClick={() => navigate(item.id)}>
               {item.NavIcon}
-              <span className="bottom-nav-label">{item.label}</span>
-              {item.id === "bookmarks" && ""}
             </button>
           ))}
 
@@ -837,7 +864,6 @@ export default function App() {
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
             </svg>
-            <span>Settings</span>
           </button>
         </div>
       </div>
