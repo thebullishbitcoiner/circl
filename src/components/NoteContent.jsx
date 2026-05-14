@@ -141,20 +141,28 @@ export default function NoteContent({
   style = {},
 }) {
   const segments = useMemo(
-    () => groupNoteMediaSegments(parseNoteMediaSegments((content || "").replace(/\n{2,}/g, "\n"))),
+    () => groupNoteMediaSegments(parseNoteMediaSegments(content || "")),
     [content]
   );
   const normalizedSegments = useMemo(() => {
-    const out = [];
+    const merged = [];
     for (const seg of segments) {
-      const prev = out[out.length - 1];
+      const prev = merged[merged.length - 1];
       if (seg.type === "text" && prev?.type === "text") {
         prev.value = `${prev.value || ""}${seg.value || ""}`;
       } else {
-        out.push({ ...seg });
+        merged.push({ ...seg });
       }
     }
-    return out;
+    return merged.map((seg, i) => {
+      if (seg.type !== "text") return seg;
+      let val = (seg.value || "").replace(/\n{3,}/g, "\n\n");
+      const prev = merged[i - 1];
+      const next = merged[i + 1];
+      if (!prev || prev.type !== "text") val = val.replace(/^\n+/, "");
+      if (!next || next.type !== "text") val = val.replace(/\n+$/, "");
+      return { ...seg, value: val };
+    }).filter(seg => seg.type !== "text" || (seg.value || "").trim() !== "");
   }, [segments]);
 
   const [lightbox, setLightbox] = useState(null);

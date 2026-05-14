@@ -5,7 +5,7 @@ import NoteContent from "./NoteContent.jsx";
 import NoteActions from "./NoteActions.jsx";
 import FocusedStatsRow from "./FocusedStatsRow.jsx";
 import { Bk } from "./icons.jsx";
-import { displayName, nip05OrNpub, relativeTime, isQuoteRepost, replyCount, buildParentChain, buildSelfReplyChain } from "../utils.js";
+import { displayName, nip05OrNpub, relativeTime, isQuoteRepost, replyCount, buildParentChain, buildSelfReplyChain, directReplyParentId } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 
@@ -237,15 +237,10 @@ export default function ThreadView({
     ...selfChain.map(e => e.id),
   ]);
 
-  const otherReplies = allEvents.filter(e =>
-    e.kind === 1 &&
-    !chainIds.has(e.id) &&
-    !isQuoteRepost(e) &&
-    e.tags.some(t =>
-      t[0] === "e" && t[3] !== "mention" &&
-      (t[1] === focusedEvent.id || selfChain.some(s => s.id === t[1]))
-    )
-  ).sort((a, b) => a.created_at - b.created_at);
+  const otherReplies = allEvents.filter(e => {
+    if (e.kind !== 1 || chainIds.has(e.id) || isQuoteRepost(e)) return false;
+    return directReplyParentId(e) === focusedEvent.id;
+  }).sort((a, b) => a.created_at - b.created_at);
 
   const rowProps = {
     profiles, allEvents,

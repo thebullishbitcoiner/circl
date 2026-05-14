@@ -38,6 +38,30 @@ function NpubCopy({ pubkey }) {
   );
 }
 
+function LightningCopy({ address }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = e => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(address).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <div className="profile-npub">
+      <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" strokeWidth={2} style={{ flexShrink: 0 }}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
+      <span style={{ marginLeft: 3 }}>{address}</span>
+      <button onClick={handleCopy} style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 3px", color: copied ? "var(--primary)" : "var(--text-faint)", transition: "color .2s", display: "flex", alignItems: "center" }}>
+        {copied
+          ? <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><polyline points="20 6 9 17 4 12" /></svg>
+          : <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+        }
+      </button>
+    </div>
+  );
+}
+
 function normalizeWebsite(url) {
   if (typeof url !== "string" || !url.trim()) return null;
   const raw = url.trim();
@@ -254,8 +278,9 @@ export default function ProfilePage({
           {isOwn && <button className="profile-edit-btn">Edit profile</button>}
         </div>
         <div className="profile-name">{name}</div>
-        {p.nip05 && <div className="profile-nip05"><div className="profile-nip05-dot" /><Ck s={9} />{p.nip05}</div>}
+        {p.nip05 && <div className="profile-nip05">{p.nip05}</div>}
         <NpubCopy pubkey={pubkey} />
+        {(p.lud16 || p.lud06) && <LightningCopy address={p.lud16 || p.lud06} />}
         {(() => {
           const circleFollows = isOwn ? follows : subjectFollows;
           if (circleLoading || circleFollows.length === 0) return null;

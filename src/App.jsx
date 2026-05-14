@@ -62,6 +62,7 @@ export default function App() {
   const addLocalZap = useCallback((eventId, zap) => {
     setZapsByEvent(prev => {
       const current = prev[eventId] ?? [];
+      if (zap.id && current.some(z => z.id === zap.id)) return prev;
       const updated = [...current, zap].sort((a, b) => b.amount - a.amount);
       return { ...prev, [eventId]: updated };
     });
@@ -75,6 +76,7 @@ export default function App() {
     if (!emoji) return;
     setReactionsByEvent(prev => {
       const current = prev[eventId] ?? [];
+      if (current.some(r => r.pk === pk)) return prev;
       return { ...prev, [eventId]: [...current, { pk, emoji, created_at: Math.floor(Date.now() / 1000) }] };
     });
   }, []);

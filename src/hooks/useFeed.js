@@ -74,7 +74,7 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap }) {
             if (descTag) {
               try { comment = JSON.parse(descTag[1]).content || ""; } catch {}
             }
-            addLocalZap?.(targetId, { zapper: zapperTag?.[1] || raw.pubkey, amount: msats, comment });
+            addLocalZap?.(targetId, { id: raw.id, zapper: zapperTag?.[1] || raw.pubkey, amount: msats, comment });
           }
         }
       },

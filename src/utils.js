@@ -85,28 +85,6 @@ export const fmtSats = msats => fmtSatsVal(Math.round(msats / 1000));
 export const isQuoteRepost = e =>
   e?.kind === 1 && e.tags?.some(t => t[0] === "q");
 
-export const replyCount = (eventId, pool) =>
-  pool.filter(e =>
-    e.kind === 1 &&
-    e.id !== eventId &&
-    !isQuoteRepost(e) &&
-    e.tags.some(t => t[0] === "e" && t[1] === eventId && t[3] !== "mention")
-  ).length;
-
-export const repostAndQuoteCount = (eventId, pool) => {
-  const kind6  = pool.filter(e =>
-    e.kind === 6 && e.tags.some(t => t[0] === "e" && t[1] === eventId)
-  ).length;
-  const quotes = pool.filter(e =>
-    e.kind === 1 && e.id !== eventId && e.tags.some(t => t[0] === "q" && t[1] === eventId)
-  ).length;
-  return kind6 + quotes;
-};
-
-/**
- * Immediate parent note id for NIP-10 marked/legacy `e` tags (kind 1 thread).
- * Prefers `reply`, then a lone `root` (direct reply to thread root), else a single non-mention `e`.
- */
 export const directReplyParentId = event => {
   if (!event?.tags?.length) return null;
   const replyMark = event.tags.find(t => t[0] === "e" && t[3] === "reply");
@@ -118,7 +96,27 @@ export const directReplyParentId = event => {
     t => t[0] === "e" && t[3] !== "mention" && t[3] !== "quote"
   );
   if (legacy.length === 1 && legacy[0][1]) return legacy[0][1];
+  // Positional convention (NIP-10 legacy): last e-tag = direct reply target
+  if (legacy.length > 1) return legacy[legacy.length - 1][1];
   return null;
+};
+
+export const replyCount = (eventId, pool) =>
+  pool.filter(e =>
+    e.kind === 1 &&
+    e.id !== eventId &&
+    !isQuoteRepost(e) &&
+    directReplyParentId(e) === eventId
+  ).length;
+
+export const repostAndQuoteCount = (eventId, pool) => {
+  const kind6  = pool.filter(e =>
+    e.kind === 6 && e.tags.some(t => t[0] === "e" && t[1] === eventId)
+  ).length;
+  const quotes = pool.filter(e =>
+    e.kind === 1 && e.id !== eventId && e.tags.some(t => t[0] === "q" && t[1] === eventId)
+  ).length;
+  return kind6 + quotes;
 };
 
 /** Thread root note id for `replyTo` (walks parents in `pool` when markers are missing). */
