@@ -139,6 +139,7 @@ export default function NoteCard({
               allEvents={events}
               onOpenThread={onOpenThread}
               resolveEventById={resolveEventById}
+              collapsible
             />
             <ZapBadges zaps={localZaps} eventId={event.id} profiles={profiles} onOpenProfile={onOpenProfile}
               onOpenZaps={() => onOpenZaps?.({ eventId: event.id, zaps: localZaps })} />

@@ -126,6 +126,8 @@ function ImageMosaic({ urls, onImageClick }) {
   );
 }
 
+const COLLAPSE_THRESHOLD = 500;
+
 /**
  * Renders note body with inline images (mosaic when multiple), videos, and @mentions.
  */
@@ -139,6 +141,7 @@ export default function NoteContent({
   allowEmbeds = true,
   className = "note-text",
   style = {},
+  collapsible = false,
 }) {
   const segments = useMemo(
     () => groupNoteMediaSegments(parseNoteMediaSegments(content || "")),
@@ -167,6 +170,10 @@ export default function NoteContent({
 
   const [lightbox, setLightbox] = useState(null);
   const [resolvedRefs, setResolvedRefs] = useState({});
+  const [expanded, setExpanded] = useState(false);
+
+  const shouldCollapse = collapsible && (content?.length ?? 0) > COLLAPSE_THRESHOLD;
+  const isCollapsed = shouldCollapse && !expanded;
 
   useEffect(() => {
     if (!allowEmbeds || !resolveEventById || typeof content !== "string" || !content.includes("nostr:nevent1")) return;
@@ -187,7 +194,8 @@ export default function NoteContent({
   }, [content, allEvents, resolveEventById, resolvedRefs, allowEmbeds]);
 
   return (
-    <div className="note-content-stack">
+    <>
+    <div className={`note-content-stack${isCollapsed ? " note-content-collapsed" : ""}`}>
       {normalizedSegments.map((seg, i) => {
         if (seg.type === "text") {
           if (!seg.value || seg.value.trim() === "") return null;
@@ -246,14 +254,26 @@ export default function NoteContent({
         return null;
       })}
 
-      {lightbox && (
-        <MediaLightbox
-          urls={lightbox.urls}
-          index={lightbox.index}
-          onClose={() => setLightbox(null)}
-          onIndexChange={idx => setLightbox(l => (l ? { ...l, index: idx } : null))}
-        />
-      )}
+      {isCollapsed && <div className="note-content-fade" />}
     </div>
+    {shouldCollapse && (
+      <button
+        type="button"
+        className="note-content-more-btn"
+        onClick={e => { e.stopPropagation(); setExpanded(v => !v); }}
+      >
+        {expanded ? "Show less" : "Show more"}
+      </button>
+    )}
+
+    {lightbox && (
+      <MediaLightbox
+        urls={lightbox.urls}
+        index={lightbox.index}
+        onClose={() => setLightbox(null)}
+        onIndexChange={idx => setLightbox(l => (l ? { ...l, index: idx } : null))}
+      />
+    )}
+    </>
   );
 }

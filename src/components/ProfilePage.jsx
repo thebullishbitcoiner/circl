@@ -409,10 +409,10 @@ export default function ProfilePage({
                         <span className="meta-dot" aria-hidden="true">·</span>
                         <span className="note-time">{relativeTime(displayEv.created_at)}</span>
                       </div>
-                      {isQuote && e.content && <NoteContent content={e.content.replace(/\nnostr:\S+/g, "").trim()} profiles={profiles} onOpenProfile={onOpenProfile} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} style={{ marginBottom: 8 }} />}
-                      {isRepost && repostedEvent && <NoteContent content={repostedEvent.content} profiles={profiles} onOpenProfile={onOpenProfile} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} />}
+                      {isQuote && e.content && <NoteContent content={e.content.replace(/\nnostr:\S+/g, "").trim()} profiles={profiles} onOpenProfile={onOpenProfile} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} style={{ marginBottom: 8 }} collapsible />}
+                      {isRepost && repostedEvent && <NoteContent content={repostedEvent.content} profiles={profiles} onOpenProfile={onOpenProfile} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} collapsible />}
                       {isRepost && !repostedEvent && <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: "var(--text-faint)" }}>Original note not in feed</p>}
-                      {!isRepost && !isQuote && <NoteContent content={e.content} profiles={profiles} onOpenProfile={onOpenProfile} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} />}
+                      {!isRepost && !isQuote && <NoteContent content={e.content} profiles={profiles} onOpenProfile={onOpenProfile} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} collapsible />}
                       {isQuote && (
                         repostedEvent ? (
                           <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px", background: "var(--surface)", marginBottom: 4, cursor: "pointer" }}
