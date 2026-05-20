@@ -5,25 +5,52 @@ import { displayName, avatarInitial, replyTagsForPublish, nip19 } from "../utils
 import { TENOR_KEY, COMPOSE_EMOJIS } from "../constants.js";
 
 export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey, myProfile, onPost, onDismiss, publishEvent, onPrepend, events = [] }) {
-  const [text,        setText]        = useState("");
-  const [media,       setMedia]       = useState([]);
-  const [uploading,   setUploading]   = useState(false);
-  const [uploadErr,   setUploadErr]   = useState("");
-  const [showGif,     setShowGif]     = useState(false);
-  const [gifQuery,    setGifQuery]    = useState("");
-  const [gifs,        setGifs]        = useState([]);
-  const [gifLoading,  setGifLoading]  = useState(false);
-  const [showEmoji,   setShowEmoji]   = useState(false);
-  const fileRef       = useRef(null);
-  const textareaRef   = useRef(null);
+  const [hasText,        setHasText]        = useState(false);
+  const [media,          setMedia]          = useState([]);
+  const [uploading,      setUploading]      = useState(false);
+  const [uploadErr,      setUploadErr]      = useState("");
+  const [showGif,        setShowGif]        = useState(false);
+  const [gifQuery,       setGifQuery]       = useState("");
+  const [gifs,           setGifs]           = useState([]);
+  const [gifLoading,     setGifLoading]     = useState(false);
+  const [showEmoji,      setShowEmoji]      = useState(false);
+  const [mentionResults, setMentionResults] = useState([]);
+  const [mentionIndex,   setMentionIndex]   = useState(0);
+  const fileRef   = useRef(null);
+  const editorRef = useRef(null);
 
   const title   = quotedEvent ? "Quote repost" : replyTo ? "Reply" : "New note";
-  const canPost = text.trim() || media.length > 0;
+  const canPost = hasText || media.length > 0;
+
+  // Walk the contenteditable DOM and produce the final content string,
+  // converting mention chip spans back to their nostr: URIs.
+  const getContent = () => {
+    const div = editorRef.current;
+    if (!div) return "";
+    let result = "";
+    const walk = node => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        result += node.textContent;
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        if (node.dataset?.uri) {
+          result += node.dataset.uri;
+        } else if (node.tagName === "BR") {
+          result += "\n";
+        } else {
+          if (node.tagName === "DIV" && result.length > 0) result += "\n";
+          node.childNodes.forEach(walk);
+        }
+      }
+    };
+    div.childNodes.forEach(walk);
+    return result;
+  };
 
   const handlePost = async () => {
     if (!canPost) return;
+    const content = getContent().trim();
     const urls = media.map(m => m.url).join("\n");
-    const full = [text.trim(), urls].filter(Boolean).join("\n");
+    const full = [content, urls].filter(Boolean).join("\n");
     if (publishEvent) {
       const tags = [];
       if (replyTo) {
@@ -50,15 +77,36 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     if (!file) return;
     setUploading(true); setUploadErr("");
     try {
+      const uploadUrl = "https://nostr.build/api/v2/upload/files";
+      let authHeader = "";
+      if (myPubkey && window.nostr?.signEvent) {
+        const buf         = await file.arrayBuffer();
+        const digest      = await crypto.subtle.digest("SHA-256", buf);
+        const payloadHash = Array.from(new Uint8Array(digest))
+          .map(b => b.toString(16).padStart(2, "0")).join("");
+        const authEvent = await window.nostr.signEvent({
+          kind: 27235,
+          pubkey: myPubkey,
+          created_at: Math.floor(Date.now() / 1000),
+          tags: [["u", uploadUrl], ["method", "POST"], ["payload", payloadHash]],
+          content: "",
+        });
+        authHeader = `Nostr ${btoa(JSON.stringify(authEvent))}`;
+      }
       const form = new FormData();
       form.append("file", file);
-      const res  = await fetch("https://nostr.build/api/v2/upload/files", { method: "POST", body: form });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const headers = authHeader ? { Authorization: authHeader } : {};
+      const res  = await fetch(uploadUrl, { method: "POST", headers, body: form });
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        throw new Error(`HTTP ${res.status}: ${errText}`);
+      }
       const json = await res.json();
-      const url  = json?.nip94_event?.tags?.find(t => t[0] === "url")?.[1];
+      const url  = json?.nip94_event?.tags?.find(t => t[0] === "url")?.[1]
+                ?? json?.data?.[0]?.url;
       if (!url) throw new Error("No URL returned");
       setMedia(m => [...m, { url, type: "image" }]);
-    } catch { setUploadErr("Upload failed — try again"); }
+    } catch (err) { setUploadErr(`Upload failed — ${err.message}`); }
     finally  { setUploading(false); e.target.value = ""; }
   };
 
@@ -98,26 +146,118 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     setShowGif(false); setGifQuery("");
   };
 
-  const insertEmoji = emoji => {
-    const ta = textareaRef.current;
-    const apply = (before, after, caret) => {
-      const next = before + emoji + after;
-      setText(next);
-      requestAnimationFrame(() => {
-        if (ta) {
-          ta.focus();
-          const pos = Math.min(caret + emoji.length, next.length);
-          ta.setSelectionRange(pos, pos);
-        }
-      });
-    };
-    if (ta) {
-      const start = ta.selectionStart;
-      const end = ta.selectionEnd;
-      apply(text.slice(0, start), text.slice(end), start);
+  const handleInput = () => {
+    setHasText(getContent().trim().length > 0);
+
+    const sel = window.getSelection();
+    if (!sel?.rangeCount) { setMentionResults([]); return; }
+    const range = sel.getRangeAt(0);
+    if (range.startContainer.nodeType !== Node.TEXT_NODE) { setMentionResults([]); return; }
+
+    const textBefore = range.startContainer.textContent.slice(0, range.startOffset);
+    const match = textBefore.match(/@([\w.-]*)$/);
+    if (match && Object.keys(profiles || {}).length > 0) {
+      const query = match[1].toLowerCase();
+      setMentionIndex(0);
+      const results = Object.entries(profiles)
+        .filter(([pk, p]) => {
+          if (pk === myPubkey) return false;
+          const name = (p.display_name || p.name || "").toLowerCase();
+          const nip05 = (p.nip05 || "").toLowerCase().split("@")[0];
+          return !query || name.startsWith(query) || nip05.startsWith(query);
+        })
+        .slice(0, 6)
+        .map(([pk]) => pk);
+      setMentionResults(results);
     } else {
-      setText(t => t + emoji);
+      setMentionResults([]);
     }
+  };
+
+  const selectMention = pk => {
+    const div = editorRef.current;
+    const name = displayName(pk, profiles);
+    const uri  = `nostr:${nip19.npubEncode(pk)}`;
+
+    const sel = window.getSelection();
+    if (!sel?.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    const textNode = range.startContainer;
+    if (textNode.nodeType !== Node.TEXT_NODE) return;
+
+    const textBefore = textNode.textContent.slice(0, range.startOffset);
+    const atIndex = textBefore.lastIndexOf("@");
+    if (atIndex === -1) return;
+
+    const replaceRange = document.createRange();
+    replaceRange.setStart(textNode, atIndex);
+    replaceRange.setEnd(textNode, range.startOffset);
+    replaceRange.deleteContents();
+
+    const chip = document.createElement("span");
+    chip.className = "mention-chip";
+    chip.dataset.uri = uri;
+    chip.contentEditable = "false";
+    chip.textContent = `@${name}`;
+    replaceRange.insertNode(chip);
+
+    const space = document.createTextNode(" ");
+    chip.after(space);
+
+    const newRange = document.createRange();
+    newRange.setStart(space, space.length);
+    newRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+
+    setMentionResults([]);
+    setHasText(true);
+    div.focus();
+  };
+
+  const handleKeyDown = e => {
+    if (mentionResults.length > 0) {
+      if (e.key === "ArrowDown")                  { e.preventDefault(); setMentionIndex(i => Math.min(i + 1, mentionResults.length - 1)); return; }
+      if (e.key === "ArrowUp")                    { e.preventDefault(); setMentionIndex(i => Math.max(i - 1, 0)); return; }
+      if (e.key === "Enter" || e.key === "Tab")   { e.preventDefault(); selectMention(mentionResults[mentionIndex]); return; }
+      if (e.key === "Escape")                     { setMentionResults([]); return; }
+    }
+  };
+
+  const handlePaste = e => {
+    e.preventDefault();
+    const text = e.clipboardData.getData("text/plain");
+    const sel = window.getSelection();
+    if (!sel?.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+    const node = document.createTextNode(text);
+    range.insertNode(node);
+    const newRange = document.createRange();
+    newRange.setStartAfter(node);
+    newRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+    setHasText(getContent().trim().length > 0);
+  };
+
+  const insertEmoji = emoji => {
+    const div = editorRef.current;
+    if (!div) return;
+    div.focus();
+    const sel = window.getSelection();
+    if (sel?.rangeCount) {
+      const range = sel.getRangeAt(0);
+      range.deleteContents();
+      const node = document.createTextNode(emoji);
+      range.insertNode(node);
+      const newRange = document.createRange();
+      newRange.setStartAfter(node);
+      newRange.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+    }
+    setHasText(true);
   };
 
   return (
@@ -150,12 +290,15 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
               ? <img src={myProfile.picture} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
               : avatarInitial(myPubkey, { [myPubkey]: myProfile })}
           </div>
-          <textarea
-            ref={textareaRef}
-            className="compose-sheet-input"
-            placeholder={replyTo ? "Write your reply…" : "What's on your mind?"}
-            value={text}
-            onChange={e => setText(e.target.value)}
+          <div
+            ref={editorRef}
+            className="compose-sheet-input compose-richtext"
+            contentEditable
+            suppressContentEditableWarning
+            onInput={handleInput}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            data-placeholder={replyTo ? "Write your reply…" : "What's on your mind?"}
           />
         </div>
 
@@ -222,6 +365,26 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
                 {quotedEvent.content}
               </p>
             </div>
+          </div>
+        )}
+
+        {mentionResults.length > 0 && (
+          <div className="mention-list">
+            {mentionResults.map((pk, i) => (
+              <button
+                key={pk}
+                type="button"
+                className={`mention-item${i === mentionIndex ? " active" : ""}`}
+                onMouseDown={e => { e.preventDefault(); selectMention(pk); }}
+                onMouseEnter={() => setMentionIndex(i)}
+              >
+                <Avatar pk={pk} profiles={profiles} size={28} />
+                <div className="mention-item-info">
+                  <span className="mention-item-name">{displayName(pk, profiles)}</span>
+                  {profiles[pk]?.nip05 && <span className="mention-item-nip05">{profiles[pk].nip05}</span>}
+                </div>
+              </button>
+            ))}
           </div>
         )}
 
