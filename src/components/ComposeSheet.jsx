@@ -51,10 +51,11 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     setUploading(true); setUploadErr("");
     try {
       const form = new FormData();
-      form.append("fileToUpload", file);
-      const res  = await fetch("https://nostr.build/api/v1/upload", { method: "POST", body: form });
+      form.append("file", file);
+      const res  = await fetch("https://nostr.build/api/v2/upload/files", { method: "POST", body: form });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
-      const url  = json?.data?.[0]?.url;
+      const url  = json?.nip94_event?.tags?.find(t => t[0] === "url")?.[1];
       if (!url) throw new Error("No URL returned");
       setMedia(m => [...m, { url, type: "image" }]);
     } catch { setUploadErr("Upload failed — try again"); }
@@ -100,7 +101,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   const insertEmoji = emoji => {
     const ta = textareaRef.current;
     const apply = (before, after, caret) => {
-      const next = (before + emoji + after).slice(0, 280);
+      const next = before + emoji + after;
       setText(next);
       requestAnimationFrame(() => {
         if (ta) {
@@ -115,7 +116,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
       const end = ta.selectionEnd;
       apply(text.slice(0, start), text.slice(end), start);
     } else {
-      setText(t => (t + emoji).slice(0, 280));
+      setText(t => t + emoji);
     }
   };
 
@@ -154,7 +155,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
             className="compose-sheet-input"
             placeholder={replyTo ? "Write your reply…" : "What's on your mind?"}
             value={text}
-            onChange={e => setText(e.target.value.slice(0, 280))}
+            onChange={e => setText(e.target.value)}
           />
         </div>
 
@@ -251,9 +252,6 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
             style={showGif ? { color: "var(--primary)", background: "var(--surface)" } : {}}>
             <span style={{ fontSize: 11, fontWeight: 700, fontFamily: "'DM Sans',sans-serif", letterSpacing: "-.5px" }}>GIF</span>
           </button>
-          <span className={`compose-char-count${text.length > 240 ? " warn" : ""}`}>
-            {text.length > 0 ? `${280 - text.length}` : ""}
-          </span>
         </div>
       </div>
     </Overlay>
