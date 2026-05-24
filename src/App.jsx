@@ -45,8 +45,6 @@ import SwipePanel from "./components/SwipePanel.jsx";
 import Avatar from "./components/Avatar.jsx";
 import NoteContent from "./components/NoteContent.jsx";
 import { SbHome, SbBell, SbBook, SbDM, SbSearch, NavHome, NavBell, NavBook, NavDM, NavSearch, Bk, Zi, Hi, Ri, Rpi, Bi } from "./components/icons.jsx";
-import useDMs from "./hooks/useDMs.js";
-
 export default function App() {
   const { pubkey, status, error, login, logout, signAndPublish } = useAuth();
   const { follows, loading: fl } = useFollows({ pubkey });
@@ -87,7 +85,6 @@ export default function App() {
     addLocalZap,
   });
   const { items: notificationEvents, loading: notifLoading } = useNotifications({ pubkey });
-  const { dmRelays, unlock: dmUnlock, unlocking: dmUnlocking, sendMessage: dmSend } = useDMs({ pubkey });
   const [bookmarkRefreshKey, setBookmarkRefreshKey] = useState(0);
   const { toggle: toggleBm, isBookmarked, bookmarkItems } = useBookmarks({ pubkey, signAndPublish, refreshKey: bookmarkRefreshKey });
   const bookmarkLocalPool = useMemo(() => [...events, ...notificationEvents], [events, notificationEvents]);
@@ -512,14 +509,7 @@ export default function App() {
               </div>
               {activeNav === "messages" && (
                 <div style={{ flex: 1, overflow: "hidden", display: "flex" }}>
-                  <DMsPage
-                    pubkey={pubkey}
-                    profiles={profiles}
-                    unlock={dmUnlock}
-                    unlocking={dmUnlocking}
-                    sendMessage={dmSend}
-                    onOpenProfile={handleOpenProfile}
-                  />
+                  <DMsPage pubkey={pubkey} profiles={profiles} onOpenProfile={handleOpenProfile} />
                 </div>
               )}
               {activeNav === "search" && (
