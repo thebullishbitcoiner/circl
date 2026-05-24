@@ -12,13 +12,6 @@ export const REACTION_EMOJIS = [
   "🤙","💜","🌊","⚔️","🌟","🐂","🍊","👆","✅","🫡",
 ];
 
-/** Curated grid for compose (reactions + common text emojis; order preserved, duplicates removed). */
-export const COMPOSE_EMOJIS = [...new Set([
-  ...REACTION_EMOJIS,
-  "😀","😃","😄","😅","🙂","😊","🤔","😭","🤣","😍","🥰","😘",
-  "✨","💪","👍","👎","🙌","👏","🫶","🤝","☀️","🌙","⭐","☕",
-  "🍕","🫒","🧡","💙","🌈","🎯","📌","🙈","🤷","👋","💀","🎶",
-])];
 
 export const ZAP_PRESETS = [
   { sats: 21,    label: "default" },

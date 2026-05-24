@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import Overlay from "./Overlay.jsx";
 import Avatar from "./Avatar.jsx";
 import { displayName, avatarInitial, replyTagsForPublish, nip19 } from "../utils.js";
-import { TENOR_KEY, COMPOSE_EMOJIS } from "../constants.js";
+import { TENOR_KEY } from "../constants.js";
+import EmojiPicker from "./EmojiPicker.jsx";
 
 export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey, myProfile, onPost, onDismiss, publishEvent, onPrepend, events = [] }) {
   const [hasText,        setHasText]        = useState(false);
@@ -317,19 +318,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
         {uploading   && <div className="compose-upload-status">Uploading…</div>}
 
         {showEmoji && (
-          <div className="compose-emoji-picker">
-            <div className="gif-search-row">
-              <span className="compose-emoji-picker-label">Emoji</span>
-              <button type="button" className="compose-media-btn" onClick={() => setShowEmoji(false)} aria-label="Close emoji picker">✕</button>
-            </div>
-            <div className="emoji-grid compose-emoji-grid">
-              {COMPOSE_EMOJIS.map(emoji => (
-                <button key={emoji} type="button" className="emoji-btn" onClick={() => insertEmoji(emoji)}>
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          </div>
+          <EmojiPicker onSelect={emoji => { insertEmoji(emoji); }} />
         )}
 
         {showGif && (
@@ -397,7 +386,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
           </button>
           <button
             type="button"
-            className="compose-media-btn"
+            className="compose-media-btn compose-emoji-toggle"
             title="Emoji"
             onClick={() => { setShowGif(false); setShowEmoji(v => !v); }}
             style={showEmoji ? { color: "var(--primary)", background: "var(--surface)" } : {}}
