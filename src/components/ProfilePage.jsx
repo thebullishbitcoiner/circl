@@ -212,10 +212,11 @@ export default function ProfilePage({
   }, [events, profileEvents, repostExtras]);
 
   const theirEvents = mergedEvents.filter(e => e.pubkey === pubkey && (e.kind === 1 || e.kind === 6));
-  const isReplyFn   = e => e.kind === 1 && e.tags.some(t => t[0] === "e") && !isQuoteRepost(e);
+  const hasNonMentionETag = e => e.tags.some(t => t[0] === "e" && t[3] !== "mention");
+  const isReplyFn = e => e.kind === 1 && hasNonMentionETag(e) && !isQuoteRepost(e);
 
   const topLevel = theirEvents.filter(e =>
-    e.kind === 6 || isQuoteRepost(e) || (e.kind === 1 && !e.tags.some(t => t[0] === "e"))
+    e.kind === 6 || isQuoteRepost(e) || (e.kind === 1 && !hasNonMentionETag(e))
   );
   const replies = theirEvents.filter(isReplyFn);
 
