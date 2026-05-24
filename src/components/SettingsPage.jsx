@@ -139,6 +139,10 @@ export default function SettingsPage({ onBack, dark, toggleDark, onLogout, pubke
       <div className="settings-row" onClick={onLogout}>
         <div className="settings-row-label" style={{ color: "#E05C8A" }}>Sign out</div>
       </div>
+
+      <div style={{ position: "sticky", bottom: 0, padding: "12px 16px", fontSize: 11, color: "var(--text-muted)", fontFamily: "'DM Sans', sans-serif", background: "var(--bg)" }}>
+        {__APP_VERSION__}
+      </div>
     </div>
   );
 }

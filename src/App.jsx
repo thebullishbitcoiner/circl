@@ -329,7 +329,7 @@ export default function App() {
       <div className="app-shell">
 
         <aside className={`sidebar ${isMobile ? "collapsed" : ""}`}>
-          <div className="logo"><div className="logo-dot" />Circl</div>
+          <div className="logo"><img src="/logo.png" alt="Circl" style={{ height: 28, width: "auto" }} /></div>
           {navItems.map(item => (
             <button key={item.id} className={`nav-item ${activeNav === item.id ? "active" : ""}`} onClick={() => navigate(item.id)}>
               <div style={{ position: "relative", display: "inline-flex" }}>
@@ -720,7 +720,7 @@ export default function App() {
                       <div className="slide-panel-scroll">
                         <div className="panel-bar">
                           <button type="button" className="back-btn" onClick={handleBack}><Bk s={16} /></button>
-                          <span className="panel-bar-logo">Circl</span>
+                          <img src="/logo.png" alt="Circl" className="panel-bar-logo" style={{ height: 22, width: "auto" }} />
                         </div>
                         <div style={{ padding: "20px 20px 80px" }}>
                           <div className="note-card" style={{ borderRadius: 14, border: "1px solid var(--border)", marginBottom: 16 }}>

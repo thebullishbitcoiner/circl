@@ -141,6 +141,8 @@ export default function ProfilePage({
 
   const [repostExtras, setRepostExtras] = useState({});
   const repostFetchRef = useRef(new Set());
+  const [parentEvents, setParentEvents] = useState({});
+  const parentFetchRef = useRef(new Set());
 
   useEffect(() => {
     setProfileNotesMenuId(null);
@@ -150,6 +152,8 @@ export default function ProfilePage({
   useEffect(() => {
     setRepostExtras({});
     repostFetchRef.current.clear();
+    setParentEvents({});
+    parentFetchRef.current.clear();
   }, [pubkey]);
 
   useEffect(() => {
@@ -218,7 +222,7 @@ export default function ProfilePage({
   const topLevel = theirEvents.filter(e =>
     e.kind === 6 || isQuoteRepost(e) || (e.kind === 1 && !hasNonMentionETag(e))
   );
-  const replies = theirEvents.filter(isReplyFn);
+  const replies = theirEvents.filter(isReplyFn).sort((a, b) => b.created_at - a.created_at);
 
   useEffect(() => {
     if (!resolveEventById) return;
@@ -241,6 +245,25 @@ export default function ProfilePage({
     }
     return () => { cancelled = true; };
   }, [topLevel, mergedEvents, resolveEventById]);
+
+  useEffect(() => {
+    if (!resolveEventById) return;
+    let cancelled = false;
+    for (const e of replies) {
+      const parentId = directReplyParentId(e);
+      if (!parentId) continue;
+      if (mergedEvents.some(ev => ev.id === parentId)) continue;
+      if (parentEvents[parentId]) continue;
+      if (parentFetchRef.current.has(parentId)) continue;
+      parentFetchRef.current.add(parentId);
+      resolveEventById(parentId).then(ev => {
+        parentFetchRef.current.delete(parentId);
+        if (cancelled || !ev?.id) return;
+        setParentEvents(prev => (prev[ev.id] ? prev : { ...prev, [ev.id]: ev }));
+      }).catch(() => { parentFetchRef.current.delete(parentId); });
+    }
+    return () => { cancelled = true; };
+  }, [replies, mergedEvents, resolveEventById]);
 
   const allEvents = [...mergedEvents, ...extras];
   const betweenUs = allEvents
@@ -457,12 +480,10 @@ export default function ProfilePage({
             ? <div className="empty-state"><div className="empty-state-title">No replies yet</div><div className="empty-state-sub">Replies to other notes will appear here</div></div>
             : replies.map((e, i) => {
               const parentId = directReplyParentId(e);
-              const parentEv = parentId ? mergedEvents.find(ev => ev.id === parentId) : null;
-              let replyingToPk = parentEv?.pubkey ?? null;
-              if (!replyingToPk && e.tags?.length) {
-                const ps = e.tags.filter(t => t[0] === "p" && t[1]).map(t => t[1]);
-                replyingToPk = ps.find(pk => pk !== e.pubkey) ?? ps[0] ?? null;
-              }
+              const parentEv = parentId
+                ? (mergedEvents.find(ev => ev.id === parentId) ?? parentEvents[parentId] ?? null)
+                : null;
+              const replyingToPk = parentEv?.pubkey ?? null;
               return (
                 <NoteCard key={e.id} event={e} profiles={profiles}
                   events={mergedEvents}
