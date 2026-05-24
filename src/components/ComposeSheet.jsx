@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import Overlay from "./Overlay.jsx";
 import Avatar from "./Avatar.jsx";
 import { displayName, avatarInitial, replyTagsForPublish, nip19 } from "../utils.js";
-import { TENOR_KEY } from "../constants.js";
+import { GIPHY_KEY } from "../constants.js";
 import EmojiPicker from "./EmojiPicker.jsx";
 
 export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey, myProfile, onPost, onDismiss, publishEvent, onPrepend, events = [] }) {
@@ -14,6 +14,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   const [gifQuery,       setGifQuery]       = useState("");
   const [gifs,           setGifs]           = useState([]);
   const [gifLoading,     setGifLoading]     = useState(false);
+  const [gifError,       setGifError]       = useState("");
   const [showEmoji,      setShowEmoji]      = useState(false);
   const [mentionResults, setMentionResults] = useState([]);
   const [mentionIndex,   setMentionIndex]   = useState(0);
@@ -111,37 +112,37 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     finally  { setUploading(false); e.target.value = ""; }
   };
 
-  const searchGifs = async q => {
-    if (!q.trim()) { setGifs([]); return; }
+  const fetchGifs = async url => {
     setGifLoading(true);
+    setGifError("");
     try {
-      const res  = await fetch(`https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(q)}&key=${TENOR_KEY}&limit=18&media_filter=gif`);
+      const res  = await fetch(url);
       const json = await res.json();
-      setGifs(json.results || []);
-    } catch {}
+      if (json.message) { setGifError(json.message); setGifs([]); }
+      else setGifs(json.data || []);
+    } catch (e) {
+      setGifError("Could not load GIFs");
+      setGifs([]);
+    }
     setGifLoading(false);
   };
 
   useEffect(() => {
-    const t = setTimeout(() => searchGifs(gifQuery), 400);
+    if (!gifQuery.trim()) { setGifs([]); setGifError(""); return; }
+    const t = setTimeout(() =>
+      fetchGifs(`https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(gifQuery)}&limit=18&rating=g`),
+      400
+    );
     return () => clearTimeout(t);
   }, [gifQuery]);
 
   useEffect(() => {
     if (!showGif || gifQuery) return;
-    (async () => {
-      setGifLoading(true);
-      try {
-        const res  = await fetch(`https://tenor.googleapis.com/v2/featured?key=${TENOR_KEY}&limit=18&media_filter=gif`);
-        const json = await res.json();
-        setGifs(json.results || []);
-      } catch {}
-      setGifLoading(false);
-    })();
+    fetchGifs(`https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=18&rating=g`);
   }, [showGif]);
 
   const pickGif = gif => {
-    const url = gif.media_formats?.gif?.url || gif.media_formats?.tinygif?.url;
+    const url = gif.images?.original?.url || gif.images?.downsized?.url;
     if (!url) return;
     setMedia(m => [...m, { url, type: "gif" }]);
     setShowGif(false); setGifQuery("");
@@ -329,16 +330,18 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
             </div>
             {gifLoading
               ? <div style={{ padding: "20px", textAlign: "center", fontSize: 12, color: "var(--text-faint)" }}>Loading…</div>
-              : <div className="gif-grid">
-                  {gifs.map((g, i) => {
-                    const thumb = g.media_formats?.tinygif?.url || g.media_formats?.gif?.url;
-                    return (
-                      <div key={i} className="gif-item" onClick={() => pickGif(g)}>
-                        {thumb && <img src={thumb} alt="" loading="lazy" />}
-                      </div>
-                    );
-                  })}
-                </div>
+              : gifError
+                ? <div style={{ padding: "20px", textAlign: "center", fontSize: 12, color: "var(--text-faint)" }}>{gifError}</div>
+                : <div className="gif-grid">
+                    {gifs.map((g, i) => {
+                      const thumb = g.images?.fixed_height_small?.url || g.images?.fixed_height?.url;
+                      return (
+                        <div key={i} className="gif-item" onClick={() => pickGif(g)}>
+                          {thumb && <img src={thumb} alt="" loading="lazy" />}
+                        </div>
+                      );
+                    })}
+                  </div>
             }
           </div>
         )}

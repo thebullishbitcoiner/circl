@@ -22,4 +22,4 @@ export const ZAP_PRESETS = [
   { sats: 21000, label: "21k" },
 ];
 
-export const TENOR_KEY = "AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCyk";
+export const GIPHY_KEY = "IOwWNUHzMmRh28umCJjJhKmaoOg71esr";
