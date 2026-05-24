@@ -4,8 +4,8 @@ function trimUrlToken(url) {
   return url.replace(/[),.;:!?*»\]}]+$/, "");
 }
 
-export default function NoteText({ content, profiles, onOpenProfile, className = "note-text", style = {} }) {
-  const parts = content.split(/(https?:\/\/[^\s<>'"]+|nostr:(?:npub1|nprofile1)[023456789acdefghjklmnpqrstuvwxyz]+|@\S+)/gi);
+export default function NoteText({ content, profiles, onOpenProfile, onOpenHashtag, className = "note-text", style = {} }) {
+  const parts = content.split(/(https?:\/\/[^\s<>'"]+|nostr:(?:npub1|nprofile1)[023456789acdefghjklmnpqrstuvwxyz]+|#[a-zA-Z][a-zA-Z0-9_]+|@\S+)/gi);
 
   const handleMention = mention => {
     if (!onOpenProfile) return;
@@ -21,6 +21,14 @@ export default function NoteText({ content, profiles, onOpenProfile, className =
     <p className={className} style={style}>
       {parts.map((part, i) => {
         if (!part) return null;
+        if (/^#[a-zA-Z][a-zA-Z0-9_]+$/.test(part)) {
+          const tag = part.slice(1);
+          return (
+            <span key={i} className="note-hashtag" onClick={e => { e.stopPropagation(); onOpenHashtag?.(tag); }}>
+              {part}
+            </span>
+          );
+        }
         if (part.startsWith("@")) {
           return (
             <span key={i} className="ix-mention" style={{ cursor: "pointer" }}

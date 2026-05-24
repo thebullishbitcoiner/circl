@@ -6,7 +6,7 @@ import { displayName, nip05OrNpub, relativeTime } from "../utils.js";
 export default function RepostCard({
   event, profiles, events, myPubkey, myProfile,
   resolveEventById,
-  onOpenProfile, onOpenThread, onOpenZaps, onOpenReactions, onOpenReposts,
+  onOpenProfile, onOpenThread, onOpenHashtag, onOpenZaps, onOpenReactions, onOpenReposts,
   onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal, delay,
@@ -47,6 +47,7 @@ export default function RepostCard({
               content={original.content}
               profiles={profiles}
               onOpenProfile={onOpenProfile}
+              onOpenHashtag={onOpenHashtag}
               allEvents={events}
               onOpenThread={onOpenThread}
               resolveEventById={resolveEventById}

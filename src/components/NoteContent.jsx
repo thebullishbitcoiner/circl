@@ -135,6 +135,7 @@ export default function NoteContent({
   content,
   profiles,
   onOpenProfile,
+  onOpenHashtag,
   allEvents = [],
   onOpenThread,
   resolveEventById,
@@ -209,6 +210,7 @@ export default function NoteContent({
                   content={part.value}
                   profiles={profiles}
                   onOpenProfile={onOpenProfile}
+                  onOpenHashtag={onOpenHashtag}
                   className={className}
                   style={style}
                 />

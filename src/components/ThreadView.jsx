@@ -10,7 +10,7 @@ import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 
 function ThreadNoteRow({
-  event, variant = "normal", profiles, allEvents, onOpenProfile, onOpenThread,
+  event, variant = "normal", profiles, allEvents, onOpenProfile, onOpenThread, onOpenHashtag,
   onOpenZaps, onOpenReactions, onOpenReposts,
   myPubkey, myProfile, onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, onRequestModal, onDismissModal,
@@ -106,6 +106,7 @@ function ThreadNoteRow({
               <>
                 {displayContent && (
                   <NoteContent content={displayContent} profiles={profiles} onOpenProfile={onOpenProfile}
+                    onOpenHashtag={onOpenHashtag}
                     allEvents={allEvents}
                     onOpenThread={onOpenThread}
                     resolveEventById={resolveEventById}
@@ -163,7 +164,7 @@ const Connector = ({ chain = false }) => (
 );
 
 export default function ThreadView({
-  focusedEvent, events, profiles, onBack, onOpenProfile, onOpenThread,
+  focusedEvent, events, profiles, onBack, onOpenProfile, onOpenThread, onOpenHashtag,
   onOpenZaps, onOpenReactions, onOpenReposts,
   myPubkey, myProfile, onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, onRequestModal, onDismissModal,
@@ -245,7 +246,7 @@ export default function ThreadView({
 
   const rowProps = {
     profiles, allEvents,
-    onOpenProfile, onOpenThread, onOpenZaps, onOpenReactions, onOpenReposts,
+    onOpenProfile, onOpenThread, onOpenHashtag, onOpenZaps, onOpenReactions, onOpenReposts,
     myPubkey, myProfile, onPublish, publishEvent, onPrepend,
     onBookmark, isBookmarked, getLocalZaps, addLocalZap,
     getLocalReactions, setLocalReaction, onRequestModal, onDismissModal, resolveEventById,

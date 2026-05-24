@@ -40,6 +40,7 @@ import ThreadView from "./components/ThreadView.jsx";
 import NotificationsFeed from "./components/NotificationsFeed.jsx";
 import DMsPage from "./components/DMsPage.jsx";
 import SearchPage from "./components/SearchPage.jsx";
+import HashtagFeed from "./components/HashtagFeed.jsx";
 import { ZapsScreen, ReactionsScreen, RepostsScreen } from "./components/ListScreens.jsx";
 import SwipePanel from "./components/SwipePanel.jsx";
 import Avatar from "./components/Avatar.jsx";
@@ -193,6 +194,7 @@ export default function App() {
   const handleOpenZaps = ({ eventId, zaps }) => pushNav({ type: "zaps", payload: { eventId, zaps } });
   const handleOpenReactions = ({ eventId, reactions }) => pushNav({ type: "reactions", payload: { eventId, reactions } });
   const handleOpenReposts = ({ eventId, reposts }) => pushNav({ type: "reposts", payload: { eventId, reposts } });
+  const handleOpenHashtag = tag => pushNav({ type: "hashtag", payload: tag });
 
   const handleBack = () => {
     if (navStack.length > 0) popNav();
@@ -428,6 +430,7 @@ export default function App() {
                                       myProfile={myProfile}
                                       onOpenProfile={handleOpenProfile}
                                       onOpenThread={handleOpenThread}
+                                      onOpenHashtag={handleOpenHashtag}
                                       onOpenZaps={handleOpenZaps}
                                       onOpenReactions={handleOpenReactions}
                                       onOpenReposts={handleOpenReposts}
@@ -463,6 +466,7 @@ export default function App() {
                                       onBookmark={handleBookmark}
                                       onOpenProfile={handleOpenProfile}
                                       onOpenThread={handleOpenThread}
+                                      onOpenHashtag={handleOpenHashtag}
                                       onOpenZaps={handleOpenZaps}
                                       onOpenReactions={handleOpenReactions}
                                       onOpenReposts={handleOpenReposts}
@@ -598,6 +602,7 @@ export default function App() {
                         onOpenProfile={handleOpenProfile}
                         onOpenNote={handleOpenNote}
                         onOpenThread={handleOpenThread}
+                        onOpenHashtag={handleOpenHashtag}
                         onOpenZaps={handleOpenZaps}
                         onOpenReactions={handleOpenReactions}
                         onOpenReposts={handleOpenReposts}
@@ -642,6 +647,7 @@ export default function App() {
                         onBack={handleBack}
                         onOpenProfile={handleOpenProfile}
                         onOpenThread={handleOpenThread}
+                        onOpenHashtag={handleOpenHashtag}
                         onOpenZaps={handleOpenZaps}
                         onOpenReactions={handleOpenReactions}
                         onOpenReposts={handleOpenReposts}
@@ -783,6 +789,20 @@ export default function App() {
                           </div>
                         </div>
                       </div>
+                    );
+                  }
+
+                  if (top.type === "hashtag") {
+                    return (
+                      <HashtagFeed
+                        key={top.payload}
+                        hashtag={top.payload}
+                        profiles={profiles}
+                        onBack={handleBack}
+                        onOpenProfile={handleOpenProfile}
+                        onOpenThread={handleOpenThread}
+                        onOpenHashtag={handleOpenHashtag}
+                      />
                     );
                   }
 

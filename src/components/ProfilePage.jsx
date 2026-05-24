@@ -118,7 +118,7 @@ function IxNote({ event, myPubkey, profiles, onOpenProfile, onOpenThread, resolv
 
 export default function ProfilePage({
   pubkey, myPubkey, profiles, follows, events, isOwn,
-  onBack, onOpenProfile, onOpenNote, onOpenThread, onOpenZaps, onOpenReactions, onOpenReposts,
+  onBack, onOpenProfile, onOpenNote, onOpenThread, onOpenHashtag, onOpenZaps, onOpenReactions, onOpenReposts,
   myProfile, onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal, backLabel = "Your Circle", resolveEventById,
@@ -410,10 +410,10 @@ export default function ProfilePage({
                         <span className="meta-dot" aria-hidden="true">·</span>
                         <span className="note-time">{relativeTime(displayEv.created_at)}</span>
                       </div>
-                      {isQuote && e.content && <NoteContent content={e.content.replace(/\nnostr:\S+/g, "").trim()} profiles={profiles} onOpenProfile={onOpenProfile} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} style={{ marginBottom: 8 }} collapsible />}
-                      {isRepost && repostedEvent && <NoteContent content={repostedEvent.content} profiles={profiles} onOpenProfile={onOpenProfile} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} collapsible />}
+                      {isQuote && e.content && <NoteContent content={e.content.replace(/\nnostr:\S+/g, "").trim()} profiles={profiles} onOpenProfile={onOpenProfile} onOpenHashtag={onOpenHashtag} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} style={{ marginBottom: 8 }} collapsible />}
+                      {isRepost && repostedEvent && <NoteContent content={repostedEvent.content} profiles={profiles} onOpenProfile={onOpenProfile} onOpenHashtag={onOpenHashtag} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} collapsible />}
                       {isRepost && !repostedEvent && <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: "var(--text-faint)" }}>Original note not in feed</p>}
-                      {!isRepost && !isQuote && <NoteContent content={e.content} profiles={profiles} onOpenProfile={onOpenProfile} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} collapsible />}
+                      {!isRepost && !isQuote && <NoteContent content={e.content} profiles={profiles} onOpenProfile={onOpenProfile} onOpenHashtag={onOpenHashtag} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} collapsible />}
                       {isQuote && (
                         repostedEvent ? (
                           <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px", background: "var(--surface)", marginBottom: 4, cursor: "pointer" }}
@@ -424,7 +424,7 @@ export default function ProfilePage({
                               <span style={{ fontSize: 10, color: "var(--text-faint)", marginLeft: "auto" }}>{relativeTime(repostedEvent.created_at)}</span>
                             </div>
                             <div style={{ maxHeight: 220, overflow: "hidden" }}>
-                              <NoteContent content={repostedEvent.content} profiles={profiles} onOpenProfile={onOpenProfile} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} className="note-text" style={{ fontSize: 13, lineHeight: 1.55, color: "var(--text-muted)", margin: 0 }} />
+                              <NoteContent content={repostedEvent.content} profiles={profiles} onOpenProfile={onOpenProfile} onOpenHashtag={onOpenHashtag} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} className="note-text" style={{ fontSize: 13, lineHeight: 1.55, color: "var(--text-muted)", margin: 0 }} />
                             </div>
                           </div>
                         ) : (

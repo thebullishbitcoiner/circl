@@ -244,6 +244,8 @@
   .note-embed-text{font-size:13px;line-height:1.55;color:var(--text-muted);margin:0;word-break:break-word;overflow-wrap:anywhere;white-space:pre-wrap;}
   .note-embed-ref{cursor:default;}
   .note-link{color:var(--primary);text-decoration:underline;word-break:break-all;}
+  .note-hashtag{color:var(--primary);font-weight:500;cursor:pointer;}
+  .note-hashtag:hover{text-decoration:underline;}
   .note-media{max-width:100%;border-radius:12px;overflow:hidden;border:1px solid var(--border);background:var(--surface);align-self:flex-start;}
   .note-media img,.note-media video{display:block;width:100%;max-height:min(70vh,520px);object-fit:cover;background:var(--surface2);}
   .note-media-video video{max-height:min(60vh,480px);}

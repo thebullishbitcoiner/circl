@@ -14,7 +14,7 @@ export default function NoteCard({
   event, profiles, liked, bookmarked, likeCount,
   replyCount: rCount = 0, repostCount: rpCount = 0,
   myPubkey, myProfile, onLike, onBookmark,
-  onOpenProfile, onOpenThread, onOpenZaps, onOpenReactions, onOpenReposts,
+  onOpenProfile, onOpenThread, onOpenHashtag, onOpenZaps, onOpenReactions, onOpenReposts,
   events = [],
   resolveEventById,
   onPublish, publishEvent, onPrepend,
@@ -136,6 +136,7 @@ export default function NoteCard({
               content={event.content}
               profiles={profiles}
               onOpenProfile={onOpenProfile}
+              onOpenHashtag={onOpenHashtag}
               allEvents={events}
               onOpenThread={onOpenThread}
               resolveEventById={resolveEventById}
