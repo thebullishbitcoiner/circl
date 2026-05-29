@@ -36,6 +36,7 @@ import SkelCard from "./components/SkelCard.jsx";
 import LongformCard from "./components/LongformCard.jsx";
 import NoteCard from "./components/NoteCard.jsx";
 import RepostCard from "./components/RepostCard.jsx";
+import PollCard from "./components/PollCard.jsx";
 import NoteActions from "./components/NoteActions.jsx";
 import ArticleReader from "./components/ArticleReader.jsx";
 import ComposeSheet from "./components/ComposeSheet.jsx";
@@ -363,7 +364,7 @@ export default function App() {
             </svg>
             Settings
           </button>
-          <button className="compose-btn">+ New Note</button>
+          <button className="compose-btn" onClick={() => setFloatingCompose(true)}>+ New Note</button>
           <div className="sidebar-profile" onClick={() => navigate("profile")}>
             <div className="sidebar-av">{myProfile?.picture ? <img src={myProfile.picture} alt="me" /> : avatarInitial(pubkey, profiles)}</div>
             <div><div className="sidebar-name">{myDisplayName}</div><div className="sidebar-npub">{myNpub}</div></div>
@@ -472,45 +473,79 @@ export default function App() {
                                       )}                                      delay={0}
                                     />
                                   )
-                                  : (
-                                    <NoteCard
-                                      key={ev.id}
-                                      event={ev}
-                                      events={mergedFeedPool}
-                                      resolveEventById={resolveEventById}
-                                      profiles={profiles}
-                                      liked={getLike(ev.id).liked}
-                                      bookmarked={isBookmarked(ev)}
-                                      likeCount={getLike(ev.id).count}
-                                      replyCount={replyCount(ev.id, mergedFeedPool)}
-                                      repostCount={repostAndQuoteCount(ev.id, mergedFeedPool)}
-                                      myPubkey={pubkey}
-                                      myProfile={myProfile}
-                                      onLike={handleLike}
-                                      onBookmark={handleBookmark}
-                                      onOpenProfile={handleOpenProfile}
-                                      onOpenThread={handleOpenThread}
-                                      onOpenHashtag={handleOpenHashtag}
-                                      onOpenZaps={handleOpenZaps}
-                                      onOpenReactions={handleOpenReactions}
-                                      onOpenReposts={handleOpenReposts}
-                                      onPublish={prependEvent}
-                                      publishEvent={publishEvent}
-                                      onPrepend={prependEvent}
-                                      getLocalZaps={getLocalZaps}
-                                      addLocalZap={addLocalZap}
-                                      getLocalReactions={getLocalReactions}
-                                      setLocalReaction={setLocalReaction}
-                                      sendZap={sendZap}
-                                      defaultZapAmount={zapSettings.amount}
-                                      defaultZapMsg={zapSettings.msg}
-                                      onZapFail={reason => showToast(
-                                        reason === "no_lud16"  ? "⚡ No lightning address" :
-                                        reason === "no_wallet" ? "⚡ No wallet connected" :
-                                        `⚡ Zap failed: ${reason}`
-                                      )}                                      delay={0}
-                                    />
-                                  )
+                                  : (ev.kind === 1068 || ev.kind === 6969)
+                                    ? (
+                                      <PollCard
+                                        key={ev.id}
+                                        event={ev}
+                                        events={mergedFeedPool}
+                                        resolveEventById={resolveEventById}
+                                        profiles={profiles}
+                                        myPubkey={pubkey}
+                                        myProfile={myProfile}
+                                        onOpenProfile={handleOpenProfile}
+                                        onOpenThread={handleOpenThread}
+                                        onOpenHashtag={handleOpenHashtag}
+                                        onOpenZaps={handleOpenZaps}
+                                        onOpenReactions={handleOpenReactions}
+                                        onOpenReposts={handleOpenReposts}
+                                        onPublish={prependEvent}
+                                        publishEvent={publishEvent}
+                                        onPrepend={prependEvent}
+                                        getLocalZaps={getLocalZaps}
+                                        addLocalZap={addLocalZap}
+                                        getLocalReactions={getLocalReactions}
+                                        setLocalReaction={setLocalReaction}
+                                        sendZap={sendZap}
+                                        defaultZapAmount={zapSettings.amount}
+                                        defaultZapMsg={zapSettings.msg}
+                                        onZapFail={reason => showToast(
+                                          reason === "no_lud16"  ? "⚡ No lightning address" :
+                                          reason === "no_wallet" ? "⚡ No wallet connected" :
+                                          `⚡ Zap failed: ${reason}`
+                                        )}
+                                        delay={0}
+                                      />
+                                    )
+                                    : (
+                                      <NoteCard
+                                        key={ev.id}
+                                        event={ev}
+                                        events={mergedFeedPool}
+                                        resolveEventById={resolveEventById}
+                                        profiles={profiles}
+                                        liked={getLike(ev.id).liked}
+                                        bookmarked={isBookmarked(ev)}
+                                        likeCount={getLike(ev.id).count}
+                                        replyCount={replyCount(ev.id, mergedFeedPool)}
+                                        repostCount={repostAndQuoteCount(ev.id, mergedFeedPool)}
+                                        myPubkey={pubkey}
+                                        myProfile={myProfile}
+                                        onLike={handleLike}
+                                        onBookmark={handleBookmark}
+                                        onOpenProfile={handleOpenProfile}
+                                        onOpenThread={handleOpenThread}
+                                        onOpenHashtag={handleOpenHashtag}
+                                        onOpenZaps={handleOpenZaps}
+                                        onOpenReactions={handleOpenReactions}
+                                        onOpenReposts={handleOpenReposts}
+                                        onPublish={prependEvent}
+                                        publishEvent={publishEvent}
+                                        onPrepend={prependEvent}
+                                        getLocalZaps={getLocalZaps}
+                                        addLocalZap={addLocalZap}
+                                        getLocalReactions={getLocalReactions}
+                                        setLocalReaction={setLocalReaction}
+                                        sendZap={sendZap}
+                                        defaultZapAmount={zapSettings.amount}
+                                        defaultZapMsg={zapSettings.msg}
+                                        onZapFail={reason => showToast(
+                                          reason === "no_lud16"  ? "⚡ No lightning address" :
+                                          reason === "no_wallet" ? "⚡ No wallet connected" :
+                                          `⚡ Zap failed: ${reason}`
+                                        )}                                      delay={0}
+                                      />
+                                    )
                             )}
                             {visible.length < filtered.length && (
                               <div style={{ padding: "20px", textAlign: "center" }}>

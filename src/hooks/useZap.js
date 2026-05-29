@@ -26,7 +26,7 @@ async function fetchLnurlData(lnAddr) {
 }
 
 export default function useZap(wallet) {
-  const sendZap = useCallback(async ({ amountSats, recipientLnAddr, recipientPubkey, eventId, eventKind = 1, msg = "" }) => {
+  const sendZap = useCallback(async ({ amountSats, recipientLnAddr, recipientPubkey, eventId, eventKind = 1, msg = "", pollOption = null }) => {
     if (!wallet?.nwc_uri) return { ok: false, reason: "no_wallet" };
     if (!recipientLnAddr) return { ok: false, reason: "no_lud16" };
 
@@ -49,6 +49,7 @@ export default function useZap(wallet) {
             : { pubkey: recipientPubkey, amount: msats, comment: msg, relays: RELAYS };
 
           const zapRequestTemplate = makeZapRequest(zapParams);
+          if (pollOption) zapRequestTemplate.tags.push(["poll_option", pollOption]);
           const signed = await window.nostr.signEvent(zapRequestTemplate);
 
           const callbackUrl = new URL(callback);

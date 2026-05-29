@@ -4,6 +4,7 @@ import Avatar from "./Avatar.jsx";
 import { displayName, avatarInitial, replyTagsForPublish, nip19 } from "../utils.js";
 import { GIPHY_KEY } from "../constants.js";
 import EmojiPicker from "./EmojiPicker.jsx";
+import PollCompose from "./PollCompose.jsx";
 
 export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey, myProfile, onPost, onDismiss, publishEvent, onPrepend, events = [] }) {
   const [hasText,        setHasText]        = useState(false);
@@ -18,11 +19,19 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   const [showEmoji,      setShowEmoji]      = useState(false);
   const [mentionResults, setMentionResults] = useState([]);
   const [mentionIndex,   setMentionIndex]   = useState(0);
+  const [pollMode,       setPollMode]       = useState(false);
+  const [pollType,       setPollType]       = useState("standard");
+  const [pollOptions,    setPollOptions]    = useState(["", ""]);
+  const [pollChoice,     setPollChoice]     = useState("singlechoice");
+  const [pollExpiry,     setPollExpiry]     = useState("");
+  const [zapMin,         setZapMin]         = useState("");
+  const [zapMax,         setZapMax]         = useState("");
   const fileRef   = useRef(null);
   const editorRef = useRef(null);
 
-  const title   = quotedEvent ? "Quote repost" : replyTo ? "Reply" : "New note";
-  const canPost = hasText || media.length > 0;
+  const title   = quotedEvent ? "Quote repost" : replyTo ? "Reply" : pollMode ? "New Poll" : "New note";
+  const pollValid = pollMode && pollOptions.filter(o => o.trim()).length >= 2;
+  const canPost = pollMode ? pollValid : (hasText || media.length > 0);
 
   // Walk the contenteditable DOM and produce the final content string,
   // converting mention chip spans back to their nostr: URIs.
@@ -50,6 +59,30 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
 
   const handlePost = async () => {
     if (!canPost) return;
+
+    if (pollMode && publishEvent) {
+      const question = getContent().trim();
+      const filledOptions = pollOptions.filter(o => o.trim());
+      const isZap = pollType === "zap";
+      const tags = [];
+
+      if (isZap) {
+        filledOptions.forEach((label, i) => tags.push(["poll_option", String(i), label]));
+        if (zapMin) tags.push(["value_minimum", String(Number(zapMin))]);
+        if (zapMax) tags.push(["value_maximum", String(Number(zapMax))]);
+        if (pollExpiry) tags.push(["closed_at", String(Math.floor(new Date(pollExpiry).getTime() / 1000))]);
+      } else {
+        filledOptions.forEach((label, i) => tags.push(["option", String(i), label]));
+        tags.push(["polltype", pollChoice]);
+        if (pollExpiry) tags.push(["endsAt", String(Math.floor(new Date(pollExpiry).getTime() / 1000))]);
+      }
+
+      const published = await publishEvent({ kind: isZap ? 6969 : 1068, content: question, tags });
+      if (published) onPrepend?.(published);
+      onDismiss?.();
+      return;
+    }
+
     const content = getContent().trim();
     const urls = media.map(m => m.url).join("\n");
     const full = [content, urls].filter(Boolean).join("\n");
@@ -304,6 +337,23 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
           />
         </div>
 
+        {pollMode && (
+          <PollCompose
+            pollType={pollType}
+            onChangePollType={t => { setPollType(t); }}
+            options={pollOptions}
+            onChangeOptions={setPollOptions}
+            pollChoice={pollChoice}
+            onChangePollChoice={setPollChoice}
+            expiry={pollExpiry}
+            onChangeExpiry={setPollExpiry}
+            zapMin={zapMin}
+            onChangeZapMin={setZapMin}
+            zapMax={zapMax}
+            onChangeZapMax={setZapMax}
+          />
+        )}
+
         {media.length > 0 && (
           <div className="compose-previews">
             {media.map((m, i) => (
@@ -407,6 +457,22 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
             style={showGif ? { color: "var(--primary)", background: "var(--surface)" } : {}}>
             <span style={{ fontSize: 11, fontWeight: 700, fontFamily: "'DM Sans',sans-serif", letterSpacing: "-.5px" }}>GIF</span>
           </button>
+          {!replyTo && !quotedEvent && (
+            <button
+              type="button"
+              className="compose-media-btn"
+              title="Create poll"
+              onClick={() => { setShowEmoji(false); setShowGif(false); setPollMode(v => !v); }}
+              style={pollMode ? { color: "var(--primary)", background: "var(--surface)" } : {}}
+              aria-pressed={pollMode}
+            >
+              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="20" x2="18" y2="10" />
+                <line x1="12" y1="20" x2="12" y2="4" />
+                <line x1="6" y1="20" x2="6" y2="14" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
     </Overlay>

@@ -35,7 +35,7 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap }) {
       next: event => eventStore.add(event),
     });
 
-    const mainSub = pool.subscription(relayUrls, [{ kinds: [1, 6, 30023], authors, since, limit: 300 }]).subscribe({
+    const mainSub = pool.subscription(relayUrls, [{ kinds: [1, 6, 30023, 1068, 6969], authors, since, limit: 300 }]).subscribe({
       next: raw => {
         eventStore.add(raw);
         if (seen.current.has(raw.id)) return;

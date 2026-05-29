@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteCard from "./NoteCard.jsx";
+import PollCard from "./PollCard.jsx";
 import NoteActions from "./NoteActions.jsx";
 import ProfileText from "./ProfileText.jsx";
 import { Bk, Ck } from "./icons.jsx";
@@ -180,8 +181,8 @@ export default function ProfilePage({
     });
     activeSubs.push(notesSub);
 
-    // Phase 2 — reposts + longform in parallel; merges into same byId
-    const otherSub = pool.request(relayUrls, [{ kinds: [6, 30023], authors: [pubkey], limit: 100 }]).subscribe({
+    // Phase 2 — reposts + longform + polls in parallel; merges into same byId
+    const otherSub = pool.request(relayUrls, [{ kinds: [6, 30023, 1068, 6969], authors: [pubkey], limit: 100 }]).subscribe({
       next: raw => { eventStore.add(raw); byId.set(raw.id, raw); },
       complete: flush,
     });
@@ -215,12 +216,12 @@ export default function ProfilePage({
     return Array.from(byId.values());
   }, [events, profileEvents, repostExtras]);
 
-  const theirEvents = mergedEvents.filter(e => e.pubkey === pubkey && (e.kind === 1 || e.kind === 6));
+  const theirEvents = mergedEvents.filter(e => e.pubkey === pubkey && (e.kind === 1 || e.kind === 6 || e.kind === 1068 || e.kind === 6969));
   const hasNonMentionETag = e => e.tags.some(t => t[0] === "e" && t[3] !== "mention");
   const isReplyFn = e => e.kind === 1 && hasNonMentionETag(e) && !isQuoteRepost(e);
 
   const topLevel = theirEvents.filter(e =>
-    e.kind === 6 || isQuoteRepost(e) || (e.kind === 1 && !hasNonMentionETag(e))
+    e.kind === 6 || isQuoteRepost(e) || (e.kind === 1 && !hasNonMentionETag(e)) || e.kind === 1068 || e.kind === 6969
   );
   const replies = theirEvents.filter(isReplyFn).sort((a, b) => b.created_at - a.created_at);
 
@@ -368,6 +369,39 @@ export default function ProfilePage({
           : topLevel.length === 0
             ? <div className="empty-state"><div className="empty-state-title">No notes yet</div><div className="empty-state-sub">Notes, reposts, and quote reposts will appear here</div></div>
             : topLevel.sort((a, b) => b.created_at - a.created_at).map((e, i) => {
+              if (e.kind === 1068 || e.kind === 6969) {
+                return (
+                  <PollCard
+                    key={e.id}
+                    event={e}
+                    events={mergedEvents}
+                    resolveEventById={resolveEventById}
+                    profiles={profiles}
+                    myPubkey={myPubkey}
+                    myProfile={myProfile}
+                    onOpenProfile={onOpenProfile}
+                    onOpenThread={onOpenThread}
+                    onOpenHashtag={onOpenHashtag}
+                    onOpenZaps={onOpenZaps}
+                    onOpenReactions={onOpenReactions}
+                    onOpenReposts={onOpenReposts}
+                    onPublish={onPublish}
+                    publishEvent={publishEvent}
+                    onPrepend={onPrepend}
+                    getLocalZaps={getLocalZaps}
+                    addLocalZap={addLocalZap}
+                    getLocalReactions={getLocalReactions}
+                    setLocalReaction={setLocalReaction}
+                    onRequestModal={onRequestModal}
+                    onDismissModal={onDismissModal}
+                    sendZap={sendZap}
+                    defaultZapAmount={defaultZapAmount}
+                    defaultZapMsg={defaultZapMsg}
+                    onZapFail={onZapFail}
+                    delay={0}
+                  />
+                );
+              }
               const isRepost      = e.kind === 6;
               const isQuote       = isQuoteRepost(e);
               const threadId      = threadTargetId(e);
