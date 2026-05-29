@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { parseBolt11Msats, isHexPubkey } from "../utils.js";
+import { parseBolt11Msats, isHexPubkey, zapperPubkeyFromKind9735 } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 
@@ -66,7 +66,6 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap }) {
         if (raw.kind === 9735) {
           const targetId = raw.tags.find(t => t[0] === "e")?.[1];
           const bolt11 = raw.tags.find(t => t[0] === "bolt11")?.[1];
-          const zapperTag = raw.tags.find(t => t[0] === "P") || raw.tags.find(t => t[0] === "p");
           if (targetId && bolt11) {
             const msats = parseBolt11Msats(bolt11);
             const descTag = raw.tags.find(t => t[0] === "description");
@@ -74,7 +73,8 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap }) {
             if (descTag) {
               try { comment = JSON.parse(descTag[1]).content || ""; } catch {}
             }
-            addLocalZap?.(targetId, { id: raw.id, zapper: zapperTag?.[1] || raw.pubkey, amount: msats, comment });
+            const zapper = zapperPubkeyFromKind9735(raw) ?? raw.pubkey;
+            addLocalZap?.(targetId, { id: raw.id, zapper, amount: msats, comment });
           }
         }
       },
