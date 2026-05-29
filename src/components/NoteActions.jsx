@@ -14,6 +14,7 @@ export default function NoteActions({
   onPublish, onBookmark, isBookmarked, publishEvent, onPrepend,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal,
+  sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail, onZapDebug,
 }) {
   const reactions    = getLocalReactions?.(event.id) ?? [];
   const rCount       = replyCount(event.id, allEvents);
@@ -26,6 +27,8 @@ export default function NoteActions({
   const zapBtnRef     = useRef(null);
   const zapAnimCoords = useRef(null);
 
+  const recipientLnAddr = profiles[event.pubkey]?.lud16 || profiles[event.pubkey]?.lud06 || null;
+
   const dismiss   = () => { onDismissModal?.(); setLocalModal(null); };
   const openModal = node => {
     if (onRequestModal) onRequestModal(node);
@@ -33,9 +36,17 @@ export default function NoteActions({
   };
 
   const addZap = ({ amount, msg }) => {
-    const newZap = { zapper: myPubkey, amount: amount * 1000, comment: msg || "" };
-    addLocalZap?.(event.id, newZap);
+    addLocalZap?.(event.id, { zapper: myPubkey, amount: amount * 1000, comment: msg || "" });
   };
+
+  const doSendZap = useCallback(async ({ amount, msg }) => {
+    onZapDebug?.(`wallet=${!!sendZap} lnAddr=${recipientLnAddr || "none"} amt=${amount}`);
+    if (!sendZap) { onZapFail?.("no_wallet"); return; }
+    if (!recipientLnAddr) { onZapFail?.("no_lud16"); return; }
+    const result = await sendZap({ amountSats: amount, recipientLnAddr, recipientPubkey: event.pubkey, eventId: event.id, eventKind: event.kind, msg });
+    if (!result.ok) onZapFail?.(result.reason);
+    else onZapDebug?.("payment ok ✓");
+  }, [sendZap, recipientLnAddr, event.pubkey, event.id, event.kind, onZapFail, onZapDebug]);
 
   const handleZapFromModal = ({ amount, msg }) => {
     setShowZapModal(false);
@@ -45,7 +56,7 @@ export default function NoteActions({
     }
     const coords = zapAnimCoords.current;
     if (coords) openModal(<ZapAnimation cx={coords.cx} cy={coords.cy} onDone={dismiss} />);
-    setTimeout(() => addZap({ amount, msg }), 680);
+    setTimeout(() => { addZap({ amount, msg }); doSendZap({ amount, msg }); }, 680);
   };
 
   const handleZapInstant = useCallback(() => {
@@ -54,21 +65,27 @@ export default function NoteActions({
       ? (() => { const r = zapBtnRef.current.getBoundingClientRect(); return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 }; })()
       : null;
     if (coords) openModal(<ZapAnimation cx={coords.cx} cy={coords.cy} onDone={dismiss} />);
-    setTimeout(() => addZap({ amount: 21, msg: "" }), 680);
-  }, [localZaps]);
+    setTimeout(() => { addZap({ amount: defaultZapAmount, msg: defaultZapMsg }); doSendZap({ amount: defaultZapAmount, msg: defaultZapMsg }); }, 680);
+  }, [localZaps, defaultZapAmount, defaultZapMsg, doSendZap]);
+
+  const publishReaction = useCallback(emoji => {
+    publishEvent?.({ kind: 7, content: emoji, tags: [["e", event.id], ["p", event.pubkey]] });
+  }, [publishEvent, event.id, event.pubkey]);
 
   const handleReact = useCallback((emoji = "🧡") => {
     if (reaction) return;
     haptic.tap();
     setReaction(emoji);
     if (setLocalReaction) setLocalReaction(event.id, myPubkey, emoji);
-  }, [reaction]);
+    publishReaction(emoji);
+  }, [reaction, publishReaction]);
 
   const handleReactPick = useCallback(emoji => {
     haptic.tap();
     setReaction(emoji);
     if (setLocalReaction) setLocalReaction(event.id, myPubkey, emoji);
-  }, []);
+    publishReaction(emoji);
+  }, [publishReaction]);
 
   return (
     <>
@@ -81,7 +98,9 @@ export default function NoteActions({
             onMouseDown={e => { e.stopPropagation(); const t = setTimeout(() => { haptic.longPress(); setShowZapModal(true); }, 600); window.addEventListener("mouseup", () => clearTimeout(t), { once: true }); }}
             onTouchStart={e => { e.stopPropagation(); const t = setTimeout(() => { haptic.longPress(); setShowZapModal(true); }, 600); window.addEventListener("touchend", () => clearTimeout(t), { once: true }); }}
           >
-            <Zi />{localZaps.length ? fmtSatsVal(localZaps.reduce((s, z) => s + Math.round(z.amount / 1000), 0)) : ""}
+            <Zi />
+            <span style={{ fontSize: 10, opacity: 0.5, marginRight: 2 }}>{defaultZapAmount}</span>
+            {localZaps.length ? fmtSatsVal(localZaps.reduce((s, z) => s + Math.round(z.amount / 1000), 0)) : ""}
           </button>
           <button className={`action-btn${reaction ? " reacted" : ""}`}
             style={reaction ? { color: "var(--primary)" } : {}}
@@ -109,7 +128,7 @@ export default function NoteActions({
           </button>
         </div>
       </div>
-      {showZapModal && <ZapModal event={event} profiles={profiles} onZap={handleZapFromModal} onDismiss={() => setShowZapModal(false)} />}
+      {showZapModal && <ZapModal event={event} profiles={profiles} defaultAmount={defaultZapAmount} defaultMsg={defaultZapMsg} onZap={handleZapFromModal} onDismiss={() => setShowZapModal(false)} />}
       {localModal}
     </>
   );

@@ -34,6 +34,7 @@ import SkelCard from "./components/SkelCard.jsx";
 import LongformCard from "./components/LongformCard.jsx";
 import NoteCard from "./components/NoteCard.jsx";
 import RepostCard from "./components/RepostCard.jsx";
+import NoteActions from "./components/NoteActions.jsx";
 import ArticleReader from "./components/ArticleReader.jsx";
 import ComposeSheet from "./components/ComposeSheet.jsx";
 import ProfilePage from "./components/ProfilePage.jsx";
@@ -48,7 +49,7 @@ import { ZapsScreen, ReactionsScreen, RepostsScreen } from "./components/ListScr
 import SwipePanel from "./components/SwipePanel.jsx";
 import Avatar from "./components/Avatar.jsx";
 import NoteContent from "./components/NoteContent.jsx";
-import { SbHome, SbBell, SbBook, SbZap, SbSearch, NavHome, NavBell, NavBook, NavZap, NavSearch, Bk, Zi, Hi, Ri, Rpi, Bi } from "./components/icons.jsx";
+import { SbHome, SbBell, SbBook, SbZap, SbSearch, NavHome, NavBell, NavBook, NavZap, NavSearch, Bk } from "./components/icons.jsx";
 export default function App() {
   const { pubkey, status, error, login, logout, signAndPublish } = useAuth();
   const { follows, loading: fl } = useFollows({ pubkey });
@@ -451,6 +452,15 @@ export default function App() {
                                       setLocalReaction={setLocalReaction}
                                       onRequestModal={setPanelModal}
                                       onDismissModal={() => setPanelModal(null)}
+                                      sendZap={sendZap}
+                                      defaultZapAmount={zapSettings.amount}
+                                      defaultZapMsg={zapSettings.msg}
+                                      onZapFail={reason => showToast(
+                                        reason === "no_lud16"  ? "⚡ No lightning address" :
+                                        reason === "no_wallet" ? "⚡ No wallet connected" :
+                                        `⚡ Zap failed: ${reason}`
+                                      )}
+                                      onZapDebug={msg => showToast(`⚡ ${msg}`)}
                                       delay={0}
                                     />
                                   )
@@ -486,7 +496,12 @@ export default function App() {
                                       sendZap={sendZap}
                                       defaultZapAmount={zapSettings.amount}
                                       defaultZapMsg={zapSettings.msg}
-                                      onZapFail={reason => showToast(reason === "no_lud16" ? "Recipient has no lightning address" : "Zap failed")}
+                                      onZapFail={reason => showToast(
+                                        reason === "no_lud16"  ? "⚡ No lightning address" :
+                                        reason === "no_wallet" ? "⚡ No wallet connected" :
+                                        `⚡ Zap failed: ${reason}`
+                                      )}
+                                      onZapDebug={msg => showToast(`⚡ ${msg}`)}
                                       delay={0}
                                     />
                                   )
@@ -637,7 +652,12 @@ export default function App() {
                         sendZap={sendZap}
                         defaultZapAmount={zapSettings.amount}
                         defaultZapMsg={zapSettings.msg}
-                        onZapFail={reason => showToast(reason === "no_lud16" ? "Recipient has no lightning address" : "Zap failed")}
+                        onZapFail={reason => showToast(
+                                        reason === "no_lud16"  ? "⚡ No lightning address" :
+                                        reason === "no_wallet" ? "⚡ No wallet connected" :
+                                        `⚡ Zap failed: ${reason}`
+                                      )}
+                        onZapDebug={msg => showToast(`⚡ ${msg}`)}
                         onRequestModal={setPanelModal}
                         onDismissModal={() => setPanelModal(null)}
                         resolveEventById={resolveEventById}
@@ -686,7 +706,16 @@ export default function App() {
                         setLocalReaction={setLocalReaction}
                         onRequestModal={setPanelModal}
                         onDismissModal={() => setPanelModal(null)}
-                    resolveEventById={resolveEventById}
+                        sendZap={sendZap}
+                        defaultZapAmount={zapSettings.amount}
+                        defaultZapMsg={zapSettings.msg}
+                        onZapFail={reason => showToast(
+                          reason === "no_lud16"  ? "⚡ No lightning address" :
+                          reason === "no_wallet" ? "⚡ No wallet connected" :
+                          `⚡ Zap failed: ${reason}`
+                        )}
+                        onZapDebug={msg => showToast(`⚡ ${msg}`)}
+                        resolveEventById={resolveEventById}
                       />
                     );
                   }
@@ -799,13 +828,37 @@ export default function App() {
                                     />
                                   </div>
                                 )}
-                                <div className="note-actions" style={{ marginTop: 6 }}>
-                                  <button type="button" className="action-btn"><Zi /></button>
-                                  <button type="button" className="action-btn"><Hi f={false} /></button>
-                                  <button type="button" className="action-btn"><Ri /></button>
-                                  <button type="button" className="action-btn"><Rpi /></button>
-                                  <button type="button" className="action-btn"><Bi f={false} /></button>
-                                </div>
+                                <NoteActions
+                                  event={ev}
+                                  profiles={profiles}
+                                  myPubkey={pubkey}
+                                  myProfile={myProfile}
+                                  events={mergedFeedPool}
+                                  onOpenThread={handleOpenThread}
+                                  onOpenZaps={handleOpenZaps}
+                                  onOpenReactions={handleOpenReactions}
+                                  onOpenReposts={handleOpenReposts}
+                                  onPublish={prependEvent}
+                                  publishEvent={publishEvent}
+                                  onPrepend={prependEvent}
+                                  onBookmark={handleBookmark}
+                                  isBookmarked={isBookmarked}
+                                  getLocalZaps={getLocalZaps}
+                                  addLocalZap={addLocalZap}
+                                  getLocalReactions={getLocalReactions}
+                                  setLocalReaction={setLocalReaction}
+                                  onRequestModal={setPanelModal}
+                                  onDismissModal={() => setPanelModal(null)}
+                                  sendZap={sendZap}
+                                  defaultZapAmount={zapSettings.amount}
+                                  defaultZapMsg={zapSettings.msg}
+                                  onZapFail={reason => showToast(
+                                    reason === "no_lud16"  ? "⚡ No lightning address" :
+                                    reason === "no_wallet" ? "⚡ No wallet connected" :
+                                    `⚡ Zap failed: ${reason}`
+                                  )}
+                                  onZapDebug={msg => showToast(`⚡ ${msg}`)}
+                                />
                               </div>
                             </div>
                           </div>

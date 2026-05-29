@@ -53,6 +53,7 @@ function toProfileShape(k, data) {
     about: data.about ?? data.description ?? data.bio ?? "",
     nip05: data.nip05 ?? null,
     lud16: data.lud16 ?? null,
+    lud06: data.lud06 ?? null,
     website: data.website ?? data.url ?? null,
     banner: data.banner ?? data.cover ?? data.header ?? null,
   };

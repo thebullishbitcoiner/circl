@@ -232,7 +232,12 @@ export default function SettingsPage({
       )}
 
       <div style={{ margin: "8px 16px 4px", padding: "14px 16px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif", marginBottom: 12 }}>Zap Defaults</div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif" }}>Zap Defaults</div>
+          <div style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "monospace" }}>
+            saved: {(() => { try { return localStorage.getItem("circl_zap_settings") || "none"; } catch { return "error"; } })()}
+          </div>
+        </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <label style={{ fontSize: 13, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", flexShrink: 0 }}>Amount (sats)</label>
