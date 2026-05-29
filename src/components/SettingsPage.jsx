@@ -41,7 +41,7 @@ function RizfulConnect({ pubkey, onConnected }) {
   });
 
   return (
-    <div style={{ padding: "16px 20px" }}>
+    <div style={{ padding: "4px 20px 16px" }}>
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -87,20 +87,112 @@ function RizfulConnect({ pubkey, onConnected }) {
   );
 }
 
-export default function SettingsPage({ onBack, dark, toggleDark, onLogout, pubkey, wallet, onWalletConnected, onWalletDisconnect }) {
+function NWCConnect({ onConnected }) {
+  const [uri,   setUri]   = useState("");
+  const [error, setError] = useState("");
+
+  const connect = () => {
+    const trimmed = uri.trim();
+    if (!trimmed.startsWith("nostr+walletconnect://")) {
+      setError("Must start with nostr+walletconnect://");
+      return;
+    }
+    try {
+      const url = new URL(trimmed);
+      const lud16 = url.searchParams.get("lud16") || null;
+      onConnected({ nwc_uri: trimmed, lightning_address: lud16 });
+    } catch {
+      setError("Invalid connection string");
+    }
+  };
+
+  const btnStyle = (active) => ({
+    width: "100%", padding: "9px 0", borderRadius: 10,
+    border: active ? "1.5px solid var(--primary)" : "1.5px solid var(--border)",
+    background: active ? "var(--primary)" : "var(--surface)",
+    color: active ? "white" : "var(--text)",
+    cursor: active ? "pointer" : "default",
+    fontSize: 13, fontFamily: "'DM Sans',sans-serif", fontWeight: active ? 600 : 500,
+    display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "all .15s",
+    opacity: active ? 1 : 0.5,
+  });
+
+  return (
+    <div style={{ padding: "4px 20px 16px" }}>
+      <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.5, margin: "0 0 12px" }}>
+        Paste a connection string from any NWC-compatible wallet.
+      </p>
+      <textarea
+        value={uri}
+        onChange={e => { setUri(e.target.value); setError(""); }}
+        placeholder="nostr+walletconnect://..."
+        rows={3}
+        style={{
+          width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10,
+          border: `1.5px solid ${error ? "#E05C8A" : "var(--border)"}`,
+          background: "var(--bg)", color: "var(--text)", fontFamily: "monospace", fontSize: 12,
+          outline: "none", resize: "none", marginBottom: 8, lineBreak: "anywhere",
+        }}
+      />
+      {error && <div style={{ fontSize: 11, color: "#E05C8A", marginBottom: 8, fontFamily: "'DM Sans',sans-serif", lineHeight: 1.4 }}>{error}</div>}
+      <button onClick={connect} disabled={!uri.trim()} style={btnStyle(!!uri.trim())}>
+        ⚡ Connect wallet
+      </button>
+    </div>
+  );
+}
+
+export default function SettingsPage({
+  onBack, dark, toggleDark, onLogout, pubkey, wallet, onWalletConnected, onWalletDisconnect,
+  zapSettings = { amount: 21, msg: "" }, onSaveZapSettings,
+}) {
+  const [walletTab,  setWalletTab]  = useState("rizful");
+  const [zapAmount,  setZapAmount]  = useState(String(zapSettings.amount));
+  const [zapMsg,     setZapMsg]     = useState(zapSettings.msg);
+
+  const flushZapDefaults = () => {
+    const amount = Math.max(1, parseInt(zapAmount) || 21);
+    onSaveZapSettings?.({ amount, msg: zapMsg });
+    setZapAmount(String(amount));
+  };
+
+  const tabBtn = (id, label) => ({
+    flex: 1, padding: "6px 0", borderRadius: 6, border: "none",
+    background: walletTab === id ? "var(--surface)" : "transparent",
+    color: walletTab === id ? "var(--text)" : "var(--text-muted)",
+    fontFamily: "'DM Sans',sans-serif", fontSize: 12,
+    fontWeight: walletTab === id ? 600 : 400,
+    cursor: "pointer",
+    boxShadow: walletTab === id ? "0 1px 3px rgba(0,0,0,.1)" : "none",
+    transition: "all .15s",
+  });
+
+  const inputStyle = {
+    padding: "6px 10px", borderRadius: 8,
+    border: "1.5px solid var(--border)", background: "var(--bg)",
+    color: "var(--text)", fontFamily: "'DM Sans',sans-serif",
+    fontSize: 13, outline: "none",
+  };
+
   return (
     <div className="slide-panel-scroll">
       <div className="feed-header" style={{ borderBottom: "1px solid var(--border)" }}>
         <div className="feed-title">Settings</div>
       </div>
 
-      <div className="settings-section-title">⚡ Lightning Wallet</div>
+      <div className="settings-section-title">Wallet</div>
+
       {wallet?.nwc_uri ? (
         <>
           <div style={{ margin: "0 16px 4px", padding: "14px 16px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
               <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4CAF50", flexShrink: 0 }} />
               <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif" }}>Wallet connected</span>
+              {wallet.source && (
+                <span style={{ fontSize: 10, color: "var(--text-faint)", background: "var(--bg)", borderRadius: 4, padding: "2px 6px", marginLeft: "auto", fontFamily: "'DM Sans',sans-serif", border: "1px solid var(--border)" }}>
+                  via {wallet.source === "rizful" ? "Rizful" : "NWC"}
+                </span>
+              )}
             </div>
             {wallet.lightning_address && (
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -114,13 +206,42 @@ export default function SettingsPage({ onBack, dark, toggleDark, onLogout, pubke
           </div>
         </>
       ) : (
-        <div style={{ margin: "0 16px 4px", padding: "14px 16px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
-          <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.5, margin: "0 0 12px" }}>
-            Connect a Lightning wallet to send real zaps. Powered by <span style={{ color: "var(--primary)", fontWeight: 500 }}>Rizful</span>.
-          </p>
-          <RizfulConnect pubkey={pubkey} onConnected={onWalletConnected} />
+        <div style={{ margin: "0 16px 4px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
+          <div style={{ display: "flex", padding: "10px 12px 0", gap: 4 }}>
+            <button style={tabBtn("rizful")} onClick={() => setWalletTab("rizful")}>Rizful</button>
+            <button style={tabBtn("nwc")}    onClick={() => setWalletTab("nwc")}>NWC Connection String</button>
+          </div>
+          {walletTab === "rizful"
+            ? <RizfulConnect pubkey={pubkey} onConnected={data => onWalletConnected({ ...data, source: "rizful" })} />
+            : <NWCConnect onConnected={data => onWalletConnected({ ...data, source: "nwc" })} />
+          }
         </div>
       )}
+
+      <div style={{ margin: "8px 16px 4px", padding: "14px 16px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif", marginBottom: 12 }}>Zap Defaults</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <label style={{ fontSize: 13, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", flexShrink: 0 }}>Amount (sats)</label>
+            <input
+              type="number" min="1" value={zapAmount}
+              onChange={e => setZapAmount(e.target.value)}
+              onBlur={flushZapDefaults}
+              style={{ ...inputStyle, width: 90, textAlign: "right", fontFamily: "monospace" }}
+            />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <label style={{ fontSize: 13, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", flexShrink: 0 }}>Message</label>
+            <input
+              type="text" value={zapMsg}
+              onChange={e => setZapMsg(e.target.value)}
+              onBlur={flushZapDefaults}
+              placeholder="optional"
+              style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+            />
+          </div>
+        </div>
+      </div>
 
       <div className="settings-section-title" style={{ marginTop: 16 }}>Appearance</div>
       <div className="settings-row" onClick={toggleDark}>

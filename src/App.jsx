@@ -25,6 +25,7 @@ import useIsMobile from "./hooks/useIsMobile.js";
 import useDarkMode from "./hooks/useDarkMode.js";
 import useWallet from "./hooks/useWallet.js";
 import useZap from "./hooks/useZap.js";
+import useZapSettings from "./hooks/useZapSettings.js";
 
 import LoginScreen from "./components/LoginScreen.jsx";
 import SettingsPage from "./components/SettingsPage.jsx";
@@ -38,14 +39,15 @@ import ProfilePage from "./components/ProfilePage.jsx";
 import CirclePage from "./components/CirclePage.jsx";
 import ThreadView from "./components/ThreadView.jsx";
 import NotificationsFeed from "./components/NotificationsFeed.jsx";
-import DMsPage from "./components/DMsPage.jsx";
+import WalletPage from "./components/WalletPage.jsx";
+import TxDetailPage from "./components/TxDetailPage.jsx";
 import SearchPage from "./components/SearchPage.jsx";
 import HashtagFeed from "./components/HashtagFeed.jsx";
 import { ZapsScreen, ReactionsScreen, RepostsScreen } from "./components/ListScreens.jsx";
 import SwipePanel from "./components/SwipePanel.jsx";
 import Avatar from "./components/Avatar.jsx";
 import NoteContent from "./components/NoteContent.jsx";
-import { SbHome, SbBell, SbBook, SbDM, SbSearch, NavHome, NavBell, NavBook, NavDM, NavSearch, Bk, Zi, Hi, Ri, Rpi, Bi } from "./components/icons.jsx";
+import { SbHome, SbBell, SbBook, SbZap, SbSearch, NavHome, NavBell, NavBook, NavZap, NavSearch, Bk, Zi, Hi, Ri, Rpi, Bi } from "./components/icons.jsx";
 export default function App() {
   const { pubkey, status, error, login, logout, signAndPublish } = useAuth();
   const { follows, loading: fl } = useFollows({ pubkey });
@@ -186,7 +188,8 @@ export default function App() {
     return "Note";
   })();
 
-  const handleOpenProfile = pk => pushNav({ type: "profile", payload: pk });
+  const handleOpenProfile     = pk => pushNav({ type: "profile", payload: pk });
+  const handleOpenTransaction = tx => pushNav({ type: "transaction", payload: tx });
   const handleOpenCircle = ({ pubkey: cpk, follows: cFollows }) =>
     pushNav({ type: "circle", payload: { pubkey: cpk, follows: cFollows } });
   const handleOpenNote = event => pushNav({ type: "note", payload: event });
@@ -201,7 +204,8 @@ export default function App() {
   };
 
   const { wallet, saveWallet, disconnect: disconnectWallet } = useWallet();
-  useZap(wallet);
+  const { sendZap } = useZap(wallet);
+  const { zapSettings, saveZapSettings } = useZapSettings();
   const [floatingCompose, setFloatingCompose] = useState(false);
   const [panelModal, setPanelModal] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -309,7 +313,7 @@ export default function App() {
   const navItems = [
     { id: "home",          label: "Home",     SbIcon: <SbHome />,   NavIcon: <NavHome /> },
     { id: "notifications", label: "Alerts",   SbIcon: <SbBell />,   NavIcon: <NavBell /> },
-    { id: "messages",      label: "Messages", SbIcon: <SbDM />,     NavIcon: <NavDM /> },
+    { id: "zaps",          label: "Zaps",     SbIcon: <SbZap />,    NavIcon: <NavZap /> },
     { id: "search",        label: "Search",   SbIcon: <SbSearch />, NavIcon: <NavSearch /> },
     { id: "bookmarks",     label: "Saved",    SbIcon: <SbBook />,   NavIcon: <NavBook /> },
   ];
@@ -364,7 +368,7 @@ export default function App() {
                     {activeNav === "home" && "Your Circle"}
                     {activeNav === "bookmarks" && "Saved"}
                     {activeNav === "notifications" && "Notifications"}
-                    {activeNav === "messages" && "Messages"}
+                    {activeNav === "zaps" && "Wallet"}
                     {activeNav === "search" && "Search"}
                     {activeNav === "profile" && "Profile"}
                   </div>
@@ -378,7 +382,7 @@ export default function App() {
                 </div>
               </div>
               <div className="feed-scroll" ref={feedScrollRef} onScroll={handleFeedScroll}
-                style={(activeNav === "messages" || activeNav === "search") ? { display: "none" } : undefined}>
+                style={activeNav === "search" ? { display: "none" } : undefined}>
                 {(activeNav === "home" || activeNav === "bookmarks") && (
                   (activeNav === "home" && isLoading && events.length === 0) ||
                   (activeNav === "bookmarks" && bookmarkFeedLoading && bookmarkFeedEvents.length > 0)
@@ -477,6 +481,10 @@ export default function App() {
                                       addLocalZap={addLocalZap}
                                       getLocalReactions={getLocalReactions}
                                       setLocalReaction={setLocalReaction}
+                                      sendZap={sendZap}
+                                      defaultZapAmount={zapSettings.amount}
+                                      defaultZapMsg={zapSettings.msg}
+                                      onZapFail={reason => showToast(reason === "no_lud16" ? "Recipient has no lightning address" : "Zap failed")}
                                       delay={0}
                                     />
                                   )
@@ -510,12 +518,15 @@ export default function App() {
                       </>
                     )
                 )}
+                {activeNav === "zaps" && (
+                  <WalletPage
+                    wallet={wallet}
+                    profiles={profiles}
+                    onOpenProfile={handleOpenProfile}
+                    onOpenTransaction={handleOpenTransaction}
+                  />
+                )}
               </div>
-              {activeNav === "messages" && (
-                <div style={{ flex: 1, overflow: "hidden", display: "flex" }}>
-                  <DMsPage pubkey={pubkey} profiles={profiles} onOpenProfile={handleOpenProfile} />
-                </div>
-              )}
               {activeNav === "search" && (
                 <div style={{ flex: 1, width: "100%", overflow: "hidden", display: "flex" }}>
                   <SearchPage
@@ -616,6 +627,10 @@ export default function App() {
                         addLocalZap={addLocalZap}
                         getLocalReactions={getLocalReactions}
                         setLocalReaction={setLocalReaction}
+                        sendZap={sendZap}
+                        defaultZapAmount={zapSettings.amount}
+                        defaultZapMsg={zapSettings.msg}
+                        onZapFail={reason => showToast(reason === "no_lud16" ? "Recipient has no lightning address" : "Zap failed")}
                         onRequestModal={setPanelModal}
                         onDismissModal={() => setPanelModal(null)}
                         resolveEventById={resolveEventById}
@@ -806,6 +821,18 @@ export default function App() {
                     );
                   }
 
+                  if (top.type === "transaction") {
+                    return (
+                      <TxDetailPage
+                        key={top.payload.payment_hash}
+                        tx={top.payload}
+                        profiles={profiles}
+                        onBack={handleBack}
+                        onOpenProfile={handleOpenProfile}
+                      />
+                    );
+                  }
+
                   return null;
                 })()}
               </SwipePanel>
@@ -820,12 +847,14 @@ export default function App() {
                   wallet={wallet}
                   onWalletConnected={data => {
                     saveWallet(data);
-                    showToast(`⚡ ${data.lightning_address} connected!`);
+                    showToast(data.lightning_address ? `⚡ ${data.lightning_address} connected!` : "⚡ Wallet connected!");
                   }}
                   onWalletDisconnect={() => {
                     disconnectWallet();
                     showToast("Wallet disconnected");
                   }}
+                  zapSettings={zapSettings}
+                  onSaveZapSettings={saveZapSettings}
                 />
               </SwipePanel>
             </div>

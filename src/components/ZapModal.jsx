@@ -3,10 +3,13 @@ import Overlay from "./Overlay.jsx";
 import { displayName, haptic } from "../utils.js";
 import { ZAP_PRESETS } from "../constants.js";
 
-export default function ZapModal({ event, profiles, onZap, onDismiss }) {
-  const [selected, setSelected] = useState(21);
-  const [custom,   setCustom]   = useState("");
-  const [msg,      setMsg]      = useState("");
+export default function ZapModal({ event, profiles, onZap, onDismiss, defaultAmount = 21, defaultMsg = "" }) {
+  const presetSats = ZAP_PRESETS.map(p => p.sats);
+  const isPreset   = presetSats.includes(defaultAmount);
+
+  const [selected, setSelected] = useState(isPreset ? defaultAmount : presetSats[0]);
+  const [custom,   setCustom]   = useState(!isPreset ? String(defaultAmount) : "");
+  const [msg,      setMsg]      = useState(defaultMsg);
   const amount = custom ? parseInt(custom) || 0 : selected;
 
   const handleSend = () => {

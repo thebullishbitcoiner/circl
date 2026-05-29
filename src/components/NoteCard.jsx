@@ -21,6 +21,7 @@ export default function NoteCard({
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   delay,
   replyingToPubkey = null,
+  sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail,
 }) {
   const reactions  = getLocalReactions?.(event.id) ?? [];
   const localZaps  = getLocalZaps?.(event.id) ?? [];
@@ -37,33 +38,55 @@ export default function NoteCard({
 
   const dismiss = () => setModal(null);
 
+  const recipientLud16 = profiles[event.pubkey]?.lud16 ?? null;
+
   const addZap = ({ amount, msg }) => {
     const newZap = { zapper: myPubkey, amount: amount * 1000, comment: msg || "" };
     addLocalZap?.(event.id, newZap);
   };
+
+  const doSendZap = useCallback(async ({ amount, msg }) => {
+    console.log("[zap] doSendZap", { amount, sendZap: !!sendZap, recipientLud16 });
+    if (!sendZap) { console.log("[zap] no sendZap fn"); return; }
+    if (!recipientLud16) { console.log("[zap] no lud16 for", event.pubkey); return; }
+    const result = await sendZap({ amountSats: amount, recipientLud16, recipientPubkey: event.pubkey, eventId: event.id });
+    console.log("[zap] result:", result);
+    if (!result.ok) onZapFail?.(result.reason);
+  }, [sendZap, recipientLud16, event.pubkey, event.id, onZapFail]);
+
+  const publishReaction = useCallback(emoji => {
+    publishEvent?.({ kind: 7, content: emoji, tags: [["e", event.id], ["p", event.pubkey]] });
+  }, [publishEvent, event.id, event.pubkey]);
 
   const handleReact = useCallback((emoji = "🧡") => {
     if (reaction) return;
     haptic.tap();
     setReaction(emoji);
     if (setLocalReaction) setLocalReaction(event.id, myPubkey, emoji);
-  }, [reaction]);
+    publishReaction(emoji);
+  }, [reaction, publishReaction]);
 
   const handleReactPick = useCallback(emoji => {
     haptic.tap();
     setReaction(emoji);
     if (setLocalReaction) setLocalReaction(event.id, myPubkey, emoji);
-  }, []);
+    publishReaction(emoji);
+  }, [publishReaction]);
 
   const handleZapInstant = useCallback(() => {
+    console.log("[zap] handleZapInstant fired", { defaultZapAmount, defaultZapMsg });
     haptic.zap();
     if (zapBtnRef.current) {
       const r = zapBtnRef.current.getBoundingClientRect();
       zapAnimCoords.current = { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
     }
     setZapAnim(Date.now());
-    setTimeout(() => addZap({ amount: 21, msg: "" }), 680);
-  }, [localZaps]);
+    setTimeout(() => {
+      console.log("[zap] setTimeout fired");
+      addZap({ amount: defaultZapAmount, msg: defaultZapMsg });
+      doSendZap({ amount: defaultZapAmount, msg: defaultZapMsg });
+    }, 680);
+  }, [localZaps, defaultZapAmount, defaultZapMsg, doSendZap]);
 
   const copyToClipboard = useCallback(text => {
     navigator.clipboard?.writeText(text).catch(() => {});
@@ -146,7 +169,7 @@ export default function NoteCard({
               onOpenZaps={() => onOpenZaps?.({ eventId: event.id, zaps: localZaps })} />
             <div className="note-actions" onClick={e => e.stopPropagation()}>
               <button ref={zapBtnRef} className="action-btn"
-                onClick={e => { e.stopPropagation(); handleZapInstant(); }}
+                onClick={e => { e.stopPropagation(); console.log("[zap] button clicked"); handleZapInstant(); }}
                 onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setModal("zap"); }}
                 onMouseDown={e => { e.stopPropagation(); const t = setTimeout(() => setModal("zap"), 600); window.addEventListener("mouseup", () => clearTimeout(t), { once: true }); }}
                 onTouchStart={e => { e.stopPropagation(); const t = setTimeout(() => setModal("zap"), 600); window.addEventListener("touchend", () => clearTimeout(t), { once: true }); }}
@@ -191,13 +214,17 @@ export default function NoteCard({
       {modal === "emoji"   && <EmojiPickerSheet onPick={emoji => { handleReactPick(emoji); dismiss(); }} onDismiss={dismiss} />}
       {modal === "zap"     && (
         <ZapModal event={event} profiles={profiles}
+          defaultAmount={defaultZapAmount} defaultMsg={defaultZapMsg}
           onZap={({ amount, msg }) => {
             if (zapBtnRef.current) {
               const r = zapBtnRef.current.getBoundingClientRect();
               zapAnimCoords.current = { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
             }
             setZapAnim(Date.now());
-            setTimeout(() => addZap({ amount, msg }), 680);
+            setTimeout(() => {
+              addZap({ amount, msg });
+              doSendZap({ amount, msg });
+            }, 680);
           }}
           onDismiss={dismiss} />
       )}
