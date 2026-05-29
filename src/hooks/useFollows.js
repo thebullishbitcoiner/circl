@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { isHexPubkey, normPubkey } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 
-export default function useFollows({ pubkey }) {
+export default function useFollows({ pubkey, signAndPublish }) {
   const [follows, setFollows] = useState([]);
+  const [rawEvent, setRawEvent] = useState(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -23,7 +24,10 @@ export default function useFollows({ pubkey }) {
           .filter(t => t[0] === "p")
           .map(t => normPubkey(t[1]))
           .filter(isHexPubkey);
-        if (pks.length) setFollows(pks);
+        if (pks.length) {
+          setFollows(pks);
+          setRawEvent(raw);
+        }
       },
       complete: () => setLoading(false),
       error: () => setLoading(false),
@@ -32,5 +36,16 @@ export default function useFollows({ pubkey }) {
     return () => sub.unsubscribe();
   }, [pubkey]);
 
-  return { follows, loading };
+  const unfollow = useCallback(async targetPk => {
+    if (!signAndPublish || !rawEvent) return;
+    const norm = normPubkey(targetPk);
+    const newTags = rawEvent.tags.filter(t => !(t[0] === "p" && normPubkey(t[1]) === norm));
+    const ev = await signAndPublish({ kind: 3, tags: newTags, content: rawEvent.content ?? "" });
+    if (ev) {
+      setFollows(prev => prev.filter(pk => pk !== norm));
+      setRawEvent(prev => ({ ...prev, tags: newTags }));
+    }
+  }, [rawEvent, signAndPublish]);
+
+  return { follows, loading, unfollow };
 }

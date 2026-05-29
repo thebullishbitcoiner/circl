@@ -105,7 +105,7 @@ export default function NotificationsFeed({ items, profiles, onOpenProfile, onOp
           const { kind, targetId, actors, latestAt } = entry;
           const targetEv = evById.get(targetId);
           const pubkeys = [...new Set(actors.map(a => a.pubkey))];
-          const emoji = kind === 7 ? (actors[0].content === "+" ? "🧡" : actors[0].content || "🧡") : null;
+          const emoji = kind === 7 ? (actors[0].content === "+" || !actors[0].content ? "💜" : actors[0].content) : null;
           const verb = kind === 7 ? `reacted ${emoji} to your note` : "reposted your note";
           const single = pubkeys.length === 1;
 

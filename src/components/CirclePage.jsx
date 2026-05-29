@@ -1,7 +1,7 @@
 import { Bk, Ck } from "./icons.jsx";
 import { displayName, shortNpub } from "../utils.js";
 
-export default function CirclePage({ pubkey, follows = [], profiles, onOpenProfile, onBack }) {
+export default function CirclePage({ pubkey, follows = [], profiles, onOpenProfile, onBack, myFollows, onUnfollow }) {
   const ownerName = displayName(pubkey, profiles);
 
   return (
@@ -20,6 +20,7 @@ export default function CirclePage({ pubkey, follows = [], profiles, onOpenProfi
           {follows.map((pk, i) => {
             const fp = profiles?.[pk] || {};
             const fn = displayName(pk, profiles);
+            const iFollow = myFollows?.includes(pk);
             return (
               <div
                 className="circle-card"
@@ -40,6 +41,15 @@ export default function CirclePage({ pubkey, follows = [], profiles, onOpenProfi
                     )}
                     <div className="circle-card-npub">{shortNpub(pk)}</div>
                   </div>
+                  {iFollow && onUnfollow && (
+                    <button
+                      type="button"
+                      className="circle-unfollow-btn"
+                      onClick={e => { e.stopPropagation(); onUnfollow(pk); }}
+                    >
+                      Unfollow
+                    </button>
+                  )}
                 </div>
               </div>
             );

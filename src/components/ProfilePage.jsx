@@ -122,7 +122,7 @@ export default function ProfilePage({
   myProfile, onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal, backLabel = "Your Circle", resolveEventById,
-  onOpenCircle,
+  onOpenCircle, onUnfollow,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail, onZapDebug,
 }) {
   const [tab, setTab] = useState("notes");
@@ -301,6 +301,11 @@ export default function ProfilePage({
               : name[0]?.toUpperCase()}
           </div>
           {isOwn && <button className="profile-edit-btn">Edit profile</button>}
+          {!isOwn && follows?.includes(pubkey) && (
+            <button className="profile-unfollow-btn" onClick={onUnfollow ? () => onUnfollow(pubkey) : undefined}>
+              Unfollow
+            </button>
+          )}
         </div>
         <div className="profile-name">{name}</div>
         {p.nip05 && <div className="profile-nip05">{p.nip05}</div>}
@@ -310,18 +315,23 @@ export default function ProfilePage({
           const circleFollows = isOwn ? follows : subjectFollows;
           if (circleLoading || circleFollows.length === 0) return null;
           return (
-            <button
-              onClick={() => !circleLoading && onOpenCircle?.({ pubkey, follows: circleFollows })}
-              style={{
-                display: "flex", alignItems: "center", gap: 5,
-                background: "none", border: "none", padding: "2px 0", marginBottom: 8,
-                cursor: circleLoading ? "default" : "pointer", color: "var(--primary)",
-                fontSize: 14, fontWeight: 600, fontFamily: "'DM Sans',sans-serif",
-              }}
-            >
-              <div style={{ width: 9, height: 9, borderRadius: "50%", flexShrink: 0, ...(circleLoading ? { border: "1.5px solid var(--primary-soft)", borderTopColor: "var(--primary)", animation: "spin .7s linear infinite" } : { border: "1.5px solid var(--primary)" }) }} />
-              {!circleLoading && circleFollows.length > 0 && circleFollows.length}
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <button
+                onClick={() => !circleLoading && onOpenCircle?.({ pubkey, follows: circleFollows })}
+                style={{
+                  display: "flex", alignItems: "center", gap: 5,
+                  background: "none", border: "none", padding: "2px 0",
+                  cursor: circleLoading ? "default" : "pointer", color: "var(--primary)",
+                  fontSize: 14, fontWeight: 600, fontFamily: "'DM Sans',sans-serif",
+                }}
+              >
+                <div style={{ width: 9, height: 9, borderRadius: "50%", flexShrink: 0, ...(circleLoading ? { border: "1.5px solid var(--primary-soft)", borderTopColor: "var(--primary)", animation: "spin .7s linear infinite" } : { border: "1.5px solid var(--primary)" }) }} />
+                {!circleLoading && circleFollows.length > 0 && circleFollows.length}
+              </button>
+              {!isOwn && subjectFollows.includes(myPubkey) && (
+                <div className="profile-follows-you">follows you</div>
+              )}
+            </div>
           );
         })()}
         {p.about && <ProfileText className="profile-about" text={p.about} />}

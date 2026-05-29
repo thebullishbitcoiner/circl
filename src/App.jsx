@@ -52,7 +52,7 @@ import NoteContent from "./components/NoteContent.jsx";
 import { SbHome, SbBell, SbBook, SbZap, SbSearch, NavHome, NavBell, NavBook, NavZap, NavSearch, Bk } from "./components/icons.jsx";
 export default function App() {
   const { pubkey, status, error, login, logout, signAndPublish } = useAuth();
-  const { follows, loading: fl } = useFollows({ pubkey });
+  const { follows, loading: fl, unfollow: unfollowPk } = useFollows({ pubkey, signAndPublish });
 
   const [likes, setLikes] = useState({});
   const [zapsByEvent, setZapsByEvent] = useState({});
@@ -662,19 +662,23 @@ export default function App() {
                         onDismissModal={() => setPanelModal(null)}
                         resolveEventById={resolveEventById}
                         onOpenCircle={handleOpenCircle}
+                        onUnfollow={unfollowPk}
                       />
                     );
                   }
 
                   if (top.type === "circle") {
+                    const isOwnCircle = top.payload.pubkey === pubkey;
                     return (
                       <CirclePage
                         key={top.payload.pubkey}
                         pubkey={top.payload.pubkey}
-                        follows={top.payload.follows}
+                        follows={isOwnCircle ? follows : top.payload.follows}
                         profiles={profiles}
                         onOpenProfile={handleOpenProfile}
                         onBack={handleBack}
+                        myFollows={follows}
+                        onUnfollow={unfollowPk}
                       />
                     );
                   }

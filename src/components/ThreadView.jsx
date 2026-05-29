@@ -111,7 +111,7 @@ function ThreadNoteRow({
                     allEvents={allEvents}
                     onOpenThread={onOpenThread}
                     resolveEventById={resolveEventById}
-                    className="note-text" style={focused ? { fontSize: 16, lineHeight: 1.75 } : {}}
+                    className="note-text"
                     collapsible={!focused} />
                 )}
                 {isQuote && quotedEv && (

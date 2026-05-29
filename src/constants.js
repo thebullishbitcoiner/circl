@@ -7,11 +7,6 @@ export const RELAYS = [
   "wss://relay.primal.net",
 ];
 
-export const REACTION_EMOJIS = [
-  "❤️","🔥","⚡","🙏","👀","💯","🫂","😂","🎉","🚀",
-  "🤙","💜","🌊","⚔️","🌟","🐂","🍊","👆","✅","🫡",
-];
-
 
 export const ZAP_PRESETS = [
   { sats: 21,    label: "default" },

@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Zi, Hi, Ri, Rpi, Bi } from "./icons.jsx";
 import { haptic, fmtSatsVal, replyCount, repostAndQuoteCount } from "../utils.js";
 import ZapBadges from "./ZapBadges.jsx";
@@ -72,7 +73,7 @@ export default function NoteActions({
     publishEvent?.({ kind: 7, content: emoji, tags: [["e", event.id], ["p", event.pubkey]] });
   }, [publishEvent, event.id, event.pubkey]);
 
-  const handleReact = useCallback((emoji = "🧡") => {
+  const handleReact = useCallback((emoji = "💜") => {
     if (reaction) return;
     haptic.tap();
     setReaction(emoji);
@@ -108,7 +109,7 @@ export default function NoteActions({
             onMouseDown={e => { e.stopPropagation(); const t = setTimeout(() => openModal(<EmojiPickerSheet onPick={emoji => { handleReactPick(emoji); dismiss(); }} onDismiss={dismiss} />), 600); window.addEventListener("mouseup", () => clearTimeout(t), { once: true }); }}
             onTouchStart={e => { e.stopPropagation(); const t = setTimeout(() => openModal(<EmojiPickerSheet onPick={emoji => { handleReactPick(emoji); dismiss(); }} onDismiss={dismiss} />), 600); window.addEventListener("touchend", () => clearTimeout(t), { once: true }); }}
           >
-            {reaction && reaction !== "🧡"
+            {reaction && reaction !== "💜"
               ? <span style={{ fontSize: 14, lineHeight: 1 }}>{reaction}</span>
               : <svg width={14} height={14} viewBox="0 0 24 24" fill={reaction ? "var(--primary)" : "none"} stroke={reaction ? "var(--primary)" : "currentColor"} strokeWidth={2}><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
             }
@@ -128,8 +129,8 @@ export default function NoteActions({
           </button>
         </div>
       </div>
-      {showZapModal && <ZapModal event={event} profiles={profiles} defaultAmount={defaultZapAmount} defaultMsg={defaultZapMsg} onZap={handleZapFromModal} onDismiss={() => setShowZapModal(false)} />}
-      {localModal}
+      {showZapModal && createPortal(<ZapModal event={event} profiles={profiles} defaultAmount={defaultZapAmount} defaultMsg={defaultZapMsg} onZap={handleZapFromModal} onDismiss={() => setShowZapModal(false)} />, document.body)}
+      {localModal && createPortal(localModal, document.body)}
     </>
   );
 }

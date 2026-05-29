@@ -20,10 +20,15 @@ export default function ZapModal({ event, profiles, onZap, onDismiss, defaultAmo
   };
 
   return (
-    <Overlay onDismiss={onDismiss} centered>
+    <Overlay onDismiss={onDismiss} centered className="zap-overlay" noClickOutside>
       <div className="zap-modal" onClick={e => e.stopPropagation()}>
-        <div className="zap-modal-title">Zap {displayName(event.pubkey, profiles)}</div>
-        <div className="zap-modal-sub">How many sats?</div>
+        <div className="zap-modal-header">
+          <div>
+            <div className="zap-modal-title">Zap {displayName(event.pubkey, profiles)}</div>
+            <div className="zap-modal-sub">How many sats?</div>
+          </div>
+          <button type="button" className="zap-modal-close" onClick={onDismiss} aria-label="Close">×</button>
+        </div>
         <div className="zap-presets">
           {ZAP_PRESETS.map(p => (
             <button key={p.sats}
@@ -44,7 +49,6 @@ export default function ZapModal({ event, profiles, onZap, onDismiss, defaultAmo
         <button className="zap-send-btn" onClick={handleSend} disabled={!amount}>
           Zap {amount >= 1000 ? `${(amount / 1000).toFixed(amount >= 10000 ? 0 : 1)}k` : amount} sats
         </button>
-        <button className="zap-cancel" onClick={onDismiss}>Cancel</button>
       </div>
     </Overlay>
   );
