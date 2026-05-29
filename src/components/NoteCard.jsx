@@ -46,7 +46,7 @@ export default function NoteCard({
   };
 
   const doSendZap = useCallback(async ({ amount, msg }) => {
-    console.log("[zap] doSendZap", { amount, sendZap: !!sendZap, recipientLud16 });
+    console.warn("[zap] doSendZap", { amount, sendZap: !!sendZap, recipientLud16 });
     if (!sendZap) { console.log("[zap] no sendZap fn"); return; }
     if (!recipientLud16) { console.log("[zap] no lud16 for", event.pubkey); return; }
     const result = await sendZap({ amountSats: amount, recipientLud16, recipientPubkey: event.pubkey, eventId: event.id });
@@ -169,7 +169,7 @@ export default function NoteCard({
               onOpenZaps={() => onOpenZaps?.({ eventId: event.id, zaps: localZaps })} />
             <div className="note-actions" onClick={e => e.stopPropagation()}>
               <button ref={zapBtnRef} className="action-btn"
-                onClick={e => { e.stopPropagation(); console.log("[zap] button clicked"); handleZapInstant(); }}
+                onClick={e => { e.stopPropagation(); console.warn("[zap] button clicked"); handleZapInstant(); }}
                 onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setModal("zap"); }}
                 onMouseDown={e => { e.stopPropagation(); const t = setTimeout(() => setModal("zap"), 600); window.addEventListener("mouseup", () => clearTimeout(t), { once: true }); }}
                 onTouchStart={e => { e.stopPropagation(); const t = setTimeout(() => setModal("zap"), 600); window.addEventListener("touchend", () => clearTimeout(t), { once: true }); }}

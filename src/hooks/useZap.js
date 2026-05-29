@@ -5,7 +5,7 @@ import { RELAYS } from "../constants.js";
 
 export default function useZap(wallet) {
   const sendZap = useCallback(async ({ amountSats, recipientLud16, recipientPubkey, eventId }) => {
-    console.log("[zap] sendZap called", { amountSats, recipientLud16, recipientPubkey, eventId });
+    console.warn("[zap] sendZap called", { amountSats, recipientLud16, recipientPubkey, eventId });
     console.log("[zap] wallet present:", !!wallet?.nwc_uri);
 
     if (!wallet?.nwc_uri) return { ok: false, reason: "no_wallet" };

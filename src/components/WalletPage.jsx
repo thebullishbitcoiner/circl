@@ -1,28 +1,40 @@
 import { useCallback } from "react";
 import Avatar from "./Avatar.jsx";
 import { displayName, relativeTime } from "../utils.js";
-import useWalletData from "../hooks/useWalletData.js";
+import { decodeInvoice } from "@getalby/lightning-tools";
 
-function parseZapRequest(tx) {
+function zapReqFromDesc(tx) {
   try {
     if (tx.description?.trim().startsWith("{")) return JSON.parse(tx.description);
+  } catch {}
+  try {
+    if (tx.invoice) {
+      const desc = decodeInvoice(tx.invoice)?.description;
+      if (desc?.trim().startsWith("{")) return JSON.parse(desc);
+    }
   } catch {}
   return null;
 }
 
+function getZapReq(tx) {
+  // tx.metadata.nostr is the full kind 9734 event when the wallet provides it
+  if (tx.metadata?.nostr?.tags) return tx.metadata.nostr;
+  return zapReqFromDesc(tx);
+}
+
 function nostrPubkeyFromTx(tx) {
-  const zr = parseZapRequest(tx);
+  const zr = getZapReq(tx);
   if (tx.type === "outgoing") {
-    const pTag = zr?.tags?.find(t => t[0] === "p")?.[1];
-    return pTag ?? tx.metadata?.nostr?.pubkey ?? null;
+    // Recipient is the p-tag of the zap request we signed
+    return zr?.tags?.find(t => t[0] === "p")?.[1] ?? null;
   }
+  // For incoming, the sender is the pubkey who signed the zap request
   return tx.metadata?.nostr?.pubkey ?? zr?.pubkey ?? null;
 }
 
 function txComment(tx) {
   if (tx.metadata?.comment?.trim()) return tx.metadata.comment.trim();
-  const zr = parseZapRequest(tx);
-  return zr?.content?.trim() ?? "";
+  return getZapReq(tx)?.content?.trim() ?? "";
 }
 
 function txDescription(tx, profiles) {
@@ -77,10 +89,8 @@ function RefreshIcon({ spinning }) {
   );
 }
 
-export default function WalletPage({ wallet, profiles, onOpenProfile, onOpenTransaction }) {
-  const { balance, transactions, loading, error, refresh } = useWalletData(wallet);
-
-  const handleRefresh = useCallback(() => { if (!loading) refresh(); }, [loading, refresh]);
+export default function WalletPage({ wallet, balance, transactions, loading, error, onRefresh, profiles, onOpenProfile, onOpenTransaction }) {
+  const handleRefresh = useCallback(() => { if (!loading) onRefresh?.(); }, [loading, onRefresh]);
 
   if (!wallet?.nwc_uri) {
     return (
@@ -150,12 +160,13 @@ export default function WalletPage({ wallet, profiles, onOpenProfile, onOpenTran
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)", fontFamily: "'DM Sans',sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {label}
+                    {label}<span style={{ color: "var(--text-faint)", fontWeight: 400 }}> · {relativeTime(ts)}</span>
                   </div>
-                  <div style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", marginTop: 1, display: "flex", gap: 4, alignItems: "center" }}>
-                    <span>{relativeTime(ts)}</span>
-                    {comment && <><span>·</span><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{comment}</span></>}
-                  </div>
+                  {comment && (
+                    <div style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {comment}
+                    </div>
+                  )}
                 </div>
 
                 <div style={{ textAlign: "right", flexShrink: 0 }}>

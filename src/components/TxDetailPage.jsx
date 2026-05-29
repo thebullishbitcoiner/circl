@@ -2,29 +2,38 @@ import { useState } from "react";
 import Avatar from "./Avatar.jsx";
 import { Bk } from "./icons.jsx";
 import { displayName } from "../utils.js";
+import { decodeInvoice } from "@getalby/lightning-tools";
 
-function parseZapRequest(tx) {
+function zapReqFromDesc(tx) {
   try {
     if (tx.description?.trim().startsWith("{")) return JSON.parse(tx.description);
+  } catch {}
+  try {
+    if (tx.invoice) {
+      const desc = decodeInvoice(tx.invoice)?.description;
+      if (desc?.trim().startsWith("{")) return JSON.parse(desc);
+    }
   } catch {}
   return null;
 }
 
+function getZapReq(tx) {
+  // tx.metadata.nostr is the full kind 9734 event when the wallet provides it
+  if (tx.metadata?.nostr?.tags) return tx.metadata.nostr;
+  return zapReqFromDesc(tx);
+}
+
 function nostrPubkeyFromTx(tx) {
-  const zr = parseZapRequest(tx);
+  const zr = getZapReq(tx);
   if (tx.type === "outgoing") {
-    // For zaps we sent, the recipient is the `p` tag of the zap request
-    const pTag = zr?.tags?.find(t => t[0] === "p")?.[1];
-    return pTag ?? tx.metadata?.nostr?.pubkey ?? null;
+    return zr?.tags?.find(t => t[0] === "p")?.[1] ?? null;
   }
-  // For incoming zaps the sender signed the request — their pubkey is the top-level field
   return tx.metadata?.nostr?.pubkey ?? zr?.pubkey ?? null;
 }
 
 function txComment(tx) {
   if (tx.metadata?.comment?.trim()) return tx.metadata.comment.trim();
-  const zr = parseZapRequest(tx);
-  return zr?.content?.trim() ?? "";
+  return getZapReq(tx)?.content?.trim() ?? "";
 }
 
 function fmtDate(ts) {
@@ -53,14 +62,21 @@ function CopyButton({ text }) {
   );
 }
 
-function DetailRow({ label, value, mono = false, wrap = false }) {
+function DetailRow({ label, value, mono = false, wrap = false, pre = false }) {
   if (!value) return null;
   return (
     <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
-        {label}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          {label}
+        </div>
+        {mono && <CopyButton text={value} />}
       </div>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+      {pre ? (
+        <pre style={{ margin: 0, fontSize: 12, color: "var(--text)", fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-all", overflowX: "auto" }}>
+          {value}
+        </pre>
+      ) : (
         <span style={{
           fontSize: 13, color: "var(--text)",
           fontFamily: mono ? "monospace" : "'DM Sans',sans-serif",
@@ -68,12 +84,11 @@ function DetailRow({ label, value, mono = false, wrap = false }) {
           whiteSpace: wrap ? "normal" : "nowrap",
           overflow: wrap ? "visible" : "hidden",
           textOverflow: wrap ? "clip" : "ellipsis",
-          flex: 1,
+          display: "block",
         }}>
           {value}
         </span>
-        {mono && <CopyButton text={value} />}
-      </div>
+      )}
     </div>
   );
 }
@@ -86,13 +101,26 @@ function SectionLabel({ children }) {
   );
 }
 
+function resolvedPubkeySource(tx) {
+  const zr = getZapReq(tx);
+  const metaNostr = tx.metadata?.nostr;
+  if (tx.type === "outgoing") {
+    const pTag = zr?.tags?.find(t => t[0] === "p")?.[1];
+    if (pTag) return { pk: pTag, source: metaNostr?.tags ? "metadata.nostr p-tag" : "zap request p-tag" };
+    return { pk: null, source: "none found" };
+  }
+  if (metaNostr?.pubkey) return { pk: metaNostr.pubkey, source: "metadata.nostr.pubkey" };
+  if (zr?.pubkey) return { pk: zr.pubkey, source: "zap request pubkey field" };
+  return { pk: null, source: "none found" };
+}
+
 export default function TxDetailPage({ tx, profiles, onBack, onOpenProfile }) {
   const pk         = nostrPubkeyFromTx(tx);
   const name       = pk ? displayName(pk, profiles) : null;
   const comment    = txComment(tx);
   const isIncoming = tx.type === "incoming";
   const feesSats   = tx.fees_paid ? Math.round(tx.fees_paid / 1000) : 0;
-  const zapReq     = parseZapRequest(tx);
+  const zapReq     = getZapReq(tx);
 
   // Extract structured fields from the zap request
   const zapReqId        = zapReq?.id ?? null;
@@ -109,6 +137,8 @@ export default function TxDetailPage({ tx, profiles, onBack, onOpenProfile }) {
   const metaNostrTags   = tx.metadata?.nostr?.tags;
 
   const hasNostrData = zapReq || tx.metadata?.nostr;
+
+  const { pk: resolvedPk, source: pkSource } = resolvedPubkeySource(tx);
 
   return (
     <div className="slide-panel-scroll">
@@ -153,7 +183,7 @@ export default function TxDetailPage({ tx, profiles, onBack, onOpenProfile }) {
             <SectionLabel>Zap Request (NIP-57)</SectionLabel>
             {zapReqId        && <DetailRow label="Event ID"      value={zapReqId}        mono wrap />}
             {zapReqSenderPk  && <DetailRow label="Sender Pubkey" value={zapReqSenderPk}  mono wrap />}
-            {pk && pk !== zapReqSenderPk && <DetailRow label={isIncoming ? "Recipient Pubkey" : "Recipient Pubkey"} value={pk} mono wrap />}
+            {pk && pk !== zapReqSenderPk && <DetailRow label="Recipient Pubkey" value={pk} mono wrap />}
             {zappedNoteId    && <DetailRow label="Zapped Note ID" value={zappedNoteId}   mono wrap />}
             {zapReqAmtSats   && <DetailRow label="Requested Amount" value={zapReqAmtSats} />}
             {zapReqCreatedAt && <DetailRow label="Request Created"  value={zapReqCreatedAt} />}
@@ -162,6 +192,27 @@ export default function TxDetailPage({ tx, profiles, onBack, onOpenProfile }) {
             {metaNostrTags   && <DetailRow label="Metadata Tags"    value={JSON.stringify(metaNostrTags, null, 2)} mono wrap />}
           </>
         )}
+
+        {/* Raw data for debugging */}
+        <SectionLabel>Raw Data</SectionLabel>
+        <DetailRow label="Resolved Pubkey Source" value={`${pkSource}${resolvedPk ? `: ${resolvedPk.slice(0, 16)}…` : ""}`} />
+        <DetailRow
+          label="tx.description"
+          value={tx.description ? (tx.description.trim().startsWith("{") ? "(JSON — see Zap Request above)" : tx.description) : "(empty)"}
+          wrap
+        />
+        {tx.invoice && (() => {
+          try {
+            const desc = decodeInvoice(tx.invoice)?.description;
+            if (!desc) return <DetailRow label="invoice description" value="(empty)" />;
+            return <DetailRow label="invoice description" value={desc.trim().startsWith("{") ? "(JSON — see Zap Request above)" : desc} wrap />;
+          } catch { return <DetailRow label="invoice description" value="(decode error)" />; }
+        })()}
+        <DetailRow
+          label="tx.metadata"
+          value={tx.metadata ? JSON.stringify(tx.metadata, null, 2) : "(none)"}
+          mono pre
+        />
       </div>
     </div>
   );

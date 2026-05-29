@@ -150,10 +150,23 @@ export default function SettingsPage({
   const [zapAmount,  setZapAmount]  = useState(String(zapSettings.amount));
   const [zapMsg,     setZapMsg]     = useState(zapSettings.msg);
 
-  const flushZapDefaults = () => {
+  const handleAmountChange = e => {
+    const raw = e.target.value;
+    setZapAmount(raw);
+    const parsed = parseInt(raw);
+    if (parsed >= 1) onSaveZapSettings?.({ amount: parsed, msg: zapMsg });
+  };
+
+  const handleAmountBlur = () => {
     const amount = Math.max(1, parseInt(zapAmount) || 21);
-    onSaveZapSettings?.({ amount, msg: zapMsg });
     setZapAmount(String(amount));
+    onSaveZapSettings?.({ amount, msg: zapMsg });
+  };
+
+  const handleMsgChange = e => {
+    setZapMsg(e.target.value);
+    const parsed = Math.max(1, parseInt(zapAmount) || 21);
+    onSaveZapSettings?.({ amount: parsed, msg: e.target.value });
   };
 
   const tabBtn = (id, label) => ({
@@ -225,8 +238,8 @@ export default function SettingsPage({
             <label style={{ fontSize: 13, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", flexShrink: 0 }}>Amount (sats)</label>
             <input
               type="number" min="1" value={zapAmount}
-              onChange={e => setZapAmount(e.target.value)}
-              onBlur={flushZapDefaults}
+              onChange={handleAmountChange}
+              onBlur={handleAmountBlur}
               style={{ ...inputStyle, width: 90, textAlign: "right", fontFamily: "monospace" }}
             />
           </div>
@@ -234,8 +247,7 @@ export default function SettingsPage({
             <label style={{ fontSize: 13, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", flexShrink: 0 }}>Message</label>
             <input
               type="text" value={zapMsg}
-              onChange={e => setZapMsg(e.target.value)}
-              onBlur={flushZapDefaults}
+              onChange={handleMsgChange}
               placeholder="optional"
               style={{ ...inputStyle, flex: 1, minWidth: 0 }}
             />

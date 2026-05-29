@@ -26,6 +26,7 @@ import useDarkMode from "./hooks/useDarkMode.js";
 import useWallet from "./hooks/useWallet.js";
 import useZap from "./hooks/useZap.js";
 import useZapSettings from "./hooks/useZapSettings.js";
+import useWalletData from "./hooks/useWalletData.js";
 
 import LoginScreen from "./components/LoginScreen.jsx";
 import SettingsPage from "./components/SettingsPage.jsx";
@@ -206,6 +207,7 @@ export default function App() {
   const { wallet, saveWallet, disconnect: disconnectWallet } = useWallet();
   const { sendZap } = useZap(wallet);
   const { zapSettings, saveZapSettings } = useZapSettings();
+  const { balance: walletBalance, transactions: walletTxs, loading: walletLoading, error: walletError, refresh: refreshWallet } = useWalletData(wallet);
   const [floatingCompose, setFloatingCompose] = useState(false);
   const [panelModal, setPanelModal] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -521,6 +523,11 @@ export default function App() {
                 {activeNav === "zaps" && (
                   <WalletPage
                     wallet={wallet}
+                    balance={walletBalance}
+                    transactions={walletTxs}
+                    loading={walletLoading}
+                    error={walletError}
+                    onRefresh={refreshWallet}
                     profiles={profiles}
                     onOpenProfile={handleOpenProfile}
                     onOpenTransaction={handleOpenTransaction}
