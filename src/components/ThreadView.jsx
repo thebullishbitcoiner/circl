@@ -15,7 +15,7 @@ function ThreadNoteRow({
   onOpenZaps, onOpenReactions, onOpenReposts,
   myPubkey, myProfile, onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, onRequestModal, onDismissModal,
-  sendZap, defaultZapAmount, defaultZapMsg, onZapFail, onZapDebug,
+  sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
   resolveEventById,
   focusRef, hasConnector = false,
   threadMenuId, setThreadMenuId, onShowThreadJson,
@@ -125,7 +125,7 @@ function ThreadNoteRow({
               getLocalReactions={getLocalReactions} setLocalReaction={setLocalReaction}
               onRequestModal={onRequestModal} onDismissModal={onDismissModal}
               sendZap={sendZap} defaultZapAmount={defaultZapAmount}
-              defaultZapMsg={defaultZapMsg} onZapFail={onZapFail} onZapDebug={onZapDebug}
+              defaultZapMsg={defaultZapMsg} onZapFail={onZapFail}
             />
           )}
         </div>
@@ -145,7 +145,7 @@ export default function ThreadView({
   onOpenZaps, onOpenReactions, onOpenReposts,
   myPubkey, myProfile, onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, onRequestModal, onDismissModal,
-  sendZap, defaultZapAmount, defaultZapMsg, onZapFail, onZapDebug,
+  sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
   resolveEventById,
 }) {
   const containerRef = useRef(null);
@@ -227,7 +227,7 @@ export default function ThreadView({
     myPubkey, myProfile, onPublish, publishEvent, onPrepend,
     onBookmark, isBookmarked, getLocalZaps, addLocalZap,
     getLocalReactions, setLocalReaction, onRequestModal, onDismissModal,
-    sendZap, defaultZapAmount, defaultZapMsg, onZapFail, onZapDebug,
+    sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
     resolveEventById,
     threadMenuId, setThreadMenuId, onShowThreadJson: setThreadJsonEvent,
   };

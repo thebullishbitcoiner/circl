@@ -17,7 +17,7 @@ export default function NoteCard({
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   delay,
   replyingToPubkey = null,
-  sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail, onZapDebug,
+  sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail,
 }) {
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
@@ -101,7 +101,6 @@ export default function NoteCard({
               defaultZapAmount={defaultZapAmount}
               defaultZapMsg={defaultZapMsg}
               onZapFail={onZapFail}
-              onZapDebug={onZapDebug}
             />
           </div>
         </div>

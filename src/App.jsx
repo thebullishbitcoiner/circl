@@ -467,9 +467,7 @@ export default function App() {
                                         reason === "no_lud16"  ? "⚡ No lightning address" :
                                         reason === "no_wallet" ? "⚡ No wallet connected" :
                                         `⚡ Zap failed: ${reason}`
-                                      )}
-                                      onZapDebug={msg => showToast(`⚡ ${msg}`)}
-                                      delay={0}
+                                      )}                                      delay={0}
                                     />
                                   )
                                   : (
@@ -508,9 +506,7 @@ export default function App() {
                                         reason === "no_lud16"  ? "⚡ No lightning address" :
                                         reason === "no_wallet" ? "⚡ No wallet connected" :
                                         `⚡ Zap failed: ${reason}`
-                                      )}
-                                      onZapDebug={msg => showToast(`⚡ ${msg}`)}
-                                      delay={0}
+                                      )}                                      delay={0}
                                     />
                                   )
                             )}
@@ -664,9 +660,7 @@ export default function App() {
                                         reason === "no_lud16"  ? "⚡ No lightning address" :
                                         reason === "no_wallet" ? "⚡ No wallet connected" :
                                         `⚡ Zap failed: ${reason}`
-                                      )}
-                        onZapDebug={msg => showToast(`⚡ ${msg}`)}
-                        onRequestModal={setPanelModal}
+                                      )}                        onRequestModal={setPanelModal}
                         onDismissModal={() => setPanelModal(null)}
                         resolveEventById={resolveEventById}
                         onOpenCircle={handleOpenCircle}
@@ -725,9 +719,7 @@ export default function App() {
                           reason === "no_lud16"  ? "⚡ No lightning address" :
                           reason === "no_wallet" ? "⚡ No wallet connected" :
                           `⚡ Zap failed: ${reason}`
-                        )}
-                        onZapDebug={msg => showToast(`⚡ ${msg}`)}
-                        resolveEventById={resolveEventById}
+                        )}                        resolveEventById={resolveEventById}
                       />
                     );
                   }
@@ -869,7 +861,6 @@ export default function App() {
                                     reason === "no_wallet" ? "⚡ No wallet connected" :
                                     `⚡ Zap failed: ${reason}`
                                   )}
-                                  onZapDebug={msg => showToast(`⚡ ${msg}`)}
                                 />
                               </div>
                             </div>

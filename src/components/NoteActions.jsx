@@ -15,7 +15,7 @@ export default function NoteActions({
   onPublish, onBookmark, isBookmarked, publishEvent, onPrepend,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal,
-  sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail, onZapDebug,
+  sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail,
 }) {
   const reactions    = getLocalReactions?.(event.id) ?? [];
   const rCount       = replyCount(event.id, allEvents);
@@ -41,13 +41,11 @@ export default function NoteActions({
   };
 
   const doSendZap = useCallback(async ({ amount, msg }) => {
-    onZapDebug?.(`wallet=${!!sendZap} lnAddr=${recipientLnAddr || "none"} amt=${amount}`);
     if (!sendZap) { onZapFail?.("no_wallet"); return; }
     if (!recipientLnAddr) { onZapFail?.("no_lud16"); return; }
     const result = await sendZap({ amountSats: amount, recipientLnAddr, recipientPubkey: event.pubkey, eventId: event.id, eventKind: event.kind, msg });
     if (!result.ok) onZapFail?.(result.reason);
-    else onZapDebug?.("payment ok ✓");
-  }, [sendZap, recipientLnAddr, event.pubkey, event.id, event.kind, onZapFail, onZapDebug]);
+  }, [sendZap, recipientLnAddr, event.pubkey, event.id, event.kind, onZapFail]);
 
   const handleZapFromModal = ({ amount, msg }) => {
     setShowZapModal(false);
@@ -100,7 +98,6 @@ export default function NoteActions({
             onTouchStart={e => { e.stopPropagation(); const t = setTimeout(() => { haptic.longPress(); setShowZapModal(true); }, 600); window.addEventListener("touchend", () => clearTimeout(t), { once: true }); }}
           >
             <Zi />
-            <span style={{ fontSize: 10, opacity: 0.5, marginRight: 2 }}>{defaultZapAmount}</span>
             {localZaps.length ? fmtSatsVal(localZaps.reduce((s, z) => s + Math.round(z.amount / 1000), 0)) : ""}
           </button>
           <button className={`action-btn${reaction ? " reacted" : ""}`}

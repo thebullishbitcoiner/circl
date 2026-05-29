@@ -10,7 +10,7 @@ export default function RepostCard({
   onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal, delay,
-  sendZap, defaultZapAmount, defaultZapMsg, onZapFail, onZapDebug,
+  sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
 }) {
   const originalId  = event.tags.find(t => t[0] === "e")?.[1];
   const fromContent = (() => { try { return JSON.parse(event.content); } catch { return null; } })();
@@ -64,7 +64,7 @@ export default function RepostCard({
               getLocalReactions={getLocalReactions} setLocalReaction={setLocalReaction}
               onRequestModal={onRequestModal} onDismissModal={onDismissModal}
               sendZap={sendZap} defaultZapAmount={defaultZapAmount}
-              defaultZapMsg={defaultZapMsg} onZapFail={onZapFail} onZapDebug={onZapDebug}
+              defaultZapMsg={defaultZapMsg} onZapFail={onZapFail}
             />
           </div>
         </div>
