@@ -1,11 +1,12 @@
 import { useRef, useEffect, useState, useMemo } from "react";
-import { createPortal } from "react-dom";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteActions from "./NoteActions.jsx";
 import FocusedStatsRow from "./FocusedStatsRow.jsx";
 import { Bk } from "./icons.jsx";
 import { displayName, nip05OrNpub, relativeTime, isQuoteRepost, replyCount, buildParentChain, buildSelfReplyChain, directReplyParentId } from "../utils.js";
+import NoteContextMenu from "./NoteContextMenu.jsx";
+import NoteJsonModal from "./NoteJsonModal.jsx";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 
@@ -54,38 +55,11 @@ function ThreadNoteRow({
             <span />
           </button>
           {threadMenuId === event.id && (
-            <div className="note-card-menu" onClick={e => e.stopPropagation()}>
-              <button
-                type="button"
-                className="note-card-menu-item"
-                onClick={() => {
-                  navigator.clipboard?.writeText(event.content || "").catch(() => {});
-                  setThreadMenuId(null);
-                }}
-              >
-                Copy Note Text
-              </button>
-              <button
-                type="button"
-                className="note-card-menu-item"
-                onClick={() => {
-                  navigator.clipboard?.writeText(event.id || "").catch(() => {});
-                  setThreadMenuId(null);
-                }}
-              >
-                Copy Note ID
-              </button>
-              <button
-                type="button"
-                className="note-card-menu-item"
-                onClick={() => {
-                  setThreadMenuId(null);
-                  onShowThreadJson(event);
-                }}
-              >
-                View JSON
-              </button>
-            </div>
+            <NoteContextMenu
+              event={event}
+              onClose={() => setThreadMenuId(null)}
+              onViewJson={onShowThreadJson}
+            />
           )}
           <div className="note-meta">
             <span className="note-name" style={{ cursor: "pointer", fontSize: focused ? 14 : 13 }}
@@ -179,7 +153,6 @@ export default function ThreadView({
   const authorPk     = focusedEvent.pubkey;
   const [threadMenuId, setThreadMenuId]     = useState(null);
   const [threadJsonEvent, setThreadJsonEvent] = useState(null);
-  const [threadJsonCopied, setThreadJsonCopied] = useState(false);
   const [fetchedEvents, setFetchedEvents] = useState([]);
 
   const allEvents = useMemo(() => {
@@ -317,33 +290,7 @@ export default function ThreadView({
         </div>
       )}
 
-      {threadJsonEvent && createPortal(
-        <div className="overlay centered profile-json-overlay" onClick={() => setThreadJsonEvent(null)}>
-          <div className="note-json-modal" onClick={ev => ev.stopPropagation()}>
-            <div className="note-json-header">
-              <div className="note-json-title">Event JSON</div>
-              <button type="button" className="note-json-close" onClick={() => setThreadJsonEvent(null)} aria-label="Close">×</button>
-            </div>
-            <div className="note-json-pre-wrap">
-              <button
-                type="button"
-                className="note-json-copy"
-                onClick={ev => {
-                  ev.stopPropagation();
-                  navigator.clipboard?.writeText(JSON.stringify(threadJsonEvent, null, 2)).catch(() => {});
-                  setThreadJsonCopied(true);
-                  setTimeout(() => setThreadJsonCopied(false), 1200);
-                }}
-                aria-label="Copy JSON"
-              >
-                {threadJsonCopied ? "✓" : "⧉"}
-              </button>
-              <pre className="note-json-pre">{JSON.stringify(threadJsonEvent, null, 2)}</pre>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      {threadJsonEvent && <NoteJsonModal event={threadJsonEvent} onClose={() => setThreadJsonEvent(null)} />}
     </div>
   );
 }

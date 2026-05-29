@@ -6,7 +6,7 @@ import { parseNoteMediaSegments, groupNoteMediaSegments, displayName, relativeTi
 
 function splitNostrEventRefs(text) {
   const out = [];
-  const re = /nostr:(nevent1[023456789acdefghjklmnpqrstuvwxyz]+)/ig;
+  const re = /nostr:(nevent1[023456789acdefghjklmnpqrstuvwxyz]+|note1[023456789acdefghjklmnpqrstuvwxyz]+)/ig;
   let last = 0;
   let m;
   while ((m = re.exec(text)) !== null) {
@@ -22,6 +22,7 @@ function resolveNeventToId(nevent) {
   try {
     const d = nip19.decode(nevent);
     if (d?.type === "nevent" && d.data?.id) return d.data.id;
+    if (d?.type === "note" && d.data) return d.data;
   } catch {}
   return null;
 }
@@ -29,10 +30,10 @@ function resolveNeventToId(nevent) {
 function decodeNevent(nevent) {
   try {
     const d = nip19.decode(nevent);
-    return d?.type === "nevent" ? d.data : null;
-  } catch {
-    return null;
-  }
+    if (d?.type === "nevent") return d.data;
+    if (d?.type === "note") return { id: d.data };
+  } catch {}
+  return null;
 }
 
 function EmbeddedEvent({ event, profiles, onOpenProfile, onOpenThread }) {
@@ -177,8 +178,8 @@ export default function NoteContent({
   const isCollapsed = shouldCollapse && !expanded;
 
   useEffect(() => {
-    if (!allowEmbeds || !resolveEventById || typeof content !== "string" || !content.includes("nostr:nevent1")) return;
-    const refs = [...content.matchAll(/nostr:(nevent1[023456789acdefghjklmnpqrstuvwxyz]+)/ig)]
+    if (!allowEmbeds || !resolveEventById || typeof content !== "string" || !/nostr:(nevent1|note1)/i.test(content)) return;
+    const refs = [...content.matchAll(/nostr:(nevent1[023456789acdefghjklmnpqrstuvwxyz]+|note1[023456789acdefghjklmnpqrstuvwxyz]+)/ig)]
       .map(m => m[1]);
     if (!refs.length) return;
     let cancelled = false;

@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { createPortal } from "react-dom";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteCard from "./NoteCard.jsx";
@@ -7,7 +6,8 @@ import NoteActions from "./NoteActions.jsx";
 import ProfileText from "./ProfileText.jsx";
 import { Bk, Ck } from "./icons.jsx";
 import { displayName, nip05OrNpub, relativeTime, shortNpub, truncNpub, avatarUrl, isQuoteRepost, isHexPubkey, replyCount, repostAndQuoteCount, normPubkey, directReplyParentId, parseKind6EmbeddedEvent } from "../utils.js";
-import { nip19 } from "../utils.js";
+import NoteContextMenu from "./NoteContextMenu.jsx";
+import NoteJsonModal from "./NoteJsonModal.jsx";
 import useInteractions from "../hooks/useInteractions.js";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
@@ -132,7 +132,6 @@ export default function ProfilePage({
   const [circleLoading, setCircleLoading] = useState(true);
   const [profileNotesMenuId, setProfileNotesMenuId] = useState(null);
   const [profileNotesJsonEvent, setProfileNotesJsonEvent] = useState(null);
-  const [profileNotesJsonCopied, setProfileNotesJsonCopied] = useState(false);
   const p    = profiles?.[pubkey] || {};
   const name = displayName(pubkey, profiles);
   const websiteHref = normalizeWebsite(p.website);
@@ -406,35 +405,11 @@ export default function ProfilePage({
                         <span />
                       </button>
                       {profileNotesMenuId === e.id && (
-                        <div className="note-card-menu" onClick={e2 => e2.stopPropagation()}>
-                          <button
-                            className="note-card-menu-item"
-                            onClick={() => {
-                              navigator.clipboard?.writeText(e.content || "").catch(() => {});
-                              setProfileNotesMenuId(null);
-                            }}
-                          >
-                            Copy Note Text
-                          </button>
-                          <button
-                            className="note-card-menu-item"
-                            onClick={() => {
-                              navigator.clipboard?.writeText(e.id || "").catch(() => {});
-                              setProfileNotesMenuId(null);
-                            }}
-                          >
-                            Copy Note ID
-                          </button>
-                          <button
-                            className="note-card-menu-item"
-                            onClick={() => {
-                              setProfileNotesMenuId(null);
-                              setProfileNotesJsonEvent(e);
-                            }}
-                          >
-                            View JSON
-                          </button>
-                        </div>
+                        <NoteContextMenu
+                          event={e}
+                          onClose={() => setProfileNotesMenuId(null)}
+                          onViewJson={setProfileNotesJsonEvent}
+                        />
                       )}
                       <div className="note-meta">
                         <span className="note-name" style={{ cursor: "pointer" }} onClick={e2 => { e2.stopPropagation(); onOpenProfile?.(displayPk); }}>
@@ -519,33 +494,7 @@ export default function ProfilePage({
             })
       )}
 
-      {profileNotesJsonEvent && createPortal(
-        <div className="overlay centered profile-json-overlay" onClick={() => setProfileNotesJsonEvent(null)}>
-          <div className="note-json-modal" onClick={ev => ev.stopPropagation()}>
-            <div className="note-json-header">
-              <div className="note-json-title">Event JSON</div>
-              <button type="button" className="note-json-close" onClick={() => setProfileNotesJsonEvent(null)} aria-label="Close">×</button>
-            </div>
-            <div className="note-json-pre-wrap">
-              <button
-                type="button"
-                className="note-json-copy"
-                onClick={ev => {
-                  ev.stopPropagation();
-                  navigator.clipboard?.writeText(JSON.stringify(profileNotesJsonEvent, null, 2)).catch(() => {});
-                  setProfileNotesJsonCopied(true);
-                  setTimeout(() => setProfileNotesJsonCopied(false), 1200);
-                }}
-                aria-label="Copy JSON"
-              >
-                {profileNotesJsonCopied ? "✓" : "⧉"}
-              </button>
-              <pre className="note-json-pre">{JSON.stringify(profileNotesJsonEvent, null, 2)}</pre>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      {profileNotesJsonEvent && <NoteJsonModal event={profileNotesJsonEvent} onClose={() => setProfileNotesJsonEvent(null)} />}
 
       {/* Between us tab */}
       {tab === "between" && !isOwn && (

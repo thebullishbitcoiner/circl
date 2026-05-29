@@ -1,8 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteActions from "./NoteActions.jsx";
 import { displayName, nip05OrNpub, relativeTime } from "../utils.js";
+import NoteContextMenu from "./NoteContextMenu.jsx";
+import NoteJsonModal from "./NoteJsonModal.jsx";
 
 export default function NoteCard({
   event, profiles, liked, bookmarked, likeCount,
@@ -18,28 +20,8 @@ export default function NoteCard({
   sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail, onZapDebug,
 }) {
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
-  const [jsonOpen,     setJsonOpen]     = useState(false);
-  const [jsonCopied,   setJsonCopied]   = useState(false);
+  const [jsonOpen, setJsonOpen] = useState(false);
 
-  const copyToClipboard = useCallback(text => {
-    navigator.clipboard?.writeText(text).catch(() => {});
-  }, []);
-
-  const copyNoteText = useCallback(() => {
-    copyToClipboard(event.content || "");
-    setCardMenuOpen(false);
-  }, [event.content]);
-
-  const copyNoteId = useCallback(() => {
-    copyToClipboard(event.id || "");
-    setCardMenuOpen(false);
-  }, [event.id]);
-
-  const copyJson = useCallback(() => {
-    copyToClipboard(JSON.stringify(event, null, 2));
-    setJsonCopied(true);
-    setTimeout(() => setJsonCopied(false), 1200);
-  }, [event]);
 
   return (
     <>
@@ -62,11 +44,11 @@ export default function NoteCard({
               <span /><span /><span />
             </button>
             {cardMenuOpen && (
-              <div className="note-card-menu" onClick={e => e.stopPropagation()}>
-                <button className="note-card-menu-item" onClick={copyNoteText}>Copy Note Text</button>
-                <button className="note-card-menu-item" onClick={copyNoteId}>Copy Note ID</button>
-                <button className="note-card-menu-item" onClick={() => { setCardMenuOpen(false); setJsonOpen(true); }}>View JSON</button>
-              </div>
+              <NoteContextMenu
+                event={event}
+                onClose={() => setCardMenuOpen(false)}
+                onViewJson={() => setJsonOpen(true)}
+              />
             )}
             <div className="note-meta">
               <span className="note-name" style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }}>
@@ -125,22 +107,7 @@ export default function NoteCard({
         </div>
       </div>
 
-      {jsonOpen && (
-        <div className="overlay centered" onClick={() => setJsonOpen(false)}>
-          <div className="note-json-modal" onClick={e => e.stopPropagation()}>
-            <div className="note-json-header">
-              <div className="note-json-title">Event JSON</div>
-              <button type="button" className="note-json-close" onClick={() => setJsonOpen(false)} aria-label="Close">×</button>
-            </div>
-            <div className="note-json-pre-wrap">
-              <button type="button" className="note-json-copy" onClick={e => { e.stopPropagation(); copyJson(); }} aria-label="Copy JSON">
-                {jsonCopied ? "✓" : "⧉"}
-              </button>
-              <pre className="note-json-pre">{JSON.stringify(event, null, 2)}</pre>
-            </div>
-          </div>
-        </div>
-      )}
+      {jsonOpen && <NoteJsonModal event={event} onClose={() => setJsonOpen(false)} />}
     </>
   );
 }

@@ -12,9 +12,10 @@ export const normPubkey = pk => {
 };
 
 export const nip19 = {
-  npubEncode: pk  => nip19Lib.npubEncode(pk),
-  noteEncode: id  => nip19Lib.noteEncode(id),
-  decode:     str => nip19Lib.decode(str),
+  npubEncode:   pk    => nip19Lib.npubEncode(pk),
+  noteEncode:   id    => nip19Lib.noteEncode(id),
+  neventEncode: event => nip19Lib.neventEncode(event),
+  decode:       str   => nip19Lib.decode(str),
 };
 
 export const truncNpub = pk => {
