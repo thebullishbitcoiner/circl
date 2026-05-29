@@ -51,7 +51,7 @@ import { ZapsScreen, ReactionsScreen, RepostsScreen } from "./components/ListScr
 import SwipePanel from "./components/SwipePanel.jsx";
 import Avatar from "./components/Avatar.jsx";
 import NoteContent from "./components/NoteContent.jsx";
-import { SbHome, SbBell, SbBook, SbZap, SbSearch, NavHome, NavBell, NavBook, NavZap, NavSearch, Bk } from "./components/icons.jsx";
+import { SbHome, SbBell, SbBook, SbZap, SbSearch, SbWallet, NavHome, NavBell, NavBook, NavZap, NavSearch, NavWallet, Bk } from "./components/icons.jsx";
 export default function App() {
   const { pubkey, status, error, login, logout, signAndPublish } = useAuth();
   const { follows, loading: fl, unfollow: unfollowPk } = useFollows({ pubkey, signAndPublish });
@@ -325,10 +325,10 @@ export default function App() {
 
   const navItems = [
     { id: "home",          label: "Home",     SbIcon: <SbHome />,   NavIcon: <NavHome /> },
-    { id: "notifications", label: "Alerts",   SbIcon: <SbBell />,   NavIcon: <NavBell /> },
-    { id: "zaps",          label: "Zaps",     SbIcon: <SbZap />,    NavIcon: <NavZap /> },
+    { id: "notifications", label: "Notifications", SbIcon: <SbBell />,   NavIcon: <NavBell /> },
+    { id: "zaps",          label: "Wallet",      SbIcon: <SbWallet />, NavIcon: <NavWallet /> },
     { id: "search",        label: "Search",   SbIcon: <SbSearch />, NavIcon: <NavSearch /> },
-    { id: "bookmarks",     label: "Saved",    SbIcon: <SbBook />,   NavIcon: <NavBook /> },
+    { id: "bookmarks",     label: "Bookmarks", SbIcon: <SbBook />,   NavIcon: <NavBook /> },
   ];
 
   useEffect(() => () => clearTimeout(toastRef.current), []);
@@ -379,7 +379,7 @@ export default function App() {
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div className="feed-title">
                     {activeNav === "home" && "Your Circle"}
-                    {activeNav === "bookmarks" && "Saved"}
+                    {activeNav === "bookmarks" && "Bookmarks"}
                     {activeNav === "notifications" && "Notifications"}
                     {activeNav === "zaps" && "Wallet"}
                     {activeNav === "search" && "Search"}
@@ -882,6 +882,28 @@ export default function App() {
                         onOpenProfile={handleOpenProfile}
                         onOpenThread={handleOpenThread}
                         onOpenHashtag={handleOpenHashtag}
+                        myPubkey={pubkey}
+                        myProfile={myProfile}
+                        onBookmark={handleBookmark}
+                        isBookmarked={isBookmarked}
+                        getLocalZaps={getLocalZaps}
+                        addLocalZap={addLocalZap}
+                        getLocalReactions={getLocalReactions}
+                        setLocalReaction={setLocalReaction}
+                        publishEvent={publishEvent}
+                        onPrepend={prependEvent}
+                        onOpenZaps={handleOpenZaps}
+                        onOpenReactions={handleOpenReactions}
+                        onOpenReposts={handleOpenReposts}
+                        resolveEventById={resolveEventById}
+                        sendZap={sendZap}
+                        defaultZapAmount={zapSettings.amount}
+                        defaultZapMsg={zapSettings.msg}
+                        onZapFail={reason => showToast(
+                          reason === "no_lud16"  ? "⚡ No lightning address" :
+                          reason === "no_wallet" ? "⚡ No wallet connected" :
+                          `⚡ Zap failed: ${reason}`
+                        )}
                       />
                     );
                   }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo, useCallback } from "react";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteActions from "./NoteActions.jsx";
@@ -6,7 +6,7 @@ import { displayName, nip05OrNpub, relativeTime } from "../utils.js";
 import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
 
-export default function NoteCard({
+function NoteCard({
   event, profiles, liked, bookmarked, likeCount,
   replyCount: rCount = 0, repostCount: rpCount = 0,
   myPubkey, myProfile, onLike, onBookmark,
@@ -21,6 +21,7 @@ export default function NoteCard({
 }) {
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
+  const isBookmarkedFn = useCallback(() => bookmarked, [bookmarked]);
 
 
   return (
@@ -92,7 +93,7 @@ export default function NoteCard({
               publishEvent={publishEvent}
               onPrepend={onPrepend}
               onBookmark={onBookmark}
-              isBookmarked={() => bookmarked}
+              isBookmarked={isBookmarkedFn}
               getLocalZaps={getLocalZaps}
               addLocalZap={addLocalZap}
               getLocalReactions={getLocalReactions}
@@ -110,3 +111,5 @@ export default function NoteCard({
     </>
   );
 }
+
+export default memo(NoteCard);

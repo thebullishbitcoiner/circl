@@ -1,6 +1,7 @@
+import { memo } from "react";
 import { avatarUrl, avatarInitial } from "../utils.js";
 
-export default function Avatar({ pk, profiles, size = 36, className = "" }) {
+function Avatar({ pk, profiles, size = 36, className = "" }) {
   const url  = avatarUrl(pk, profiles);
   const init = avatarInitial(pk, profiles);
   return (
@@ -11,3 +12,10 @@ export default function Avatar({ pk, profiles, size = 36, className = "" }) {
     </div>
   );
 }
+
+export default memo(Avatar, (prev, next) =>
+  prev.pk === next.pk &&
+  prev.size === next.size &&
+  prev.className === next.className &&
+  prev.profiles[prev.pk] === next.profiles[next.pk]
+);

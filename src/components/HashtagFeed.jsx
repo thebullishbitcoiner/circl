@@ -1,12 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
-import { relativeTime, displayName } from "../utils.js";
-import Avatar from "./Avatar.jsx";
-import NoteContent from "./NoteContent.jsx";
+import { replyCount, repostAndQuoteCount } from "../utils.js";
+import NoteCard from "./NoteCard.jsx";
 import { Bk } from "./icons.jsx";
 
-export default function HashtagFeed({ hashtag, profiles, onBack, onOpenProfile, onOpenThread, onOpenHashtag }) {
+export default function HashtagFeed({
+  hashtag, profiles, onBack, onOpenProfile, onOpenThread, onOpenHashtag,
+  myPubkey, myProfile, onBookmark, isBookmarked,
+  getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
+  publishEvent, onPrepend, onOpenZaps, onOpenReactions, onOpenReposts,
+  sendZap, defaultZapAmount, defaultZapMsg, onZapFail, resolveEventById,
+}) {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const subRef = useRef(null);
@@ -57,39 +62,41 @@ export default function HashtagFeed({ hashtag, profiles, onBack, onOpenProfile, 
         </div>
       )}
 
-      {notes.map(ev => (
-        <div
+      {notes.map((ev, i) => (
+        <NoteCard
           key={ev.id}
-          className="note-card"
-          style={{ cursor: "pointer" }}
-          onClick={() => onOpenThread?.(ev)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={e => { if (e.key === "Enter" || e.key === " ") onOpenThread?.(ev); }}
-        >
-          <div className="note-inner">
-            <div style={{ cursor: "pointer", flexShrink: 0 }} onClick={e => { e.stopPropagation(); onOpenProfile?.(ev.pubkey); }}>
-              <Avatar pk={ev.pubkey} profiles={profiles} size={36} />
-            </div>
-            <div className="note-body">
-              <div className="note-meta">
-                <span className="note-name" style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); onOpenProfile?.(ev.pubkey); }}>
-                  {displayName(ev.pubkey, profiles)}
-                </span>
-                <span className="note-time">{relativeTime(ev.created_at)}</span>
-              </div>
-              <NoteContent
-                content={ev.content}
-                profiles={profiles}
-                onOpenProfile={onOpenProfile}
-                onOpenThread={onOpenThread}
-                onOpenHashtag={onOpenHashtag}
-                allEvents={[]}
-                collapsible
-              />
-            </div>
-          </div>
-        </div>
+          event={ev}
+          events={notes}
+          resolveEventById={resolveEventById}
+          profiles={profiles}
+          liked={false}
+          bookmarked={isBookmarked?.(ev) || false}
+          likeCount={0}
+          replyCount={replyCount(ev.id, notes)}
+          repostCount={repostAndQuoteCount(ev.id, notes)}
+          myPubkey={myPubkey}
+          myProfile={myProfile}
+          onLike={() => {}}
+          onBookmark={onBookmark}
+          onOpenProfile={onOpenProfile}
+          onOpenThread={onOpenThread}
+          onOpenHashtag={onOpenHashtag}
+          onOpenZaps={onOpenZaps}
+          onOpenReactions={onOpenReactions}
+          onOpenReposts={onOpenReposts}
+          onPublish={onPrepend}
+          publishEvent={publishEvent}
+          onPrepend={onPrepend}
+          getLocalZaps={getLocalZaps}
+          addLocalZap={addLocalZap}
+          getLocalReactions={getLocalReactions}
+          setLocalReaction={setLocalReaction}
+          sendZap={sendZap}
+          defaultZapAmount={defaultZapAmount}
+          defaultZapMsg={defaultZapMsg}
+          onZapFail={onZapFail}
+          delay={i * 0.03}
+        />
       ))}
     </div>
   );

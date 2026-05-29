@@ -18,7 +18,7 @@ async function fetchLnurlData(lnAddr) {
     const { words } = bech32.decode(lnAddr, 1000);
     url = utf8Decoder.decode(bech32.fromWords(words));
   }
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
   if (!res.ok) throw new Error(`LNURL fetch failed: ${res.status}`);
   const body = await res.json();
   if (body.status === "ERROR") throw new Error(body.reason || "LNURL error");
@@ -27,8 +27,6 @@ async function fetchLnurlData(lnAddr) {
 
 export default function useZap(wallet) {
   const sendZap = useCallback(async ({ amountSats, recipientLnAddr, recipientPubkey, eventId, eventKind = 1, msg = "" }) => {
-    console.warn("[zap] sendZap called", { amountSats, recipientLnAddr, recipientPubkey, eventId, msg });
-
     if (!wallet?.nwc_uri) return { ok: false, reason: "no_wallet" };
     if (!recipientLnAddr) return { ok: false, reason: "no_lud16" };
 
@@ -40,8 +38,6 @@ export default function useZap(wallet) {
       const lnurlData = await fetchLnurlData(recipientLnAddr);
       const { callback, allowsNostr, commentAllowed } = lnurlData;
       if (!callback) throw new Error("No LNURL callback");
-      console.log("[zap] LNURL data", { allowsNostr, callback: callback.slice(0, 40) });
-
       let pr;
 
       // Try NIP-57 zap request if the endpoint supports Nostr and we have a signer.
@@ -53,47 +49,37 @@ export default function useZap(wallet) {
             : { pubkey: recipientPubkey, amount: msats, comment: msg, relays: RELAYS };
 
           const zapRequestTemplate = makeZapRequest(zapParams);
-          console.log("[zap] signing zap request...");
           const signed = await window.nostr.signEvent(zapRequestTemplate);
-          console.log("[zap] zap request signed, sending to callback");
 
           const callbackUrl = new URL(callback);
           callbackUrl.searchParams.set("amount", String(msats));
           callbackUrl.searchParams.set("nostr", JSON.stringify(signed));
 
-          const invoiceRes = await fetch(callbackUrl.toString());
+          const invoiceRes = await fetch(callbackUrl.toString(), { signal: AbortSignal.timeout(10000) });
           const invoiceData = await invoiceRes.json();
           if (invoiceData.status === "ERROR") throw new Error(invoiceData.reason || "Invoice error");
           if (!invoiceData.pr) throw new Error("No invoice in response");
           pr = invoiceData.pr;
-          console.log("[zap] got NIP-57 invoice");
-        } catch (zapErr) {
-          console.warn("[zap] NIP-57 failed, falling back to plain LNURL-pay:", zapErr.message);
+        } catch {
         }
       }
 
-      // Plain LNURL-pay fallback
       if (!pr) {
-        console.log("[zap] using plain LNURL-pay");
         const callbackUrl = new URL(callback);
         callbackUrl.searchParams.set("amount", String(msats));
         if (msg && commentAllowed && msg.length <= commentAllowed) {
           callbackUrl.searchParams.set("comment", msg);
         }
-        const invoiceRes = await fetch(callbackUrl.toString());
+        const invoiceRes = await fetch(callbackUrl.toString(), { signal: AbortSignal.timeout(10000) });
         const invoiceData = await invoiceRes.json();
         if (!invoiceData.pr) throw new Error(invoiceData.reason || "No invoice from LNURL-pay");
         pr = invoiceData.pr;
-        console.log("[zap] got plain invoice");
       }
 
       client = new NWCClient({ nostrWalletConnectUrl: wallet.nwc_uri });
-      console.log("[zap] paying invoice via NWC");
-      const response = await client.payInvoice({ invoice: pr });
-      console.log("[zap] payment response:", response);
+      await client.payInvoice({ invoice: pr });
       return { ok: true };
     } catch (e) {
-      console.error("[zap] error:", e);
       return { ok: false, reason: e.message || "payment_failed" };
     } finally {
       client?.close();
