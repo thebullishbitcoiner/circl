@@ -11,6 +11,7 @@ import {
   normPubkey,
   nip19,
   parseKind6EmbeddedEvent,
+  zapperPubkeyFromKind9735,
 } from "./utils.js";
 import useAuth from "./hooks/useAuth.js";
 import { nostrSubscribe } from "./nostr.js";
@@ -161,7 +162,13 @@ export default function App() {
       for (const r of reacts) add(typeof r === "string" ? r : r?.pk);
     }
     for (const f of follows) add(f);
-    for (const n of notificationEvents) add(n.pubkey);
+    for (const n of notificationEvents) {
+      add(n.pubkey);
+      if (n.kind === 9735) {
+        const zapper = zapperPubkeyFromKind9735(n);
+        if (zapper) add(zapper);
+      }
+    }
     return result;
   }, [mergedFeedPool, events, follows, pubkey, zapsByEvent, reactionsByEvent, notificationEvents]);
   const { profiles } = useProfiles({ pubkeys: allPks });
@@ -297,6 +304,7 @@ export default function App() {
       setLastNotifSeenAt(now);
       try { localStorage.setItem("circl_notif_seen_v1", String(now)); } catch {}
     }
+    if (nav === "zaps" && activeNav !== "zaps") refreshWallet();
   };
 
   const displayEvs = activeNav === "bookmarks" ? bookmarkFeedEvents : events;

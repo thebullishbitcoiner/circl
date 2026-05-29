@@ -226,6 +226,17 @@ export function zapCommentFromKind9735(ev) {
   }
 }
 
+/** Pubkey of the person who sent the zap (kind 9734 sender inside the kind 9735 receipt). */
+export function zapperPubkeyFromKind9735(ev) {
+  const desc = ev?.tags?.find(t => t[0] === "description")?.[1];
+  if (!desc) return null;
+  try {
+    return JSON.parse(desc)?.pubkey ?? null;
+  } catch {
+    return null;
+  }
+}
+
 const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp|avif|svg)(\?|#|$)/i;
 const VIDEO_EXT_RE = /\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i;
 

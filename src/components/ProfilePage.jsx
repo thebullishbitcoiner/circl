@@ -5,7 +5,7 @@ import NoteCard from "./NoteCard.jsx";
 import NoteActions from "./NoteActions.jsx";
 import ProfileText from "./ProfileText.jsx";
 import { Bk, Ck } from "./icons.jsx";
-import { displayName, nip05OrNpub, relativeTime, shortNpub, truncNpub, avatarUrl, isQuoteRepost, isHexPubkey, replyCount, repostAndQuoteCount, normPubkey, directReplyParentId, parseKind6EmbeddedEvent } from "../utils.js";
+import { displayName, nip05OrNpub, relativeTime, shortNpub, truncNpub, avatarUrl, isQuoteRepost, isHexPubkey, replyCount, repostAndQuoteCount, normPubkey, directReplyParentId, parseKind6EmbeddedEvent, nip19 } from "../utils.js";
 import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
 import useInteractions from "../hooks/useInteractions.js";

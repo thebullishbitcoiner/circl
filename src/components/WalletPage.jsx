@@ -101,7 +101,14 @@ export default function WalletPage({ wallet, balance, transactions, loading, err
     );
   }
 
-  const settled = transactions.filter(tx => tx.state === "settled");
+  const seenHashes = new Set();
+  const settled = transactions.filter(tx => {
+    if (tx.state !== "settled") return false;
+    if (!tx.payment_hash) return true;
+    if (seenHashes.has(tx.payment_hash)) return false;
+    seenHashes.add(tx.payment_hash);
+    return true;
+  });
 
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>

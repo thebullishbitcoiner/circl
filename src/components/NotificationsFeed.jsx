@@ -1,6 +1,6 @@
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
-import { displayName, relativeTime, zapCommentFromKind9735, parseArticle, fmtSats, parseBolt11Msats } from "../utils.js";
+import { displayName, relativeTime, zapCommentFromKind9735, zapperPubkeyFromKind9735, parseArticle, fmtSats, parseBolt11Msats } from "../utils.js";
 import { getNotificationSummary } from "../hooks/useNotifications.js";
 
 const AV_SIZE = 36;
@@ -142,8 +142,9 @@ export default function NotificationsFeed({ items, profiles, onOpenProfile, onOp
         }
 
         const { ev } = entry;
-        const { headline, detail } = getNotificationSummary(ev);
+        const actorPubkey = ev.kind === 9735 ? (zapperPubkeyFromKind9735(ev) ?? ev.pubkey) : ev.pubkey;
 
+        let headline, detail;
         let preview = null;
         if (ev.kind === 9735) {
           const bolt11 = ev.tags?.find(t => t[0] === "bolt11")?.[1];
@@ -151,15 +152,18 @@ export default function NotificationsFeed({ items, profiles, onOpenProfile, onOp
           const comment = zapCommentFromKind9735(ev);
           const satsStr = fmtSats(msats);
           const satsLabel = msats === 1000 ? "sat" : "sats";
-          preview = (
-            <div className="notif-preview notif-zap-preview">
-              <span className="notif-zap-amt">{satsStr}</span>
-              <span className="notif-action"> {satsLabel}</span>
-              {comment && <span className="notif-action"> · {comment}</span>}
-            </div>
-          );
-        } else if (ev.kind === 1 || ev.kind === 30023) {
-          preview = <NotePreview ev={ev} profiles={profiles} />;
+          const zappedEventId = ev.tags?.find(t => t[0] === "e")?.[1];
+          const zappedEv = zappedEventId ? evById.get(zappedEventId) : null;
+          headline = zappedEv
+            ? `zapped your note ${satsStr} ${satsLabel}`
+            : `zapped you ${satsStr} ${satsLabel}`;
+          detail = comment;
+          preview = zappedEv ? <NotePreview ev={zappedEv} profiles={profiles} /> : null;
+        } else {
+          ({ headline, detail } = getNotificationSummary(ev));
+          if (ev.kind === 1 || ev.kind === 30023) {
+            preview = <NotePreview ev={ev} profiles={profiles} />;
+          }
         }
 
         return (
@@ -170,14 +174,14 @@ export default function NotificationsFeed({ items, profiles, onOpenProfile, onOp
             <span style={timeStyle}>{relativeTime(ev.created_at)}</span>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
               <div onClick={e => e.stopPropagation()} style={{ flexShrink: 0 }}>
-                <AvatarStack pubkeys={[ev.pubkey]} profiles={profiles} onOpenProfile={onOpenProfile} />
+                <AvatarStack pubkeys={[actorPubkey]} profiles={profiles} onOpenProfile={onOpenProfile} />
               </div>
               <div className="notif-text" style={{ margin: 0 }}>
                 <span className="notif-name-btn"
                   role="button" tabIndex={0}
-                  onClick={e => { e.stopPropagation(); onOpenProfile?.(ev.pubkey); }}
-                  onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenProfile?.(ev.pubkey); } }}>
-                  {displayName(ev.pubkey, profiles)}
+                  onClick={e => { e.stopPropagation(); onOpenProfile?.(actorPubkey); }}
+                  onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenProfile?.(actorPubkey); } }}>
+                  {displayName(actorPubkey, profiles)}
                 </span>
                 <span className="notif-action"> {headline}{detail ? ` · ${detail}` : ""}</span>
               </div>
