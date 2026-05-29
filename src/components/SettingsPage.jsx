@@ -145,6 +145,7 @@ function NWCConnect({ onConnected }) {
 export default function SettingsPage({
   onBack, dark, toggleDark, onLogout, pubkey, wallet, onWalletConnected, onWalletDisconnect,
   zapSettings = { amount: 21, msg: "" }, onSaveZapSettings,
+  textSize = "medium", onTextSizeChange,
 }) {
   const [walletTab,  setWalletTab]  = useState("rizful");
   const [zapAmount,  setZapAmount]  = useState(String(zapSettings.amount));
@@ -232,11 +233,8 @@ export default function SettingsPage({
       )}
 
       <div style={{ margin: "8px 16px 4px", padding: "14px 16px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <div style={{ marginBottom: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif" }}>Zap Defaults</div>
-          <div style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "monospace" }}>
-            saved: {(() => { try { return localStorage.getItem("circl_zap_settings") || "none"; } catch { return "error"; } })()}
-          </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
@@ -271,6 +269,31 @@ export default function SettingsPage({
           <div className="toggle-track" />
           <div className="toggle-thumb" />
         </label>
+      </div>
+      <div className="settings-row" style={{ alignItems: "center" }}>
+        <div>
+          <div className="settings-row-label">Text size</div>
+          <div className="settings-row-sub">Adjust the base font size</div>
+        </div>
+        <div style={{ display: "flex", gap: 4, background: "var(--surface)", borderRadius: 8, padding: 3 }}>
+          {[["small", "S"], ["medium", "M"], ["large", "L"]].map(([size, label]) => (
+            <button
+              key={size}
+              onClick={e => { e.stopPropagation(); onTextSizeChange?.(size); }}
+              style={{
+                padding: "4px 10px", borderRadius: 6, border: "none", cursor: "pointer",
+                background: textSize === size ? "var(--bg)" : "transparent",
+                color: textSize === size ? "var(--text)" : "var(--text-faint)",
+                fontFamily: "'DM Sans',sans-serif", fontSize: 12,
+                fontWeight: textSize === size ? 600 : 400,
+                boxShadow: textSize === size ? "0 1px 3px rgba(0,0,0,.1)" : "none",
+                transition: "all .15s",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="settings-section-title">Account</div>

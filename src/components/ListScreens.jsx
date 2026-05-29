@@ -99,7 +99,7 @@ export function RepostsScreen({ eventId, reposts, profiles, onBack, onOpenProfil
                     onOpenThread={onOpenThread}
                     resolveEventById={resolveEventById}
                     className="note-text"
-                    style={{ fontSize: 13, lineHeight: 1.55, color: "var(--text)", margin: "0 0 8px" }}
+                    style={{ lineHeight: 1.55, color: "var(--text)", margin: "0 0 8px" }}
                   />
                 )}
                 {item.quotedEvent && (

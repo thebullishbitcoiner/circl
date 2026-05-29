@@ -146,7 +146,7 @@ export default function WalletPage({ wallet, balance, transactions, loading, err
         </div>
       ) : !settled.length ? (
         <div style={{ padding: "32px 16px", textAlign: "center" }}>
-          <div style={{ fontSize: 14, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif" }}>No transactions yet</div>
+          <div style={{ fontSize: "var(--font-base)", color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif" }}>No transactions yet</div>
         </div>
       ) : (
         <div style={{ margin: "0 16px 24px", background: "var(--surface)", borderRadius: 14, border: "1px solid var(--border)", overflow: "hidden" }}>
@@ -166,7 +166,7 @@ export default function WalletPage({ wallet, balance, transactions, loading, err
                 {pk ? <Avatar pk={pk} profiles={profiles} size={36} /> : <LightningIcon />}
 
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)", fontFamily: "'DM Sans',sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <div style={{ fontSize: "var(--font-base)", fontWeight: 500, color: "var(--text)", fontFamily: "'DM Sans',sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {label}<span style={{ color: "var(--text-faint)", fontWeight: 400 }}> · {relativeTime(ts)}</span>
                   </div>
                   {comment && (
@@ -177,7 +177,7 @@ export default function WalletPage({ wallet, balance, transactions, loading, err
                 </div>
 
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, fontFamily: "'DM Sans',sans-serif", color: isIncoming ? "#4CAF50" : "var(--text)" }}>
+                  <div style={{ fontSize: "var(--font-base)", fontWeight: 600, fontFamily: "'DM Sans',sans-serif", color: isIncoming ? "#4CAF50" : "var(--text)" }}>
                     {amountStr}
                   </div>
                   <div style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", marginTop: 1 }}>sats</div>

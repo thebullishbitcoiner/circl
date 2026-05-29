@@ -24,6 +24,7 @@ import useBookmarkedEvents from "./hooks/useBookmarkedEvents.js";
 import usePublish from "./hooks/usePublish.js";
 import useIsMobile from "./hooks/useIsMobile.js";
 import useDarkMode from "./hooks/useDarkMode.js";
+import useTextSize from "./hooks/useTextSize.js";
 import useWallet from "./hooks/useWallet.js";
 import useZap from "./hooks/useZap.js";
 import useZapSettings from "./hooks/useZapSettings.js";
@@ -175,6 +176,7 @@ export default function App() {
   const { publish, publishEvent } = usePublish({ signAndPublish, pubkey });
   const isMobile = useIsMobile();
   const { dark, toggle: toggleDark } = useDarkMode();
+  const { textSize, setTextSize } = useTextSize();
 
   const [activeNav, setActiveNav] = useState("home");
   const [lastNotifSeenAt, setLastNotifSeenAt] = useState(() => {
@@ -918,6 +920,8 @@ export default function App() {
                   }}
                   zapSettings={zapSettings}
                   onSaveZapSettings={saveZapSettings}
+                  textSize={textSize}
+                  onTextSizeChange={setTextSize}
                 />
               </SwipePanel>
             </div>
