@@ -28,11 +28,13 @@ function ListScreen({ title, subtitle, children, onBack }) {
 
 export function ZapsScreen({ eventId, zaps, profiles, onBack, onOpenProfile }) {
   const total = zaps.reduce((s, z) => s + z.amount, 0);
+  const sorted = [...zaps].sort((a, b) => b.amount - a.amount);
+  const hasUniqTop = sorted.length === 1 || sorted[0].amount > sorted[1].amount;
   return (
     <ListScreen title="Zaps" subtitle={`${fmtSats(total)} sats total`} onBack={onBack}>
-      {zaps.map((z, i) => (
+      {sorted.map((z, i) => (
         <div key={i} className="list-row" onClick={() => onOpenProfile?.(z.zapper)}>
-          <div className={`list-row-av${i === 0 ? " top" : ""}`}>
+          <div className={`list-row-av${hasUniqTop && i === 0 ? " top" : ""}`}>
             {avatarUrl(z.zapper, profiles)
               ? <img src={avatarUrl(z.zapper, profiles)} alt="" onError={e => { e.target.style.display = "none"; }} />
               : avatarInitial(z.zapper, profiles)}
@@ -40,7 +42,7 @@ export function ZapsScreen({ eventId, zaps, profiles, onBack, onOpenProfile }) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="list-row-name">
               {zapsRowLabel(z.zapper, profiles)}
-              {i === 0 && <span className="list-badge">top zap</span>}
+              {hasUniqTop && i === 0 && <span className="list-badge">top zap</span>}
             </div>
             {z.comment && <div className="list-row-meta">{z.comment}</div>}
           </div>
