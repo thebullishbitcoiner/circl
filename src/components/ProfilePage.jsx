@@ -123,7 +123,7 @@ export default function ProfilePage({
   myProfile, onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal, backLabel = "Your Circle", resolveEventById,
-  onOpenCircle, onUnfollow,
+  onOpenCircle, onUnfollow, onOpenPollVotes,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
 }) {
   const [tab, setTab] = useState("notes");
@@ -398,6 +398,7 @@ export default function ProfilePage({
                     defaultZapAmount={defaultZapAmount}
                     defaultZapMsg={defaultZapMsg}
                     onZapFail={onZapFail}
+                    onOpenVotes={onOpenPollVotes}
                     delay={0}
                   />
                 );

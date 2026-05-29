@@ -72,6 +72,58 @@ export function ReactionsScreen({ eventId, reactions, profiles, onBack, onOpenPr
   );
 }
 
+export function PollVotesScreen({ options, voteEvents, isZapPoll, profiles, onBack, onOpenProfile }) {
+  const votesByOption = Object.fromEntries(options.map(o => [o.id, []]));
+
+  for (const ev of voteEvents) {
+    if (isZapPoll) {
+      const descTag = ev.tags.find(t => t[0] === "description");
+      if (!descTag) continue;
+      try {
+        const zapReq = JSON.parse(descTag[1]);
+        const optTag = (zapReq.tags || []).find(t => t[0] === "poll_option");
+        if (!optTag || !votesByOption[optTag[1]]) continue;
+        const amtTag = (zapReq.tags || []).find(t => t[0] === "amount");
+        const sats = amtTag ? Math.round(Number(amtTag[1]) / 1000) : 0;
+        votesByOption[optTag[1]].push({ pubkey: zapReq.pubkey, sats });
+      } catch {}
+    } else {
+      const optTag = ev.tags.find(t => t[0] === "response");
+      if (!optTag || !votesByOption[optTag[1]]) continue;
+      votesByOption[optTag[1]].push({ pubkey: ev.pubkey });
+    }
+  }
+
+  const totalVotes = voteEvents.length;
+
+  return (
+    <ListScreen title="Votes" subtitle={`${totalVotes} vote${totalVotes !== 1 ? "s" : ""}`} onBack={onBack}>
+      {options.map(opt => {
+        const voters = votesByOption[opt.id] || [];
+        if (!voters.length) return null;
+        return (
+          <div key={opt.id}>
+            <div style={{ padding: "10px 16px 6px", fontSize: 11, fontWeight: 600, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: ".6px", borderBottom: "1px solid var(--border)" }}>
+              {opt.label}
+            </div>
+            {voters.map((v, i) => (
+              <div key={i} className="list-row" onClick={() => onOpenProfile?.(v.pubkey)}>
+                <div className="list-row-av">
+                  {avatarUrl(v.pubkey, profiles)
+                    ? <img src={avatarUrl(v.pubkey, profiles)} alt="" onError={e => { e.target.style.display = "none"; }} />
+                    : avatarInitial(v.pubkey, profiles)}
+                </div>
+                <div className="list-row-name">{displayName(v.pubkey, profiles)}</div>
+                {isZapPoll && v.sats > 0 && <div className="list-row-right">{fmtSats(v.sats * 1000)}</div>}
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </ListScreen>
+  );
+}
+
 export function RepostsScreen({ eventId, reposts, profiles, onBack, onOpenProfile, onOpenThread, allEvents = [], resolveEventById }) {
   const items = reposts.map(r => typeof r === "string" ? { type: "repost", pubkey: r } : r);
   return (

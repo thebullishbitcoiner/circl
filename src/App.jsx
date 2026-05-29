@@ -48,7 +48,7 @@ import WalletPage from "./components/WalletPage.jsx";
 import TxDetailPage from "./components/TxDetailPage.jsx";
 import SearchPage from "./components/SearchPage.jsx";
 import HashtagFeed from "./components/HashtagFeed.jsx";
-import { ZapsScreen, ReactionsScreen, RepostsScreen } from "./components/ListScreens.jsx";
+import { ZapsScreen, ReactionsScreen, RepostsScreen, PollVotesScreen } from "./components/ListScreens.jsx";
 import SwipePanel from "./components/SwipePanel.jsx";
 import Avatar from "./components/Avatar.jsx";
 import NoteContent from "./components/NoteContent.jsx";
@@ -210,6 +210,8 @@ export default function App() {
   const handleOpenReactions = ({ eventId, reactions }) => pushNav({ type: "reactions", payload: { eventId, reactions } });
   const handleOpenReposts = ({ eventId, reposts }) => pushNav({ type: "reposts", payload: { eventId, reposts } });
   const handleOpenHashtag = tag => pushNav({ type: "hashtag", payload: tag });
+  const handleOpenPollVotes = ({ event, options, voteEvents, isZapPoll }) =>
+    pushNav({ type: "poll-votes", payload: { event, options, voteEvents, isZapPoll } });
 
   const handleBack = () => {
     if (navStack.length > 0) popNav();
@@ -504,6 +506,7 @@ export default function App() {
                                           reason === "no_wallet" ? "⚡ No wallet connected" :
                                           `⚡ Zap failed: ${reason}`
                                         )}
+                                        onOpenVotes={handleOpenPollVotes}
                                         delay={0}
                                       />
                                     )
@@ -702,6 +705,7 @@ export default function App() {
                         resolveEventById={resolveEventById}
                         onOpenCircle={handleOpenCircle}
                         onUnfollow={unfollowPk}
+                        onOpenPollVotes={handleOpenPollVotes}
                       />
                     );
                   }
@@ -757,6 +761,21 @@ export default function App() {
                           reason === "no_wallet" ? "⚡ No wallet connected" :
                           `⚡ Zap failed: ${reason}`
                         )}                        resolveEventById={resolveEventById}
+                        onOpenPollVotes={handleOpenPollVotes}
+                      />
+                    );
+                  }
+
+                  if (top.type === "poll-votes") {
+                    return (
+                      <PollVotesScreen
+                        key={top.payload.event.id}
+                        options={top.payload.options}
+                        voteEvents={top.payload.voteEvents}
+                        isZapPoll={top.payload.isZapPoll}
+                        profiles={profiles}
+                        onBack={handleBack}
+                        onOpenProfile={handleOpenProfile}
                       />
                     );
                   }

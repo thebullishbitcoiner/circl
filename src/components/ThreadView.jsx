@@ -15,8 +15,8 @@ import usePollData from "../hooks/usePollData.js";
 
 function pct(count, total) { return total ? Math.round((count / total) * 100) : 0; }
 
-function PollInline({ event, myPubkey, sendZap, defaultZapAmount, defaultZapMsg, onZapFail, profiles, publishEvent, onRequestModal, onDismissModal }) {
-  const { options, voteCounts, myVote, total, isExpired, expiry, loading, polltype, zapLimits } = usePollData({ event, myPubkey });
+function PollInline({ event, myPubkey, sendZap, defaultZapAmount, defaultZapMsg, onZapFail, profiles, publishEvent, onRequestModal, onDismissModal, onOpenVotes }) {
+  const { options, voteCounts, myVote, total, isExpired, expiry, loading, polltype, zapLimits, voteEvents, voterCount } = usePollData({ event, myPubkey });
   const isZapPoll = event.kind === 6969;
   const [localVote, setLocalVote] = useState(null);
   const [localCounts, setLocalCounts] = useState(null);
@@ -91,8 +91,10 @@ function PollInline({ event, myPubkey, sendZap, defaultZapAmount, defaultZapMsg,
         })}
       </div>
       {!loading && (
-        <div className="poll-footer">
-          <span>{isZapPoll ? `${fmtSatsVal(effectiveTotal)} total sats` : `${effectiveTotal} vote${effectiveTotal !== 1 ? "s" : ""}`}</span>
+        <div className="poll-footer" onClick={e => e.stopPropagation()}>
+          <button type="button" className="poll-votes-link" onClick={() => onOpenVotes?.({ event, options, voteEvents, isZapPoll })}>
+            {voterCount} vote{voterCount !== 1 ? "s" : ""}
+          </button>
           {expiry && <>{" · "}<span>{isExpired ? "Ended" : (() => { const s = expiry - Math.floor(Date.now() / 1000); const d = Math.floor(s / 86400); const h = Math.floor((s % 86400) / 3600); return d > 0 ? `${d}d ${h}h left` : h > 0 ? `${h}h left` : "Ending soon"; })()}</span></>}
         </div>
       )}
@@ -108,7 +110,7 @@ function ThreadNoteRow({
   myPubkey, myProfile, onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, onRequestModal, onDismissModal,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
-  resolveEventById,
+  resolveEventById, onOpenPollVotes,
   focusRef, hasConnector = false,
   threadMenuId, setThreadMenuId, onShowThreadJson,
 }) {
@@ -193,6 +195,7 @@ function ThreadNoteRow({
                     publishEvent={publishEvent}
                     onRequestModal={onRequestModal}
                     onDismissModal={onDismissModal}
+                    onOpenVotes={onOpenPollVotes}
                   />
                 )}
                 {isQuote && quotedEv && (
@@ -253,7 +256,7 @@ export default function ThreadView({
   myPubkey, myProfile, onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, onRequestModal, onDismissModal,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
-  resolveEventById,
+  resolveEventById, onOpenPollVotes,
 }) {
   const containerRef = useRef(null);
   const focusRef     = useRef(null);
@@ -335,7 +338,7 @@ export default function ThreadView({
     onBookmark, isBookmarked, getLocalZaps, addLocalZap,
     getLocalReactions, setLocalReaction, onRequestModal, onDismissModal,
     sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
-    resolveEventById,
+    resolveEventById, onOpenPollVotes,
     threadMenuId, setThreadMenuId, onShowThreadJson: setThreadJsonEvent,
   };
 

@@ -34,6 +34,7 @@ function PollCard({
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail,
   onRequestModal, onDismissModal,
+  onOpenVotes,
   delay = 0,
 }) {
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
@@ -44,7 +45,7 @@ function PollCard({
   const [localVote, setLocalVote] = useState(null);
   const [localVoteCounts, setLocalVoteCounts] = useState(null);
 
-  const { options, voteCounts, myVote, total, isExpired, expiry, loading, polltype, zapLimits } = usePollData({ event, myPubkey });
+  const { options, voteCounts, myVote, total, isExpired, expiry, loading, polltype, zapLimits, voteEvents, voterCount } = usePollData({ event, myPubkey });
   const isZapPoll = event.kind === 6969;
   const effectiveVote = localVote ?? myVote;
   const effectiveCounts = localVoteCounts ?? voteCounts;
@@ -183,14 +184,15 @@ function PollCard({
             </div>
 
             {!loading && (
-              <div className="poll-footer">
-                <span className="poll-expiry-inline">
-                  {isZapPoll
-                    ? `${fmtSatsVal(effectiveTotal)} total sats`
-                    : `${effectiveTotal} vote${effectiveTotal !== 1 ? "s" : ""}`}
-                </span>
-                {" · "}
-                <ExpiryLine expiry={expiry} isExpired={isExpired} />
+              <div className="poll-footer" onClick={e => e.stopPropagation()}>
+                <button
+                  type="button"
+                  className="poll-votes-link"
+                  onClick={() => onOpenVotes?.({ event, options, voteEvents, isZapPoll })}
+                >
+                  {voterCount} vote{voterCount !== 1 ? "s" : ""}
+                </button>
+                {expiry && <>{" · "}<ExpiryLine expiry={expiry} isExpired={isExpired} /></>}
               </div>
             )}
 

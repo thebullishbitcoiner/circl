@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { pool } from "../nostr.js";
 import { RELAYS } from "../constants.js";
+import { parseBolt11Msats } from "../utils.js";
 
 function parsePollOptions(event) {
   if (event.kind === 1068) {
@@ -76,9 +77,8 @@ function countZapVotes(zapReceipts, options, zapLimits) {
 
     const bolt11Tag = receipt.tags.find(t => t[0] === "bolt11");
     if (!bolt11Tag) continue;
-    // Parse msats from bolt11 amount — use amount tag from zap request as fallback
-    const amountTag = (zapReq.tags || []).find(t => t[0] === "amount");
-    const msats = amountTag ? Number(amountTag[1]) : 0;
+    const msats = parseBolt11Msats(bolt11Tag[1])
+      || Number((zapReq.tags || []).find(t => t[0] === "amount")?.[1] || 0);
     const sats = Math.round(msats / 1000);
 
     if (zapLimits.min !== null && sats < zapLimits.min) continue;
@@ -100,6 +100,7 @@ export default function usePollData({ event, myPubkey }) {
   );
   const [myVote, setMyVote] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [voteEvents, setVoteEvents] = useState([]);
   const rawEvents = useRef([]);
 
   const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
@@ -115,6 +116,7 @@ export default function usePollData({ event, myPubkey }) {
     const sub = pool.subscription(relayUrls, [filter]).subscribe({
       next: raw => {
         rawEvents.current = [...rawEvents.current, raw];
+        setVoteEvents([...rawEvents.current]);
         if (event.kind === 1068) {
           const counts = countStandardVotes(rawEvents.current, options, polltype);
           setVoteCounts(counts);
@@ -152,5 +154,15 @@ export default function usePollData({ event, myPubkey }) {
   const total = Object.values(voteCounts).reduce((s, v) => s + v, 0);
   const isExpired = expiry ? Math.floor(Date.now() / 1000) > expiry : false;
 
-  return { options, voteCounts, myVote, total, isExpired, expiry, loading, polltype, zapLimits };
+  // Actual poll votes: standard polls deduplicate by pubkey (NIP-88); zap polls
+  // filter to only receipts whose zap request carries a poll_option tag.
+  const voterCount = event.kind === 1068
+    ? new Set(voteEvents.map(e => e.pubkey)).size
+    : voteEvents.filter(ev => {
+        const desc = ev.tags.find(t => t[0] === "description");
+        if (!desc) return false;
+        try { return JSON.parse(desc[1]).tags?.some(t => t[0] === "poll_option") ?? false; } catch { return false; }
+      }).length;
+
+  return { options, voteCounts, myVote, total, isExpired, expiry, loading, polltype, zapLimits, voteEvents, voterCount };
 }
