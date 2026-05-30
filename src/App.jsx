@@ -661,6 +661,28 @@ export default function App() {
               </div>
 
               <SwipePanel open={navStack.length > 0 && !openArticle && !settingsOpen} onSwipeRight={handleBack}>
+                {/* Keep the previous circle entry mounted when a profile is open on top of it */}
+                {navStack.length >= 2 && !openArticle && !settingsOpen && (() => {
+                  const prev = navStack[navStack.length - 2];
+                  const top  = navStack[navStack.length - 1];
+                  if (prev.type !== "circle" || top.type !== "profile") return null;
+                  const isOwnCircle = prev.payload.pubkey === pubkey;
+                  return (
+                    <div key={`hidden-circle-${prev.payload.pubkey}`} style={{ display: "none", height: "100%" }}>
+                      <CirclePage
+                        key={prev.payload.pubkey}
+                        pubkey={prev.payload.pubkey}
+                        follows={isOwnCircle ? follows : prev.payload.follows}
+                        profiles={profiles}
+                        onOpenProfile={handleOpenProfile}
+                        onBack={handleBack}
+                        myFollows={follows}
+                        onFollow={followPk}
+                        onUnfollow={unfollowPk}
+                      />
+                    </div>
+                  );
+                })()}
                 {navStack.length > 0 && !openArticle && !settingsOpen && (() => {
                   const top = navStack[navStack.length - 1];
 
