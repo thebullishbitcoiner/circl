@@ -37,7 +37,7 @@ export default function CirclePage({ pubkey, follows = [], profiles, onOpenProfi
                   <div className="circle-card-info">
                     <div className="circle-card-name">{fn}</div>
                     {fp.nip05 && (
-                      <div className="circle-card-nip05"><Ck s={8} />{fp.nip05}</div>
+                      <div className="circle-card-nip05"><Ck s={8} /><span>{fp.nip05}</span></div>
                     )}
                     <div className="circle-card-npub">{shortNpub(pk)}</div>
                   </div>

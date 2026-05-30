@@ -47,5 +47,18 @@ export default function useFollows({ pubkey, signAndPublish }) {
     }
   }, [rawEvent, signAndPublish]);
 
-  return { follows, loading, unfollow };
+  const follow = useCallback(async targetPk => {
+    if (!signAndPublish) return;
+    const norm = normPubkey(targetPk);
+    const baseTags = rawEvent?.tags ?? [];
+    if (baseTags.some(t => t[0] === "p" && normPubkey(t[1]) === norm)) return;
+    const newTags = [...baseTags, ["p", norm]];
+    const ev = await signAndPublish({ kind: 3, tags: newTags, content: rawEvent?.content ?? "" });
+    if (ev) {
+      setFollows(prev => prev.includes(norm) ? prev : [...prev, norm]);
+      setRawEvent(prev => prev ? { ...prev, tags: newTags } : { tags: newTags, content: "" });
+    }
+  }, [rawEvent, signAndPublish]);
+
+  return { follows, loading, follow, unfollow };
 }

@@ -131,7 +131,7 @@ export default function ProfilePage({
   myProfile, onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal, backLabel = "Your Circle", resolveEventById,
-  onOpenCircle, onUnfollow, onOpenPollVotes, onOpenArticle,
+  onOpenCircle, onFollow, onUnfollow, onOpenPollVotes, onOpenArticle,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
 }) {
   const [tab, setTab] = useState("notes");             // drives indicator immediately
@@ -464,10 +464,10 @@ export default function ProfilePage({
               : name[0]?.toUpperCase()}
           </div>
           {isOwn && <button className="profile-edit-btn">Edit profile</button>}
-          {!isOwn && follows?.includes(pubkey) && (
-            <button className="profile-unfollow-btn" onClick={onUnfollow ? () => onUnfollow(pubkey) : undefined}>
-              Unfollow
-            </button>
+          {!isOwn && (
+            follows?.includes(pubkey)
+              ? <button className="profile-unfollow-btn" onClick={() => onUnfollow?.(pubkey)}>Unfollow</button>
+              : <button className="profile-follow-btn"  onClick={() => onFollow?.(pubkey)}>Follow</button>
           )}
         </div>
         <div className="profile-name">{name}</div>

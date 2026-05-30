@@ -55,7 +55,7 @@ import NoteContent from "./components/NoteContent.jsx";
 import { SbHome, SbBell, SbBook, SbZap, SbSearch, SbWallet, NavHome, NavBell, NavBook, NavZap, NavSearch, NavWallet, Bk } from "./components/icons.jsx";
 export default function App() {
   const { pubkey, status, error, login, logout, signAndPublish } = useAuth();
-  const { follows, loading: fl, unfollow: unfollowPk } = useFollows({ pubkey, signAndPublish });
+  const { follows, loading: fl, follow: followPk, unfollow: unfollowPk } = useFollows({ pubkey, signAndPublish });
 
   const [likes, setLikes] = useState({});
   const [zapsByEvent, setZapsByEvent] = useState({});
@@ -704,6 +704,7 @@ export default function App() {
                         onDismissModal={() => setPanelModal(null)}
                         resolveEventById={resolveEventById}
                         onOpenCircle={handleOpenCircle}
+                        onFollow={followPk}
                         onUnfollow={unfollowPk}
                         onOpenPollVotes={handleOpenPollVotes}
                         onOpenArticle={setOpenArticle}
@@ -722,6 +723,7 @@ export default function App() {
                         onOpenProfile={handleOpenProfile}
                         onBack={handleBack}
                         myFollows={follows}
+                        onFollow={followPk}
                         onUnfollow={unfollowPk}
                       />
                     );
