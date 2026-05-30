@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, useTransition } from "react";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteCard from "./NoteCard.jsx";
@@ -6,13 +6,20 @@ import PollCard from "./PollCard.jsx";
 import NoteActions from "./NoteActions.jsx";
 import ProfileText from "./ProfileText.jsx";
 import { Bk, Ck } from "./icons.jsx";
-import { displayName, nip05OrNpub, relativeTime, shortNpub, truncNpub, avatarUrl, isQuoteRepost, isHexPubkey, replyCount, repostAndQuoteCount, normPubkey, directReplyParentId, parseKind6EmbeddedEvent, nip19 } from "../utils.js";
+import { displayName, nip05OrNpub, relativeTime, shortNpub, truncNpub, avatarUrl, isQuoteRepost, isHexPubkey, replyCount, repostAndQuoteCount, normPubkey, directReplyParentId, parseKind6EmbeddedEvent, nip19, parseNoteMediaSegments } from "../utils.js";
 import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
 import useInteractions from "../hooks/useInteractions.js";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 import SkelCard from "./SkelCard.jsx";
+import ProfileMediaGrid from "./ProfileMediaGrid.jsx";
+
+// Persists across component mounts so returning to a profile doesn't refetch
+const mediaCache = new Map(); // pubkey → { items, until, exhausted }
+
+const hasNonMentionETag = e => e.tags.some(t => t[0] === "e" && t[3] !== "mention");
+const isReplyEvent = e => e.kind === 1 && hasNonMentionETag(e) && !isQuoteRepost(e);
 
 function NpubCopy({ pubkey }) {
   const [copied, setCopied] = useState(false);
@@ -126,13 +133,31 @@ export default function ProfilePage({
   onOpenCircle, onUnfollow, onOpenPollVotes,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
 }) {
-  const [tab, setTab] = useState("notes");
+  const [tab, setTab] = useState("notes");             // drives indicator immediately
+  const [renderedTab, setRenderedTab] = useState("notes"); // drives content (deferred)
+  const [, startTransition] = useTransition();
+
+  const switchTab = useCallback((newTab) => {
+    setTab(newTab);                                    // instant: tab highlight
+    startTransition(() => setRenderedTab(newTab));     // deferred: render content
+  }, []);
+
+  const [visibleNotes, setVisibleNotes] = useState(20);
+  const [visibleReplies, setVisibleReplies] = useState(20);
   const [profileEvents, setProfileEvents] = useState([]);
   const [profileLoading, setProfileLoading] = useState(true);
   const [subjectFollows, setSubjectFollows] = useState([]);
   const [circleLoading, setCircleLoading] = useState(true);
   const [profileNotesMenuId, setProfileNotesMenuId] = useState(null);
   const [profileNotesJsonEvent, setProfileNotesJsonEvent] = useState(null);
+
+  const [mediaItems, setMediaItems] = useState([]);
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [mediaExhausted, setMediaExhausted] = useState(false);
+  const mediaUntilRef = useRef(null);
+  const mediaFetchingRef = useRef(false);
+  const mediaExhaustedRef = useRef(false);
+  const mediaStartedRef = useRef(false);
   const p    = profiles?.[pubkey] || {};
   const name = displayName(pubkey, profiles);
   const websiteHref = normalizeWebsite(p.website);
@@ -148,14 +173,116 @@ export default function ProfilePage({
   useEffect(() => {
     setProfileNotesMenuId(null);
     setProfileNotesJsonEvent(null);
-  }, [tab, pubkey]);
+  }, [renderedTab, pubkey]);
+
+  useEffect(() => {
+    setVisibleNotes(20);
+    setVisibleReplies(20);
+    setRenderedTab("notes");
+    setTab("notes");
+  }, [pubkey]);
 
   useEffect(() => {
     setRepostExtras({});
     repostFetchRef.current.clear();
     setParentEvents({});
     parentFetchRef.current.clear();
+
+    mediaFetchingRef.current = false;
+    const cached = mediaCache.get(pubkey);
+    if (cached) {
+      setMediaItems(cached.items);
+      setMediaExhausted(cached.exhausted);
+      setMediaLoading(false);
+      mediaUntilRef.current = cached.until;
+      mediaExhaustedRef.current = cached.exhausted;
+      mediaStartedRef.current = true;
+    } else {
+      setMediaItems([]);
+      setMediaLoading(false);
+      setMediaExhausted(false);
+      mediaUntilRef.current = null;
+      mediaExhaustedRef.current = false;
+      mediaStartedRef.current = false;
+    }
   }, [pubkey]);
+
+  const fetchMediaBatch = useCallback(() => {
+    if (mediaFetchingRef.current || mediaExhaustedRef.current) return;
+    mediaFetchingRef.current = true;
+    setMediaLoading(true);
+
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const filter = { kinds: [1], authors: [pubkey], limit: 50 };
+    if (mediaUntilRef.current) filter.until = mediaUntilRef.current;
+
+    const batch = [];
+    pool.request(relayUrls, [filter]).subscribe({
+      next: raw => batch.push(raw),
+      complete: () => {
+        const newItems = [];
+        for (const ev of batch) {
+          const segs = parseNoteMediaSegments(ev.content || "");
+          const media = segs.filter(s => s.type === "image" || s.type === "video");
+          if (media.length) newItems.push({ event: ev, url: media[0].url, type: media[0].type, count: media.length });
+        }
+        newItems.sort((a, b) => b.event.created_at - a.event.created_at);
+
+        const isExhausted = batch.length < 50;
+        mediaUntilRef.current = batch.length ? Math.min(...batch.map(e => e.created_at)) - 1 : null;
+        mediaFetchingRef.current = false;
+        mediaExhaustedRef.current = isExhausted;
+
+        setMediaItems(prev => {
+          const seen = new Set(prev.map(i => i.event.id));
+          const merged = [...prev, ...newItems.filter(i => !seen.has(i.event.id))];
+          mediaCache.set(pubkey, { items: merged, until: mediaUntilRef.current, exhausted: isExhausted });
+          return merged;
+        });
+        setMediaExhausted(isExhausted);
+        setMediaLoading(false);
+      },
+      error: () => {
+        mediaFetchingRef.current = false;
+        setMediaLoading(false);
+      },
+    });
+  }, [pubkey]);
+
+  useEffect(() => {
+    if (renderedTab !== "media" || mediaStartedRef.current) return;
+    mediaStartedRef.current = true;
+    fetchMediaBatch();
+  }, [renderedTab, fetchMediaBatch]);
+
+  // Scroll the tab bar into view when switching between text tabs.
+  // Skipped for any transition involving the media tab because the grid's
+  // display:none toggle collapses layout height right before the scroll fires,
+  // making it look like a full page reload.
+  const tabBarRef = useRef(null);
+  const prevTabRef = useRef(tab);
+  useEffect(() => {
+    const prev = prevTabRef.current;
+    prevTabRef.current = tab;
+    if (prev !== "media" && tab !== "media") {
+      tabBarRef.current?.scrollIntoView({ behavior: "instant", block: "nearest" });
+    }
+  }, [tab]);
+
+  // Stable refs so the scroll handler never needs to be recreated
+  const renderedTabRef = useRef(renderedTab);
+  const topLevelLenRef = useRef(0);
+  const repliesLenRef  = useRef(0);
+  useEffect(() => { renderedTabRef.current = renderedTab; }, [renderedTab]);
+
+  const handleProfileScroll = useCallback(e => {
+    const el = e.currentTarget;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight > 300) return;
+    if (renderedTabRef.current === "notes")
+      setVisibleNotes(n => Math.min(n + 20, topLevelLenRef.current));
+    else if (renderedTabRef.current === "replies")
+      setVisibleReplies(n => Math.min(n + 20, repliesLenRef.current));
+  }, []);
 
   useEffect(() => {
     if (!pubkey) return;
@@ -216,14 +343,25 @@ export default function ProfilePage({
     return Array.from(byId.values());
   }, [events, profileEvents, repostExtras]);
 
-  const theirEvents = mergedEvents.filter(e => e.pubkey === pubkey && (e.kind === 1 || e.kind === 6 || e.kind === 1068 || e.kind === 6969));
-  const hasNonMentionETag = e => e.tags.some(t => t[0] === "e" && t[3] !== "mention");
-  const isReplyFn = e => e.kind === 1 && hasNonMentionETag(e) && !isQuoteRepost(e);
-
-  const topLevel = theirEvents.filter(e =>
-    e.kind === 6 || isQuoteRepost(e) || (e.kind === 1 && !hasNonMentionETag(e)) || e.kind === 1068 || e.kind === 6969
+  const theirEvents = useMemo(
+    () => mergedEvents.filter(e => e.pubkey === pubkey && (e.kind === 1 || e.kind === 6 || e.kind === 1068 || e.kind === 6969)),
+    [mergedEvents, pubkey]
   );
-  const replies = theirEvents.filter(isReplyFn).sort((a, b) => b.created_at - a.created_at);
+
+  const topLevel = useMemo(
+    () => theirEvents
+      .filter(e => e.kind === 6 || isQuoteRepost(e) || (e.kind === 1 && !hasNonMentionETag(e)) || e.kind === 1068 || e.kind === 6969)
+      .sort((a, b) => b.created_at - a.created_at),
+    [theirEvents]
+  );
+
+  const replies = useMemo(
+    () => theirEvents.filter(isReplyEvent).sort((a, b) => b.created_at - a.created_at),
+    [theirEvents]
+  );
+
+  useEffect(() => { topLevelLenRef.current = topLevel.length; }, [topLevel.length]);
+  useEffect(() => { repliesLenRef.current  = replies.length;  }, [replies.length]);
 
   useEffect(() => {
     if (!resolveEventById) return;
@@ -266,19 +404,23 @@ export default function ProfilePage({
     return () => { cancelled = true; };
   }, [replies, mergedEvents, resolveEventById]);
 
-  const allEvents = [...mergedEvents, ...extras];
-  const betweenUs = allEvents
-    .filter(e => {
-      if (e.kind !== 1) return false;
-      const pTags = e.tags.filter(t => t[0] === "p").map(t => t[1]);
-      return (e.pubkey === pubkey && pTags.includes(myPubkey)) ||
-             (e.pubkey === myPubkey && pTags.includes(pubkey));
-    })
-    .filter((e, i, arr) => arr.findIndex(x => x.id === e.id) === i)
-    .sort((a, b) => a.created_at - b.created_at);
+  const allEvents = useMemo(() => [...mergedEvents, ...extras], [mergedEvents, extras]);
+
+  const betweenUs = useMemo(
+    () => allEvents
+      .filter(e => {
+        if (e.kind !== 1) return false;
+        const pTags = e.tags.filter(t => t[0] === "p").map(t => t[1]);
+        return (e.pubkey === pubkey && pTags.includes(myPubkey)) ||
+               (e.pubkey === myPubkey && pTags.includes(pubkey));
+      })
+      .filter((e, i, arr) => arr.findIndex(x => x.id === e.id) === i)
+      .sort((a, b) => a.created_at - b.created_at),
+    [allEvents, pubkey, myPubkey]
+  );
 
   return (
-    <div className="slide-panel-scroll">
+    <div className="slide-panel-scroll" onScroll={handleProfileScroll}>
       <div className="profile-banner" style={{ position: "relative" }}>
         {p.banner ? (
           <>
@@ -348,27 +490,30 @@ export default function ProfilePage({
         )}
       </div>
 
-      <div className="profile-stats">
-        <div className={`profile-stat ${tab === "notes" ? "active" : ""}`} onClick={() => setTab("notes")}>
+      <div className="profile-stats" ref={tabBarRef}>
+        <div className={`profile-stat ${tab === "notes" ? "active" : ""}`} onClick={() => switchTab("notes")}>
           <div className="profile-stat-label">Notes</div>
         </div>
-        <div className={`profile-stat ${tab === "replies" ? "active" : ""}`} onClick={() => setTab("replies")}>
+        <div className={`profile-stat ${tab === "replies" ? "active" : ""}`} onClick={() => switchTab("replies")}>
           <div className="profile-stat-label">Replies</div>
         </div>
+        <div className={`profile-stat ${tab === "media" ? "active" : ""}`} onClick={() => switchTab("media")}>
+          <div className="profile-stat-label">Media</div>
+        </div>
         {!isOwn && (
-          <div className={`profile-stat ${tab === "between" ? "active" : ""}`} onClick={() => setTab("between")}>
+          <div className={`profile-stat ${tab === "between" ? "active" : ""}`} onClick={() => switchTab("between")}>
             <div className="profile-stat-label">Between us</div>
           </div>
         )}
       </div>
 
       {/* Notes tab */}
-      {tab === "notes" && (
+      {renderedTab === "notes" && (
         profileLoading && topLevel.length === 0
           ? [0, 1, 2].map(i => <SkelCard key={i} />)
           : topLevel.length === 0
             ? <div className="empty-state"><div className="empty-state-title">No notes yet</div><div className="empty-state-sub">Notes, reposts, and quote reposts will appear here</div></div>
-            : topLevel.sort((a, b) => b.created_at - a.created_at).map((e, i) => {
+            : topLevel.slice(0, visibleNotes).map((e, i) => {
               if (e.kind === 1068 || e.kind === 6969) {
                 return (
                   <PollCard
@@ -496,12 +641,12 @@ export default function ProfilePage({
       )}
 
       {/* Replies tab */}
-      {tab === "replies" && (
+      {renderedTab === "replies" && (
         profileLoading && replies.length === 0
           ? [0, 1, 2].map(i => <SkelCard key={i} />)
           : replies.length === 0
             ? <div className="empty-state"><div className="empty-state-title">No replies yet</div><div className="empty-state-sub">Replies to other notes will appear here</div></div>
-            : replies.map((e, i) => {
+            : replies.slice(0, visibleReplies).map((e, i) => {
               const parentId = directReplyParentId(e);
               const parentEv = parentId
                 ? (mergedEvents.find(ev => ev.id === parentId) ?? parentEvents[parentId] ?? null)
@@ -529,10 +674,20 @@ export default function ProfilePage({
             })
       )}
 
+      {/* Media tab — always mounted so thumbnail images stay in DOM across tab switches */}
+      <ProfileMediaGrid
+        visible={renderedTab === "media"}
+        items={mediaItems}
+        loading={mediaLoading}
+        exhausted={mediaExhausted}
+        onLoadMore={fetchMediaBatch}
+        onOpenThread={onOpenThread}
+      />
+
       {profileNotesJsonEvent && <NoteJsonModal event={profileNotesJsonEvent} onClose={() => setProfileNotesJsonEvent(null)} />}
 
       {/* Between us tab */}
-      {tab === "between" && !isOwn && (
+      {renderedTab === "between" && !isOwn && (
         ixLoading && betweenUs.length === 0
           ? <div className="empty-state"><div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: "var(--text-faint)", fontSize: 13 }}><div style={{ width: 14, height: 14, border: "2px solid var(--border)", borderTopColor: "var(--primary)", borderRadius: "50%", animation: "spin .7s linear infinite" }} />Loading exchanges…</div></div>
           : betweenUs.length === 0

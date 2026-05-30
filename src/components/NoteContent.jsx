@@ -127,6 +127,49 @@ function ImageMosaic({ urls, onImageClick }) {
   );
 }
 
+// Renders a mixed image+video mosaic. items = [{ type: "image"|"video", url }]
+function MediaMosaic({ items, onItemClick }) {
+  const c = items.length;
+  const extra = c > 4 ? c - 4 : 0;
+  const shown = extra ? items.slice(0, 4) : items;
+  const layoutKey = c === 1 ? "one" : c === 2 ? "two" : c === 3 ? "three" : c === 4 ? "four" : "many";
+
+  return (
+    <div className={`note-mosaic note-mosaic-${layoutKey}`} onClick={e => e.stopPropagation()}>
+      {shown.map((item, i) => (
+        <button
+          key={`${item.url}-${i}`}
+          type="button"
+          className="note-mosaic-cell"
+          onClick={e => { e.stopPropagation(); onItemClick(i); }}
+        >
+          {item.type === "video" ? (
+            <>
+              <video src={item.url} playsInline preload="metadata" muted />
+              <span className="note-mosaic-play">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="36" height="36"><polygon points="5,3 19,12 5,21" /></svg>
+              </span>
+            </>
+          ) : (
+            <img
+              src={item.url}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              referrerPolicy="no-referrer"
+              onError={e => {
+                e.target.closest(".note-mosaic-cell")?.classList.add("note-mosaic-broken");
+                e.target.style.display = "none";
+              }}
+            />
+          )}
+          {extra > 0 && i === 3 && <span className="note-mosaic-more">+{extra}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 const COLLAPSE_THRESHOLD = 500;
 
 /**
@@ -170,6 +213,22 @@ export default function NoteContent({
     }).filter(seg => seg.type !== "text" || (seg.value || "").trim() !== "");
   }, [segments]);
 
+  // Collect all media items in document order for bottom-mosaic layout
+  const allMediaItems = useMemo(() => {
+    const items = [];
+    for (const seg of normalizedSegments) {
+      if (seg.type === "images") {
+        for (const url of seg.urls) items.push({ type: "image", url });
+      } else if (seg.type === "video") {
+        items.push({ type: "video", url: seg.url });
+      }
+    }
+    return items;
+  }, [normalizedSegments]);
+
+  // When 2+ media items exist, hoist them all to a single mosaic at the bottom
+  const hoistMedia = allMediaItems.length >= 2;
+
   const [lightbox, setLightbox] = useState(null);
   const [resolvedRefs, setResolvedRefs] = useState({});
   const [expanded, setExpanded] = useState(false);
@@ -195,67 +254,79 @@ export default function NoteContent({
     return () => { cancelled = true; };
   }, [content, allEvents, resolveEventById, resolvedRefs, allowEmbeds]);
 
+  const renderTextSegment = (seg, i) => {
+    if (!seg.value || seg.value.trim() === "") return null;
+    const textParts = allowEmbeds ? splitNostrEventRefs(seg.value) : [{ type: "text", value: seg.value }];
+    return textParts.map((part, idx) => {
+      if (part.type === "text") {
+        if (!part.value) return null;
+        return (
+          <NoteText
+            key={`${i}-t-${idx}`}
+            content={part.value}
+            profiles={profiles}
+            onOpenProfile={onOpenProfile}
+            onOpenHashtag={onOpenHashtag}
+            className={className}
+            style={style}
+          />
+        );
+      }
+      if (!allowEmbeds) return null;
+      const id = resolveNeventToId(part.value);
+      const refEvent = id ? (allEvents.find(e => e.id === id) || resolvedRefs[id]) : null;
+      if (!refEvent) {
+        return <EmbeddedEventRef key={`${i}-n-${idx}`} nevent={part.value} />;
+      }
+      return (
+        <EmbeddedEvent
+          key={`${i}-n-${idx}`}
+          event={refEvent}
+          profiles={profiles}
+          onOpenProfile={onOpenProfile}
+          onOpenThread={onOpenThread}
+        />
+      );
+    });
+  };
+
   return (
     <>
     <div className={`note-content-stack${isCollapsed ? " note-content-collapsed" : ""}`}>
-      {normalizedSegments.map((seg, i) => {
-        if (seg.type === "text") {
-          if (!seg.value || seg.value.trim() === "") return null;
-          const textParts = allowEmbeds ? splitNostrEventRefs(seg.value) : [{ type: "text", value: seg.value }];
-          return textParts.map((part, idx) => {
-            if (part.type === "text") {
-              if (!part.value) return null;
-              return (
-                <NoteText
-                  key={`${i}-t-${idx}`}
-                  content={part.value}
-                  profiles={profiles}
-                  onOpenProfile={onOpenProfile}
-                  onOpenHashtag={onOpenHashtag}
-                  className={className}
-                  style={style}
-                />
-              );
-            }
-            if (!allowEmbeds) return null;
-            const id = resolveNeventToId(part.value);
-            const refEvent = id ? (allEvents.find(e => e.id === id) || resolvedRefs[id]) : null;
-            if (!refEvent) {
-              return <EmbeddedEventRef key={`${i}-n-${idx}`} nevent={part.value} />;
-            }
+      {hoistMedia ? (
+        <>
+          {normalizedSegments.map((seg, i) => seg.type === "text" ? renderTextSegment(seg, i) : null)}
+          <MediaMosaic
+            items={allMediaItems}
+            onItemClick={idx => setLightbox({ items: allMediaItems, index: idx })}
+          />
+        </>
+      ) : (
+        normalizedSegments.map((seg, i) => {
+          if (seg.type === "text") return renderTextSegment(seg, i);
+          if (seg.type === "images" && seg.urls?.length) {
             return (
-              <EmbeddedEvent
-                key={`${i}-n-${idx}`}
-                event={refEvent}
-                profiles={profiles}
-                onOpenProfile={onOpenProfile}
-                onOpenThread={onOpenThread}
+              <ImageMosaic
+                key={i}
+                urls={seg.urls}
+                onImageClick={idx => setLightbox({ items: seg.urls.map(url => ({ type: "image", url })), index: idx })}
               />
             );
-          });
-        }
-        if (seg.type === "images" && seg.urls?.length) {
-          return (
-            <ImageMosaic
-              key={i}
-              urls={seg.urls}
-              onImageClick={idx => setLightbox({ urls: seg.urls, index: idx })}
-            />
-          );
-        }
-        if (seg.type === "video") {
-          return (
-            <div
-              key={i}
-              className="note-media note-media-video"
-              onClick={e => e.stopPropagation()}
-            >
-              <video src={seg.url} controls playsInline preload="metadata" />
-            </div>
-          );
-        }
-        return null;
-      })}
+          }
+          if (seg.type === "video") {
+            return (
+              <div
+                key={i}
+                className="note-media note-media-video"
+                onClick={e => e.stopPropagation()}
+              >
+                <video src={seg.url} controls playsInline preload="metadata" />
+              </div>
+            );
+          }
+          return null;
+        })
+      )}
 
       {isCollapsed && <div className="note-content-fade" />}
     </div>
@@ -274,7 +345,7 @@ export default function NoteContent({
 
     {lightbox && (
       <MediaLightbox
-        urls={lightbox.urls}
+        items={lightbox.items}
         index={lightbox.index}
         onClose={() => setLightbox(null)}
         onIndexChange={idx => setLightbox(l => (l ? { ...l, index: idx } : null))}

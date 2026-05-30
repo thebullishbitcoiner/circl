@@ -3,9 +3,10 @@ import { createPortal } from "react-dom";
 
 const preloadedUrls = new Set();
 
-export default function MediaLightbox({ urls, index, onClose, onIndexChange }) {
-  const n = urls?.length ?? 0;
+export default function MediaLightbox({ items, index, onClose, onIndexChange }) {
+  const n = items?.length ?? 0;
   const safe = n > 0 ? Math.max(0, Math.min(index, n - 1)) : 0;
+  const current = items?.[safe];
   const touchX = useRef(null);
 
   const go = useCallback(
@@ -33,18 +34,18 @@ export default function MediaLightbox({ urls, index, onClose, onIndexChange }) {
   }, []);
 
   useEffect(() => {
-    for (const url of urls || []) {
-      if (!url || preloadedUrls.has(url)) continue;
+    for (const item of items || []) {
+      if (!item?.url || item.type !== "image" || preloadedUrls.has(item.url)) continue;
       const img = new Image();
       img.decoding = "async";
       img.loading = "eager";
       img.referrerPolicy = "no-referrer";
-      img.src = url;
-      preloadedUrls.add(url);
+      img.src = item.url;
+      preloadedUrls.add(item.url);
     }
-  }, [urls]);
+  }, [items]);
 
-  if (!urls?.length) return null;
+  if (!items?.length) return null;
 
   return createPortal(
     <div className="media-lightbox" onClick={onClose} role="presentation">
@@ -62,7 +63,7 @@ export default function MediaLightbox({ urls, index, onClose, onIndexChange }) {
           className="media-lightbox-nav media-lightbox-prev"
           onClick={e => { e.stopPropagation(); go(-1); }}
           disabled={safe <= 0}
-          aria-label="Previous image"
+          aria-label="Previous"
         >
           ‹
         </button>
@@ -73,7 +74,7 @@ export default function MediaLightbox({ urls, index, onClose, onIndexChange }) {
           className="media-lightbox-nav media-lightbox-next"
           onClick={e => { e.stopPropagation(); go(1); }}
           disabled={safe >= n - 1}
-          aria-label="Next image"
+          aria-label="Next"
         >
           ›
         </button>
@@ -90,7 +91,18 @@ export default function MediaLightbox({ urls, index, onClose, onIndexChange }) {
           touchX.current = null;
         }}
       >
-        <img key={urls[safe]} src={urls[safe]} alt="" referrerPolicy="no-referrer" loading="eager" />
+        {current?.type === "video" ? (
+          <video
+            key={current.url}
+            src={current.url}
+            controls
+            autoPlay
+            playsInline
+            preload="metadata"
+          />
+        ) : (
+          <img key={current?.url} src={current?.url} alt="" referrerPolicy="no-referrer" loading="eager" />
+        )}
       </div>
       {n > 1 && (
         <div className="media-lightbox-counter" onClick={e => e.stopPropagation()}>
