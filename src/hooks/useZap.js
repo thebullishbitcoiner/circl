@@ -3,6 +3,7 @@ import { NWCClient } from "@getalby/sdk/nwc";
 import { makeZapRequest } from "nostr-tools/nip57";
 import { bech32 } from "@scure/base";
 import { RELAYS } from "../constants.js";
+import { cacheZapReq } from "../utils.js";
 
 const utf8Decoder = new TextDecoder();
 
@@ -42,6 +43,7 @@ export default function useZap(wallet) {
 
       // Try NIP-57 zap request if the endpoint supports Nostr and we have a signer.
       // Use `!== false` like Jumble — treats missing allowsNostr as supported.
+      let signed = null;
       if (allowsNostr !== false && window.nostr) {
         try {
           const zapParams = eventId
@@ -50,7 +52,7 @@ export default function useZap(wallet) {
 
           const zapRequestTemplate = makeZapRequest(zapParams);
           if (pollOption) zapRequestTemplate.tags.push(["poll_option", pollOption]);
-          const signed = await window.nostr.signEvent(zapRequestTemplate);
+          signed = await window.nostr.signEvent(zapRequestTemplate);
 
           const callbackUrl = new URL(callback);
           callbackUrl.searchParams.set("amount", String(msats));
@@ -62,6 +64,7 @@ export default function useZap(wallet) {
           if (!invoiceData.pr) throw new Error("No invoice in response");
           pr = invoiceData.pr;
         } catch {
+          signed = null;
         }
       }
 
@@ -78,7 +81,10 @@ export default function useZap(wallet) {
       }
 
       client = new NWCClient({ nostrWalletConnectUrl: wallet.nwc_uri });
-      await client.payInvoice({ invoice: pr });
+      const payResult = await client.payInvoice({ invoice: pr });
+      if (payResult?.payment_hash && signed) {
+        cacheZapReq(payResult.payment_hash, signed);
+      }
       return { ok: true };
     } catch (e) {
       return { ok: false, reason: e.message || "payment_failed" };

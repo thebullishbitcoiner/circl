@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Avatar from "./Avatar.jsx";
 import { Bk } from "./icons.jsx";
-import { displayName } from "../utils.js";
+import { displayName, getZapReqFromCache } from "../utils.js";
 import { decodeInvoice } from "@getalby/lightning-tools";
 
 function zapReqFromDesc(tx) {
@@ -18,9 +18,11 @@ function zapReqFromDesc(tx) {
 }
 
 function getZapReq(tx) {
-  // tx.metadata.nostr is the full kind 9734 event when the wallet provides it
   if (tx.metadata?.nostr?.tags) return tx.metadata.nostr;
-  return zapReqFromDesc(tx);
+  const fromDesc = zapReqFromDesc(tx);
+  if (fromDesc) return fromDesc;
+  if (tx.type === "outgoing" && tx.payment_hash) return getZapReqFromCache(tx.payment_hash);
+  return null;
 }
 
 function nostrPubkeyFromTx(tx) {

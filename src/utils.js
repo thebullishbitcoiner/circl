@@ -357,6 +357,29 @@ export function parseStreamEvent(event) {
   };
 }
 
+const ZAP_REQ_CACHE_KEY = "circl_zap_req_cache";
+const ZAP_REQ_CACHE_MAX = 200;
+
+export function cacheZapReq(paymentHash, zapReq) {
+  try {
+    const cache = JSON.parse(localStorage.getItem(ZAP_REQ_CACHE_KEY) || "{}");
+    cache[paymentHash] = zapReq;
+    const keys = Object.keys(cache);
+    if (keys.length > ZAP_REQ_CACHE_MAX) {
+      keys.slice(0, keys.length - ZAP_REQ_CACHE_MAX).forEach(k => delete cache[k]);
+    }
+    localStorage.setItem(ZAP_REQ_CACHE_KEY, JSON.stringify(cache));
+  } catch {}
+}
+
+export function getZapReqFromCache(paymentHash) {
+  try {
+    const raw = localStorage.getItem(ZAP_REQ_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw)[paymentHash] ?? null;
+  } catch { return null; }
+}
+
 /**
  * Collapse consecutive image segments into one `{ type: "images", urls }` for mosaic + lightbox.
  * Whitespace-only text between URLs (common: one image per line) does not break the group.
