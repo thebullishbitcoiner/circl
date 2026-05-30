@@ -1,11 +1,25 @@
+import { useEffect, useRef } from "react";
 import { Bk, Ck } from "./icons.jsx";
 import { displayName, shortNpub } from "../utils.js";
 
-export default function CirclePage({ pubkey, follows = [], profiles, onOpenProfile, onBack, myFollows, onUnfollow }) {
+// Persists scroll position across unmount/remount (e.g. navigating to a profile and back)
+const savedScrollPositions = new Map();
+
+export default function CirclePage({ pubkey, follows = [], profiles, onOpenProfile, onBack, myFollows, onFollow, onUnfollow }) {
   const ownerName = displayName(pubkey, profiles);
+  const scrollRef = useRef(null);
+
+  // Restore scroll position after mount (rAF ensures layout is settled)
+  useEffect(() => {
+    const el = scrollRef.current;
+    const saved = savedScrollPositions.get(pubkey);
+    if (!el || !saved) return;
+    const frame = requestAnimationFrame(() => { el.scrollTop = saved; });
+    return () => cancelAnimationFrame(frame);
+  }, [pubkey]);
 
   return (
-    <div className="slide-panel-scroll">
+    <div className="slide-panel-scroll" ref={scrollRef} onScroll={() => savedScrollPositions.set(pubkey, scrollRef.current?.scrollTop ?? 0)}>
       <div className="panel-bar">
         <button type="button" className="back-btn" onClick={onBack}><Bk s={16} /></button>
         <span className="panel-bar-logo">{ownerName}'s Circle</span>
