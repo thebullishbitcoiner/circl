@@ -1,11 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, memo } from "react";
 import { Bk, Ck } from "./icons.jsx";
 import { displayName, shortNpub } from "../utils.js";
 
 // Persists scroll position across unmount/remount (e.g. navigating to a profile and back)
 const savedScrollPositions = new Map();
 
-export default function CirclePage({ pubkey, follows = [], profiles, onOpenProfile, onBack, myFollows, onFollow, onUnfollow }) {
+export default memo(function CirclePage({ pubkey, follows = [], profiles, onOpenProfile, onBack, myFollows, onFollow, onUnfollow }) {
   const ownerName = displayName(pubkey, profiles);
   const scrollRef = useRef(null);
 
@@ -39,7 +39,6 @@ export default function CirclePage({ pubkey, follows = [], profiles, onOpenProfi
               <div
                 className="circle-card"
                 key={pk}
-                style={{ animationDelay: `${i * 0.04}s` }}
                 onClick={() => onOpenProfile?.(pk)}
               >
                 <div className="circle-card-inner">
@@ -72,4 +71,4 @@ export default function CirclePage({ pubkey, follows = [], profiles, onOpenProfi
       )}
     </div>
   );
-}
+});
