@@ -706,6 +706,7 @@ export default function App() {
                         onOpenCircle={handleOpenCircle}
                         onUnfollow={unfollowPk}
                         onOpenPollVotes={handleOpenPollVotes}
+                        onOpenArticle={setOpenArticle}
                       />
                     );
                   }

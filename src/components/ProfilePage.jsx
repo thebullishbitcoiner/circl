@@ -14,6 +14,7 @@ import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 import SkelCard from "./SkelCard.jsx";
 import ProfileMediaGrid from "./ProfileMediaGrid.jsx";
+import LongformCard from "./LongformCard.jsx";
 
 // Persists across component mounts so returning to a profile doesn't refetch
 const mediaCache = new Map(); // pubkey → { items, until, exhausted }
@@ -130,7 +131,7 @@ export default function ProfilePage({
   myProfile, onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal, backLabel = "Your Circle", resolveEventById,
-  onOpenCircle, onUnfollow, onOpenPollVotes,
+  onOpenCircle, onUnfollow, onOpenPollVotes, onOpenArticle,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
 }) {
   const [tab, setTab] = useState("notes");             // drives indicator immediately
@@ -144,6 +145,7 @@ export default function ProfilePage({
 
   const [visibleNotes, setVisibleNotes] = useState(20);
   const [visibleReplies, setVisibleReplies] = useState(20);
+  const [visibleArticles, setVisibleArticles] = useState(10);
   const [profileEvents, setProfileEvents] = useState([]);
   const [profileLoading, setProfileLoading] = useState(true);
   const [subjectFollows, setSubjectFollows] = useState([]);
@@ -178,6 +180,7 @@ export default function ProfilePage({
   useEffect(() => {
     setVisibleNotes(20);
     setVisibleReplies(20);
+    setVisibleArticles(10);
     setRenderedTab("notes");
     setTab("notes");
   }, [pubkey]);
@@ -213,7 +216,7 @@ export default function ProfilePage({
     setMediaLoading(true);
 
     const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
-    const filter = { kinds: [1], authors: [pubkey], limit: 50 };
+    const filter = { kinds: [1], authors: [pubkey], limit: 100 };
     if (mediaUntilRef.current) filter.until = mediaUntilRef.current;
 
     const batch = [];
@@ -228,7 +231,7 @@ export default function ProfilePage({
         }
         newItems.sort((a, b) => b.event.created_at - a.event.created_at);
 
-        const isExhausted = batch.length < 50;
+        const isExhausted = batch.length < 100;
         mediaUntilRef.current = batch.length ? Math.min(...batch.map(e => e.created_at)) - 1 : null;
         mediaFetchingRef.current = false;
         mediaExhaustedRef.current = isExhausted;
@@ -273,6 +276,7 @@ export default function ProfilePage({
   const renderedTabRef = useRef(renderedTab);
   const topLevelLenRef = useRef(0);
   const repliesLenRef  = useRef(0);
+  const articlesLenRef = useRef(0);
   useEffect(() => { renderedTabRef.current = renderedTab; }, [renderedTab]);
 
   const handleProfileScroll = useCallback(e => {
@@ -282,6 +286,8 @@ export default function ProfilePage({
       setVisibleNotes(n => Math.min(n + 20, topLevelLenRef.current));
     else if (renderedTabRef.current === "replies")
       setVisibleReplies(n => Math.min(n + 20, repliesLenRef.current));
+    else if (renderedTabRef.current === "articles")
+      setVisibleArticles(n => Math.min(n + 10, articlesLenRef.current));
   }, []);
 
   useEffect(() => {
@@ -308,12 +314,19 @@ export default function ProfilePage({
     });
     activeSubs.push(notesSub);
 
-    // Phase 2 — reposts + longform + polls in parallel; merges into same byId
-    const otherSub = pool.request(relayUrls, [{ kinds: [6, 30023, 1068, 6969], authors: [pubkey], limit: 100 }]).subscribe({
+    // Phase 2 — reposts + polls in parallel; merges into same byId
+    const otherSub = pool.request(relayUrls, [{ kinds: [6, 1068, 6969], authors: [pubkey], limit: 100 }]).subscribe({
       next: raw => { eventStore.add(raw); byId.set(raw.id, raw); },
       complete: flush,
     });
     activeSubs.push(otherSub);
+
+    // Phase 3 — articles get their own budget so a large repost count can't crowd them out
+    const articlesSub = pool.request(relayUrls, [{ kinds: [30023], authors: [pubkey], limit: 100 }]).subscribe({
+      next: raw => { eventStore.add(raw); byId.set(raw.id, raw); },
+      complete: flush,
+    });
+    activeSubs.push(articlesSub);
 
     // Fetch subject's contact list for circle count (skip for own profile)
     if (!isOwn) {
@@ -360,8 +373,16 @@ export default function ProfilePage({
     [theirEvents]
   );
 
-  useEffect(() => { topLevelLenRef.current = topLevel.length; }, [topLevel.length]);
-  useEffect(() => { repliesLenRef.current  = replies.length;  }, [replies.length]);
+  const articles = useMemo(
+    () => mergedEvents
+      .filter(e => e.pubkey === pubkey && e.kind === 30023)
+      .sort((a, b) => b.created_at - a.created_at),
+    [mergedEvents, pubkey]
+  );
+
+  useEffect(() => { topLevelLenRef.current  = topLevel.length;  }, [topLevel.length]);
+  useEffect(() => { repliesLenRef.current   = replies.length;   }, [replies.length]);
+  useEffect(() => { articlesLenRef.current  = articles.length;  }, [articles.length]);
 
   useEffect(() => {
     if (!resolveEventById) return;
@@ -499,6 +520,9 @@ export default function ProfilePage({
         </div>
         <div className={`profile-stat ${tab === "media" ? "active" : ""}`} onClick={() => switchTab("media")}>
           <div className="profile-stat-label">Media</div>
+        </div>
+        <div className={`profile-stat ${tab === "articles" ? "active" : ""}`} onClick={() => switchTab("articles")}>
+          <div className="profile-stat-label">Articles</div>
         </div>
         {!isOwn && (
           <div className={`profile-stat ${tab === "between" ? "active" : ""}`} onClick={() => switchTab("between")}>
@@ -672,6 +696,29 @@ export default function ProfilePage({
                 />
               );
             })
+      )}
+
+      {/* Articles tab */}
+      {renderedTab === "articles" && (
+        profileLoading && articles.length === 0
+          ? [0, 1, 2].map(i => <SkelCard key={i} />)
+          : articles.length === 0
+            ? <div className="empty-state"><div className="empty-state-title">No articles yet</div><div className="empty-state-sub">Long-form posts will appear here</div></div>
+            : articles.slice(0, visibleArticles).map(e => (
+                <LongformCard
+                  key={e.id}
+                  event={e}
+                  profiles={profiles}
+                  liked={false}
+                  bookmarked={isBookmarked?.(e) || false}
+                  likeCount={0}
+                  onLike={() => {}}
+                  onBookmark={onBookmark}
+                  onOpen={onOpenArticle}
+                  onOpenProfile={onOpenProfile}
+                  delay={0}
+                />
+              ))
       )}
 
       {/* Media tab — always mounted so thumbnail images stay in DOM across tab switches */}
