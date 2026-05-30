@@ -41,6 +41,8 @@ import NoteActions from "./components/NoteActions.jsx";
 import ArticleReader from "./components/ArticleReader.jsx";
 import CalendarCard from "./components/CalendarCard.jsx";
 import EventDetailView from "./components/EventDetailView.jsx";
+import StreamCard from "./components/StreamCard.jsx";
+import StreamDetailView from "./components/StreamDetailView.jsx";
 import ComposeSheet from "./components/ComposeSheet.jsx";
 import ProfilePage from "./components/ProfilePage.jsx";
 import CirclePage from "./components/CirclePage.jsx";
@@ -187,6 +189,7 @@ export default function App() {
   });
   const [openArticle, setOpenArticle] = useState(null);
   const [openCalendarEvent, setOpenCalendarEvent] = useState(null);
+  const [openStreamEvent, setOpenStreamEvent] = useState(null);
   const [navStack, setNavStack] = useState([]);
 
   const pushNav = entry => setNavStack(s => [...s, entry]);
@@ -304,6 +307,7 @@ export default function App() {
     setActiveNav(nav);
     setOpenArticle(null);
     setOpenCalendarEvent(null);
+    setOpenStreamEvent(null);
     setVisibleCount(20);
     setSettingsOpen(false);
     clearNav();
@@ -318,7 +322,7 @@ export default function App() {
 
   const displayEvs = activeNav === "bookmarks" ? bookmarkFeedEvents : events;
   const isLoading = fl || el;
-  const anyPanelOpen = settingsOpen || !!openArticle || !!openCalendarEvent || navStack.length > 0;
+  const anyPanelOpen = settingsOpen || !!openArticle || !!openCalendarEvent || !!openStreamEvent || navStack.length > 0;
   const myProfile = profiles[pubkey];
   const myDisplayName = displayName(pubkey, profiles);
   const myNpub = (() => {
@@ -532,6 +536,22 @@ export default function App() {
                                           delay={0}
                                         />
                                       )
+                                    : ev.kind === 30311
+                                      ? (
+                                        <StreamCard
+                                          key={ev.id}
+                                          event={ev}
+                                          profiles={profiles}
+                                          liked={getLike(ev.id).liked}
+                                          bookmarked={isBookmarked(ev)}
+                                          likeCount={getLike(ev.id).count}
+                                          onLike={handleLike}
+                                          onBookmark={handleBookmark}
+                                          onOpen={setOpenStreamEvent}
+                                          onOpenProfile={handleOpenProfile}
+                                          delay={0}
+                                        />
+                                      )
                                     : (
                                       <NoteCard
                                         key={ev.id}
@@ -695,9 +715,21 @@ export default function App() {
                 )}
               </div>
 
-              <SwipePanel open={navStack.length > 0 && !openArticle && !openCalendarEvent && !settingsOpen} onSwipeRight={handleBack}>
+              <div className={`slide-panel ${openStreamEvent ? "open" : ""}`}>
+                {openStreamEvent && (
+                  <StreamDetailView
+                    event={openStreamEvent}
+                    profiles={profiles}
+                    pubkey={pubkey}
+                    onBack={() => setOpenStreamEvent(null)}
+                    onOpenProfile={pk => { setOpenStreamEvent(null); handleOpenProfile(pk); }}
+                  />
+                )}
+              </div>
+
+              <SwipePanel open={navStack.length > 0 && !openArticle && !openCalendarEvent && !openStreamEvent && !settingsOpen} onSwipeRight={handleBack}>
                 {/* Keep the previous circle entry mounted when a profile is open on top of it */}
-                {navStack.length >= 2 && !openArticle && !openCalendarEvent && !settingsOpen && (() => {
+                {navStack.length >= 2 && !openArticle && !openCalendarEvent && !openStreamEvent && !settingsOpen && (() => {
                   const prev = navStack[navStack.length - 2];
                   const top  = navStack[navStack.length - 1];
                   if (prev.type !== "circle" || top.type !== "profile") return null;
@@ -718,7 +750,7 @@ export default function App() {
                     </div>
                   );
                 })()}
-                {navStack.length > 0 && !openArticle && !openCalendarEvent && !settingsOpen && (() => {
+                {navStack.length > 0 && !openArticle && !openCalendarEvent && !openStreamEvent && !settingsOpen && (() => {
                   const top = navStack[navStack.length - 1];
 
                   if (top.type === "profile") {
@@ -766,6 +798,7 @@ export default function App() {
                         onOpenPollVotes={handleOpenPollVotes}
                         onOpenArticle={setOpenArticle}
                         onOpenCalendarEvent={setOpenCalendarEvent}
+                        onOpenStream={setOpenStreamEvent}
                       />
                     );
                   }

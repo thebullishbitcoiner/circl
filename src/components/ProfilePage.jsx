@@ -16,6 +16,8 @@ import SkelCard from "./SkelCard.jsx";
 import ProfileMediaGrid from "./ProfileMediaGrid.jsx";
 import LongformCard from "./LongformCard.jsx";
 import CalendarCard from "./CalendarCard.jsx";
+import StreamCard from "./StreamCard.jsx";
+import useActiveStream from "../hooks/useActiveStream.js";
 
 // Persists across component mounts so returning to a profile doesn't refetch
 const mediaCache = new Map(); // pubkey → { items, until, exhausted }
@@ -132,7 +134,7 @@ export default function ProfilePage({
   myProfile, onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal, backLabel = "Your Circle", resolveEventById,
-  onOpenCircle, onFollow, onUnfollow, onOpenPollVotes, onOpenArticle, onOpenCalendarEvent,
+  onOpenCircle, onFollow, onUnfollow, onOpenPollVotes, onOpenArticle, onOpenCalendarEvent, onOpenStream,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
 }) {
   const [tab, setTab] = useState("notes");             // drives indicator immediately
@@ -161,6 +163,8 @@ export default function ProfilePage({
   const mediaFetchingRef = useRef(false);
   const mediaExhaustedRef = useRef(false);
   const mediaStartedRef = useRef(false);
+  const { stream: activeStream } = useActiveStream(pubkey);
+
   const p    = profiles?.[pubkey] || {};
   const name = displayName(pubkey, profiles);
   const websiteHref = normalizeWebsite(p.website);
@@ -316,7 +320,7 @@ export default function ProfilePage({
     activeSubs.push(notesSub);
 
     // Phase 2 — reposts, polls, and calendar events in parallel; merges into same byId
-    const otherSub = pool.request(relayUrls, [{ kinds: [6, 1068, 6969, 31922, 31923], authors: [pubkey], limit: 100 }]).subscribe({
+    const otherSub = pool.request(relayUrls, [{ kinds: [6, 1068, 6969, 31922, 31923, 30311], authors: [pubkey], limit: 100 }]).subscribe({
       next: raw => { eventStore.add(raw); byId.set(raw.id, raw); },
       complete: flush,
     });
@@ -358,13 +362,13 @@ export default function ProfilePage({
   }, [events, profileEvents, repostExtras]);
 
   const theirEvents = useMemo(
-    () => mergedEvents.filter(e => e.pubkey === pubkey && (e.kind === 1 || e.kind === 6 || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923)),
+    () => mergedEvents.filter(e => e.pubkey === pubkey && (e.kind === 1 || e.kind === 6 || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311)),
     [mergedEvents, pubkey]
   );
 
   const topLevel = useMemo(
     () => theirEvents
-      .filter(e => e.kind === 6 || isQuoteRepost(e) || (e.kind === 1 && !hasNonMentionETag(e)) || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923)
+      .filter(e => e.kind === 6 || isQuoteRepost(e) || (e.kind === 1 && !hasNonMentionETag(e)) || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311)
       .sort((a, b) => b.created_at - a.created_at),
     [theirEvents]
   );
@@ -459,10 +463,15 @@ export default function ProfilePage({
 
       <div className="profile-identity" style={{ paddingBottom: 16 }}>
         <div className="profile-av-wrap">
-          <div className="profile-av">
+          <div
+            className={`profile-av${activeStream ? " profile-av-live" : ""}`}
+            onClick={activeStream ? () => onOpenStream?.(activeStream) : undefined}
+            style={activeStream ? { cursor: "pointer" } : undefined}
+          >
             {p.picture
               ? <img src={p.picture} alt={name} onError={e => { e.target.style.display = "none"; }} />
               : name[0]?.toUpperCase()}
+            {activeStream && <div className="profile-av-live-badge">LIVE</div>}
           </div>
           {isOwn && <button className="profile-edit-btn">Edit profile</button>}
           {!isOwn && (
@@ -551,6 +560,23 @@ export default function ProfilePage({
                     onLike={() => {}}
                     onBookmark={onBookmark}
                     onOpen={onOpenCalendarEvent}
+                    onOpenProfile={onOpenProfile}
+                    delay={0}
+                  />
+                );
+              }
+              if (e.kind === 30311) {
+                return (
+                  <StreamCard
+                    key={e.id}
+                    event={e}
+                    profiles={profiles}
+                    liked={false}
+                    bookmarked={isBookmarked?.(e) || false}
+                    likeCount={0}
+                    onLike={() => {}}
+                    onBookmark={onBookmark}
+                    onOpen={onOpenStream}
                     onOpenProfile={onOpenProfile}
                     delay={0}
                   />

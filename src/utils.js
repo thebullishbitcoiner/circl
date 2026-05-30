@@ -10,6 +10,17 @@ import {
   getCalendarEventLocations,
   getCalendarEventHashtags,
 } from "applesauce-common/helpers/calendar-event";
+import {
+  getStreamTitle,
+  getStreamStatus,
+  getStreamImage,
+  getStreamHost,
+  getStreamViewers,
+  getStreamStreamingURLs,
+  getStreamHashtags,
+  getStreamSummary,
+  getStreamStartTime,
+} from "applesauce-common/helpers/stream";
 
 /** Nostr hex pubkey: exactly 64 hex chars (NDK / nostr-tools validate this). */
 export const isHexPubkey = pk =>
@@ -329,6 +340,21 @@ export function parseNoteMediaSegments(raw) {
   }
   if (!segments.length) segments.push({ type: "text", value: input });
   return segments;
+}
+
+export function parseStreamEvent(event) {
+  return {
+    title: getStreamTitle(event) ?? "",
+    status: getStreamStatus(event),
+    image: getStreamImage(event) ?? null,
+    host: getStreamHost(event),
+    viewers: getStreamViewers(event) ?? null,
+    streamingURLs: getStreamStreamingURLs(event),
+    hashtags: getStreamHashtags(event) ?? [],
+    summary: getStreamSummary(event) ?? event.content?.slice(0, 200) ?? "",
+    startTime: getStreamStartTime(event) ?? null,
+    d: event.tags?.find(t => t[0] === "d")?.[1] ?? "",
+  };
 }
 
 /**
