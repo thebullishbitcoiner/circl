@@ -39,6 +39,8 @@ import RepostCard from "./components/RepostCard.jsx";
 import PollCard from "./components/PollCard.jsx";
 import NoteActions from "./components/NoteActions.jsx";
 import ArticleReader from "./components/ArticleReader.jsx";
+import CalendarCard from "./components/CalendarCard.jsx";
+import EventDetailView from "./components/EventDetailView.jsx";
 import ComposeSheet from "./components/ComposeSheet.jsx";
 import ProfilePage from "./components/ProfilePage.jsx";
 import CirclePage from "./components/CirclePage.jsx";
@@ -184,6 +186,7 @@ export default function App() {
     try { return parseInt(localStorage.getItem("circl_notif_seen_v1") || "0", 10); } catch { return 0; }
   });
   const [openArticle, setOpenArticle] = useState(null);
+  const [openCalendarEvent, setOpenCalendarEvent] = useState(null);
   const [navStack, setNavStack] = useState([]);
 
   const pushNav = entry => setNavStack(s => [...s, entry]);
@@ -300,6 +303,7 @@ export default function App() {
   const navigate = nav => {
     setActiveNav(nav);
     setOpenArticle(null);
+    setOpenCalendarEvent(null);
     setVisibleCount(20);
     setSettingsOpen(false);
     clearNav();
@@ -314,7 +318,7 @@ export default function App() {
 
   const displayEvs = activeNav === "bookmarks" ? bookmarkFeedEvents : events;
   const isLoading = fl || el;
-  const anyPanelOpen = settingsOpen || !!openArticle || navStack.length > 0;
+  const anyPanelOpen = settingsOpen || !!openArticle || !!openCalendarEvent || navStack.length > 0;
   const myProfile = profiles[pubkey];
   const myDisplayName = displayName(pubkey, profiles);
   const myNpub = (() => {
@@ -359,7 +363,7 @@ export default function App() {
               {item.label}
             </button>
           ))}
-          <button className={`nav-item ${settingsOpen ? "active" : ""}`} onClick={() => { setOpenArticle(null); clearNav(); setSettingsOpen(true); }}>
+          <button className={`nav-item ${settingsOpen ? "active" : ""}`} onClick={() => { setOpenArticle(null); setOpenCalendarEvent(null); clearNav(); setSettingsOpen(true); }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="nav-icon">
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
@@ -416,6 +420,8 @@ export default function App() {
                           : displayEvs.filter(ev =>
                               ev.kind === 30023 ||
                               ev.kind === 6 ||
+                              ev.kind === 31922 ||
+                              ev.kind === 31923 ||
                               !ev.tags.some(t => t[0] === "e" && t[3] !== "mention")
                             );
                         const visible = filtered.slice(0, visibleCount);
@@ -510,6 +516,22 @@ export default function App() {
                                         delay={0}
                                       />
                                     )
+                                    : (ev.kind === 31922 || ev.kind === 31923)
+                                      ? (
+                                        <CalendarCard
+                                          key={ev.id}
+                                          event={ev}
+                                          profiles={profiles}
+                                          liked={getLike(ev.id).liked}
+                                          bookmarked={isBookmarked(ev)}
+                                          likeCount={getLike(ev.id).count}
+                                          onLike={handleLike}
+                                          onBookmark={handleBookmark}
+                                          onOpen={setOpenCalendarEvent}
+                                          onOpenProfile={handleOpenProfile}
+                                          delay={0}
+                                        />
+                                      )
                                     : (
                                       <NoteCard
                                         key={ev.id}
@@ -660,9 +682,22 @@ export default function App() {
                 )}
               </div>
 
-              <SwipePanel open={navStack.length > 0 && !openArticle && !settingsOpen} onSwipeRight={handleBack}>
+              <div className={`slide-panel ${openCalendarEvent ? "open" : ""}`}>
+                {openCalendarEvent && (
+                  <EventDetailView
+                    event={openCalendarEvent}
+                    profiles={profiles}
+                    pubkey={pubkey}
+                    publishEvent={publishEvent}
+                    onBack={() => setOpenCalendarEvent(null)}
+                    onOpenProfile={pk => { setOpenCalendarEvent(null); handleOpenProfile(pk); }}
+                  />
+                )}
+              </div>
+
+              <SwipePanel open={navStack.length > 0 && !openArticle && !openCalendarEvent && !settingsOpen} onSwipeRight={handleBack}>
                 {/* Keep the previous circle entry mounted when a profile is open on top of it */}
-                {navStack.length >= 2 && !openArticle && !settingsOpen && (() => {
+                {navStack.length >= 2 && !openArticle && !openCalendarEvent && !settingsOpen && (() => {
                   const prev = navStack[navStack.length - 2];
                   const top  = navStack[navStack.length - 1];
                   if (prev.type !== "circle" || top.type !== "profile") return null;
@@ -683,7 +718,7 @@ export default function App() {
                     </div>
                   );
                 })()}
-                {navStack.length > 0 && !openArticle && !settingsOpen && (() => {
+                {navStack.length > 0 && !openArticle && !openCalendarEvent && !settingsOpen && (() => {
                   const top = navStack[navStack.length - 1];
 
                   if (top.type === "profile") {
@@ -730,6 +765,7 @@ export default function App() {
                         onUnfollow={unfollowPk}
                         onOpenPollVotes={handleOpenPollVotes}
                         onOpenArticle={setOpenArticle}
+                        onOpenCalendarEvent={setOpenCalendarEvent}
                       />
                     );
                   }
@@ -1067,7 +1103,7 @@ export default function App() {
             </button>
           ))}
 
-          <button type="button" className={`bottom-settings-btn${settingsOpen ? " active" : ""}`} onClick={() => { setOpenArticle(null); clearNav(); setSettingsOpen(true); }}>
+          <button type="button" className={`bottom-settings-btn${settingsOpen ? " active" : ""}`} onClick={() => { setOpenArticle(null); setOpenCalendarEvent(null); clearNav(); setSettingsOpen(true); }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />

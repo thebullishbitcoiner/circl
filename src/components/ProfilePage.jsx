@@ -15,6 +15,7 @@ import { RELAYS } from "../constants.js";
 import SkelCard from "./SkelCard.jsx";
 import ProfileMediaGrid from "./ProfileMediaGrid.jsx";
 import LongformCard from "./LongformCard.jsx";
+import CalendarCard from "./CalendarCard.jsx";
 
 // Persists across component mounts so returning to a profile doesn't refetch
 const mediaCache = new Map(); // pubkey → { items, until, exhausted }
@@ -131,7 +132,7 @@ export default function ProfilePage({
   myProfile, onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal, backLabel = "Your Circle", resolveEventById,
-  onOpenCircle, onFollow, onUnfollow, onOpenPollVotes, onOpenArticle,
+  onOpenCircle, onFollow, onUnfollow, onOpenPollVotes, onOpenArticle, onOpenCalendarEvent,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
 }) {
   const [tab, setTab] = useState("notes");             // drives indicator immediately
@@ -314,8 +315,8 @@ export default function ProfilePage({
     });
     activeSubs.push(notesSub);
 
-    // Phase 2 — reposts + polls in parallel; merges into same byId
-    const otherSub = pool.request(relayUrls, [{ kinds: [6, 1068, 6969], authors: [pubkey], limit: 100 }]).subscribe({
+    // Phase 2 — reposts, polls, and calendar events in parallel; merges into same byId
+    const otherSub = pool.request(relayUrls, [{ kinds: [6, 1068, 6969, 31922, 31923], authors: [pubkey], limit: 100 }]).subscribe({
       next: raw => { eventStore.add(raw); byId.set(raw.id, raw); },
       complete: flush,
     });
@@ -357,13 +358,13 @@ export default function ProfilePage({
   }, [events, profileEvents, repostExtras]);
 
   const theirEvents = useMemo(
-    () => mergedEvents.filter(e => e.pubkey === pubkey && (e.kind === 1 || e.kind === 6 || e.kind === 1068 || e.kind === 6969)),
+    () => mergedEvents.filter(e => e.pubkey === pubkey && (e.kind === 1 || e.kind === 6 || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923)),
     [mergedEvents, pubkey]
   );
 
   const topLevel = useMemo(
     () => theirEvents
-      .filter(e => e.kind === 6 || isQuoteRepost(e) || (e.kind === 1 && !hasNonMentionETag(e)) || e.kind === 1068 || e.kind === 6969)
+      .filter(e => e.kind === 6 || isQuoteRepost(e) || (e.kind === 1 && !hasNonMentionETag(e)) || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923)
       .sort((a, b) => b.created_at - a.created_at),
     [theirEvents]
   );
@@ -538,6 +539,23 @@ export default function ProfilePage({
           : topLevel.length === 0
             ? <div className="empty-state"><div className="empty-state-title">No notes yet</div><div className="empty-state-sub">Notes, reposts, and quote reposts will appear here</div></div>
             : topLevel.slice(0, visibleNotes).map((e, i) => {
+              if (e.kind === 31922 || e.kind === 31923) {
+                return (
+                  <CalendarCard
+                    key={e.id}
+                    event={e}
+                    profiles={profiles}
+                    liked={false}
+                    bookmarked={isBookmarked?.(e) || false}
+                    likeCount={0}
+                    onLike={() => {}}
+                    onBookmark={onBookmark}
+                    onOpen={onOpenCalendarEvent}
+                    onOpenProfile={onOpenProfile}
+                    delay={0}
+                  />
+                );
+              }
               if (e.kind === 1068 || e.kind === 6969) {
                 return (
                   <PollCard

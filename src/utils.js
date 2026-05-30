@@ -1,5 +1,15 @@
 import * as nip19Lib from "nostr-tools/nip19";
 import { decodeInvoice } from "@getalby/lightning-tools";
+import {
+  getCalendarEventTitle,
+  getCalendarEventSummary,
+  getCalendarEventImage,
+  getCalendarEventStart,
+  getCalendarEventEnd,
+  getCalendarEventStartTimezone,
+  getCalendarEventLocations,
+  getCalendarEventHashtags,
+} from "applesauce-common/helpers/calendar-event";
 
 /** Nostr hex pubkey: exactly 64 hex chars (NDK / nostr-tools validate this). */
 export const isHexPubkey = pk =>
@@ -60,6 +70,37 @@ export const parseArticle = ev => {
     dTag:     get("d")       || "",
   };
 };
+
+export function parseCalendarEvent(event) {
+  const isDateBased = event.kind === 31922;
+  const start = getCalendarEventStart(event);
+  const end = getCalendarEventEnd(event);
+  return {
+    title: getCalendarEventTitle(event) ?? "",
+    summary: getCalendarEventSummary(event) ?? event.content?.slice(0, 200) ?? "",
+    image: getCalendarEventImage(event) ?? null,
+    start,
+    end,
+    isDateBased,
+    timezone: getCalendarEventStartTimezone(event) ?? null,
+    locations: getCalendarEventLocations(event) ?? [],
+    hashtags: getCalendarEventHashtags(event) ?? [],
+    d: event.tags?.find(t => t[0] === "d")?.[1] ?? "",
+  };
+}
+
+export function formatCalendarDate(start, end, isDateBased) {
+  if (!start) return "";
+  const startDate = new Date(start * 1000);
+  const opts = isDateBased
+    ? { month: "short", day: "numeric", year: "numeric" }
+    : { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" };
+  const startStr = startDate.toLocaleDateString(undefined, opts);
+  if (!end || end === start) return startStr;
+  const endDate = new Date(end * 1000);
+  const endStr = endDate.toLocaleDateString(undefined, opts);
+  return `${startStr} – ${endStr}`;
+}
 
 export const displayName = (pk, p) => {
   const k = normPubkey(pk);
