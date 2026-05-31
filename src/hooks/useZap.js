@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { NWCClient } from "@getalby/sdk/nwc";
 import { makeZapRequest } from "nostr-tools/nip57";
 import { bech32 } from "@scure/base";
+import { decodeInvoice } from "@getalby/lightning-tools";
 import { RELAYS } from "../constants.js";
 import { cacheZapReq } from "../utils.js";
 
@@ -80,11 +81,13 @@ export default function useZap(wallet) {
         pr = invoiceData.pr;
       }
 
-      client = new NWCClient({ nostrWalletConnectUrl: wallet.nwc_uri });
-      const payResult = await client.payInvoice({ invoice: pr });
-      if (payResult?.payment_hash && signed) {
-        cacheZapReq(payResult.payment_hash, signed);
+      if (signed) {
+        const paymentHash = decodeInvoice(pr)?.paymentHash;
+        if (paymentHash) cacheZapReq(paymentHash, signed);
       }
+
+      client = new NWCClient({ nostrWalletConnectUrl: wallet.nwc_uri });
+      await client.payInvoice({ invoice: pr });
       return { ok: true };
     } catch (e) {
       return { ok: false, reason: e.message || "payment_failed" };
