@@ -39,6 +39,7 @@ import RepostCard from "./components/RepostCard.jsx";
 import PollCard from "./components/PollCard.jsx";
 import NoteActions from "./components/NoteActions.jsx";
 import ArticleReader from "./components/ArticleReader.jsx";
+import HighlightCard from "./components/HighlightCard.jsx";
 import CalendarCard from "./components/CalendarCard.jsx";
 import EventDetailView from "./components/EventDetailView.jsx";
 import StreamCard from "./components/StreamCard.jsx";
@@ -178,7 +179,7 @@ export default function App() {
     return result;
   }, [mergedFeedPool, events, follows, pubkey, zapsByEvent, reactionsByEvent, notificationEvents]);
   const { profiles } = useProfiles({ pubkeys: allPks });
-  const { publish, publishEvent } = usePublish({ signAndPublish, pubkey });
+  const { publish, publishEvent, publishHighlight } = usePublish({ signAndPublish, pubkey });
   const isMobile = useIsMobile();
   const { dark, toggle: toggleDark } = useDarkMode();
   const { textSize, setTextSize } = useTextSize();
@@ -424,6 +425,7 @@ export default function App() {
                           : displayEvs.filter(ev =>
                               ev.kind === 30023 ||
                               ev.kind === 6 ||
+                              ev.kind === 9802 ||
                               ev.kind === 31922 ||
                               ev.kind === 31923 ||
                               !ev.tags.some(t => t[0] === "e" && t[3] !== "mention")
@@ -552,6 +554,47 @@ export default function App() {
                                           delay={0}
                                         />
                                       )
+                                    : ev.kind === 9802
+                                      ? (
+                                        <HighlightCard
+                                          key={ev.id}
+                                          event={ev}
+                                          profiles={profiles}
+                                          liked={getLike(ev.id).liked}
+                                          bookmarked={isBookmarked(ev)}
+                                          likeCount={getLike(ev.id).count}
+                                          myPubkey={pubkey}
+                                          myProfile={myProfile}
+                                          onLike={handleLike}
+                                          onBookmark={handleBookmark}
+                                          onOpenProfile={handleOpenProfile}
+                                          onOpenThread={handleOpenThread}
+                                          onOpenArticle={setOpenArticle}
+                                          onOpenHashtag={handleOpenHashtag}
+                                          onOpenZaps={handleOpenZaps}
+                                          onOpenReactions={handleOpenReactions}
+                                          onOpenReposts={handleOpenReposts}
+                                          onPublish={prependEvent}
+                                          publishEvent={publishEvent}
+                                          onPrepend={prependEvent}
+                                          getLocalZaps={getLocalZaps}
+                                          addLocalZap={addLocalZap}
+                                          getLocalReactions={getLocalReactions}
+                                          setLocalReaction={setLocalReaction}
+                                          onRequestModal={setPanelModal}
+                                          onDismissModal={() => setPanelModal(null)}
+                                          sendZap={sendZap}
+                                          defaultZapAmount={zapSettings.amount}
+                                          defaultZapMsg={zapSettings.msg}
+                                          onZapFail={reason => showToast(
+                                            reason === "no_lud16"  ? "⚡ No lightning address" :
+                                            reason === "no_wallet" ? "⚡ No wallet connected" :
+                                            `⚡ Zap failed: ${reason}`
+                                          )}
+                                          resolveEventById={resolveEventById}
+                                          delay={0}
+                                        />
+                                      )
                                     : (
                                       <NoteCard
                                         key={ev.id}
@@ -576,6 +619,7 @@ export default function App() {
                                         onOpenReposts={handleOpenReposts}
                                         onPublish={prependEvent}
                                         publishEvent={publishEvent}
+                                        publishHighlight={publishHighlight}
                                         onPrepend={prependEvent}
                                         getLocalZaps={getLocalZaps}
                                         addLocalZap={addLocalZap}
@@ -698,6 +742,8 @@ export default function App() {
                     allEvents={mergedFeedPool}
                     onOpenThread={handleOpenThread}
                     resolveEventById={resolveEventById}
+                    publishHighlight={publishHighlight}
+                    onPrepend={prependEvent}
                   />
                 )}
               </div>
@@ -775,6 +821,7 @@ export default function App() {
                         myProfile={myProfile}
                         onPublish={prependEvent}
                         publishEvent={publishEvent}
+                        publishHighlight={publishHighlight}
                         onPrepend={prependEvent}
                         onBookmark={handleBookmark}
                         isBookmarked={isBookmarked}

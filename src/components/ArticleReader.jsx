@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import Avatar from "./Avatar.jsx";
 import ArticleBody from "./ArticleBody.jsx";
 import ProfileText from "./ProfileText.jsx";
+import HighlightPopover from "./HighlightPopover.jsx";
+import HighlightSheet from "./HighlightSheet.jsx";
 import { Bk, Hi, Bi, Sh, Cl, Ri, Zi } from "./icons.jsx";
 import { displayName, nip05OrNpub, relativeTime, parseArticle, avatarUrl } from "../utils.js";
 import { nip19 } from "../utils.js";
@@ -19,9 +21,13 @@ export default function ArticleReader({
   allEvents = [],
   onOpenThread,
   resolveEventById,
+  publishHighlight,
+  onPrepend,
 }) {
   const [progress, setProgress] = useState(0);
+  const [highlightDraft, setHighlightDraft] = useState(null);
   const ref = useRef(null);
+  const bodyRef = useRef(null);
   const art  = parseArticle(event);
   const name = displayName(event.pubkey, profiles);
   const about = profiles?.[event.pubkey]?.about || "";
@@ -35,6 +41,7 @@ export default function ArticleReader({
   }, []);
 
   return (
+    <>
     <div ref={ref} className="slide-panel-scroll">
       <div className="read-progress" style={{ width: `${progress}%` }} />
       <div className="panel-bar">
@@ -75,14 +82,23 @@ export default function ArticleReader({
             <span className="meta-pill">{relativeTime(event.created_at)} ago</span>
           </div>
         </div>
-        <ArticleBody
-          content={event.content}
-          profiles={profiles}
-          onOpenProfile={onOpenProfile}
-          allEvents={allEvents}
-          onOpenThread={onOpenThread}
-          resolveEventById={resolveEventById}
-        />
+        <div ref={bodyRef} style={{ position: "relative" }}>
+          {publishHighlight && (
+            <HighlightPopover
+              sourceEvent={event}
+              containerRef={bodyRef}
+              onHighlight={draft => setHighlightDraft(draft)}
+            />
+          )}
+          <ArticleBody
+            content={event.content}
+            profiles={profiles}
+            onOpenProfile={onOpenProfile}
+            allEvents={allEvents}
+            onOpenThread={onOpenThread}
+            resolveEventById={resolveEventById}
+          />
+        </div>
         <div className="reader-footer">
           <div className="reactions-row">
             <span className="reactions-label">Reactions</span>
@@ -104,5 +120,16 @@ export default function ArticleReader({
         </div>
       </div>
     </div>
+    {highlightDraft && (
+      <HighlightSheet
+        text={highlightDraft.text}
+        context={highlightDraft.context}
+        sourceEvent={highlightDraft.sourceEvent}
+        publishHighlight={publishHighlight}
+        onPrepend={onPrepend}
+        onDismiss={() => setHighlightDraft(null)}
+      />
+    )}
+    </>
   );
 }

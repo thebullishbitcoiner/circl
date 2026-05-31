@@ -17,6 +17,7 @@ import ProfileMediaGrid from "./ProfileMediaGrid.jsx";
 import LongformCard from "./LongformCard.jsx";
 import CalendarCard from "./CalendarCard.jsx";
 import StreamCard from "./StreamCard.jsx";
+import HighlightCard from "./HighlightCard.jsx";
 import useActiveStream from "../hooks/useActiveStream.js";
 
 // Persists across component mounts so returning to a profile doesn't refetch
@@ -131,7 +132,7 @@ function IxNote({ event, myPubkey, profiles, onOpenProfile, onOpenThread, resolv
 export default function ProfilePage({
   pubkey, myPubkey, profiles, follows, events, isOwn,
   onBack, onOpenProfile, onOpenNote, onOpenThread, onOpenHashtag, onOpenZaps, onOpenReactions, onOpenReposts,
-  myProfile, onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
+  myProfile, onPublish, publishEvent, publishHighlight, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal, backLabel = "Your Circle", resolveEventById,
   onOpenCircle, onFollow, onUnfollow, onOpenPollVotes, onOpenArticle, onOpenCalendarEvent, onOpenStream,
@@ -149,6 +150,7 @@ export default function ProfilePage({
   const [visibleNotes, setVisibleNotes] = useState(20);
   const [visibleReplies, setVisibleReplies] = useState(20);
   const [visibleArticles, setVisibleArticles] = useState(10);
+  const [visibleHighlights, setVisibleHighlights] = useState(10);
   const [profileEvents, setProfileEvents] = useState([]);
   const [profileLoading, setProfileLoading] = useState(true);
   const [subjectFollows, setSubjectFollows] = useState([]);
@@ -186,6 +188,7 @@ export default function ProfilePage({
     setVisibleNotes(20);
     setVisibleReplies(20);
     setVisibleArticles(10);
+    setVisibleHighlights(10);
     setRenderedTab("notes");
     setTab("notes");
   }, [pubkey]);
@@ -333,6 +336,13 @@ export default function ProfilePage({
     });
     activeSubs.push(articlesSub);
 
+    // Phase 4 — highlights (kind 9802)
+    const highlightsSub = pool.request(relayUrls, [{ kinds: [9802], authors: [pubkey], limit: 100 }]).subscribe({
+      next: raw => { eventStore.add(raw); byId.set(raw.id, raw); },
+      complete: flush,
+    });
+    activeSubs.push(highlightsSub);
+
     // Fetch subject's contact list for circle count (skip for own profile)
     if (!isOwn) {
       const followsSub = pool.request(relayUrls, [{ kinds: [3], authors: [pubkey], limit: 1 }]).subscribe({
@@ -381,6 +391,13 @@ export default function ProfilePage({
   const articles = useMemo(
     () => mergedEvents
       .filter(e => e.pubkey === pubkey && e.kind === 30023)
+      .sort((a, b) => b.created_at - a.created_at),
+    [mergedEvents, pubkey]
+  );
+
+  const highlights = useMemo(
+    () => mergedEvents
+      .filter(e => e.pubkey === pubkey && e.kind === 9802)
       .sort((a, b) => b.created_at - a.created_at),
     [mergedEvents, pubkey]
   );
@@ -533,6 +550,9 @@ export default function ProfilePage({
         </div>
         <div className={`profile-stat ${tab === "articles" ? "active" : ""}`} onClick={() => switchTab("articles")}>
           <div className="profile-stat-label">Articles</div>
+        </div>
+        <div className={`profile-stat ${tab === "highlights" ? "active" : ""}`} onClick={() => switchTab("highlights")}>
+          <div className="profile-stat-label">Highlights</div>
         </div>
         {!isOwn && (
           <div className={`profile-stat ${tab === "between" ? "active" : ""}`} onClick={() => switchTab("between")}>
@@ -760,6 +780,50 @@ export default function ProfilePage({
                   onBookmark={onBookmark}
                   onOpen={onOpenArticle}
                   onOpenProfile={onOpenProfile}
+                  delay={0}
+                />
+              ))
+      )}
+
+      {/* Highlights tab */}
+      {renderedTab === "highlights" && (
+        profileLoading && highlights.length === 0
+          ? [0, 1, 2].map(i => <SkelCard key={i} />)
+          : highlights.length === 0
+            ? <div className="empty-state"><div className="empty-state-title">No highlights yet</div><div className="empty-state-sub">Highlighted passages from notes and articles will appear here</div></div>
+            : highlights.slice(0, visibleHighlights).map(e => (
+                <HighlightCard
+                  key={e.id}
+                  event={e}
+                  profiles={profiles}
+                  liked={false}
+                  bookmarked={isBookmarked?.(e) || false}
+                  likeCount={0}
+                  myPubkey={myPubkey}
+                  myProfile={myProfile}
+                  onLike={() => {}}
+                  onBookmark={onBookmark}
+                  onOpenProfile={onOpenProfile}
+                  onOpenThread={onOpenThread}
+                  onOpenArticle={onOpenArticle}
+                  onOpenHashtag={onOpenHashtag}
+                  onOpenZaps={onOpenZaps}
+                  onOpenReactions={onOpenReactions}
+                  onOpenReposts={onOpenReposts}
+                  onPublish={onPublish}
+                  publishEvent={publishEvent}
+                  onPrepend={onPrepend}
+                  getLocalZaps={getLocalZaps}
+                  addLocalZap={addLocalZap}
+                  getLocalReactions={getLocalReactions}
+                  setLocalReaction={setLocalReaction}
+                  onRequestModal={onRequestModal}
+                  onDismissModal={onDismissModal}
+                  sendZap={sendZap}
+                  defaultZapAmount={defaultZapAmount}
+                  defaultZapMsg={defaultZapMsg}
+                  onZapFail={onZapFail}
+                  resolveEventById={resolveEventById}
                   delay={0}
                 />
               ))

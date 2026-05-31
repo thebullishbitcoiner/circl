@@ -410,3 +410,23 @@ export function groupNoteMediaSegments(segments) {
   }
   return out;
 }
+
+export const parseHighlight = ev => {
+  const get = n => ev.tags?.find(t => t[0] === n)?.[1] ?? null;
+  const eTag = ev.tags?.find(t => t[0] === "e");
+  const aTag = ev.tags?.find(t => t[0] === "a");
+  const rTag = ev.tags?.find(t => t[0] === "r");
+  const pTag = ev.tags?.find(t => t[0] === "p");
+  let sourceTag = null, sourceRef = null;
+  if (aTag) { sourceTag = "a"; sourceRef = aTag[1]; }
+  else if (eTag) { sourceTag = "e"; sourceRef = eTag[1]; }
+  else if (rTag) { sourceTag = "r"; sourceRef = rTag[1]; }
+  return {
+    text: ev.content || "",
+    sourceTag,
+    sourceRef,
+    authorPubkey: pTag?.[1] ?? null,
+    context: get("context"),
+    comment: get("comment"),
+  };
+};

@@ -1,10 +1,12 @@
-import { useState, memo, useCallback } from "react";
+import { useState, useRef, memo, useCallback } from "react";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteActions from "./NoteActions.jsx";
 import { displayName, nip05OrNpub, relativeTime } from "../utils.js";
 import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
+import HighlightPopover from "./HighlightPopover.jsx";
+import HighlightSheet from "./HighlightSheet.jsx";
 
 function NoteCard({
   event, profiles, liked, bookmarked, likeCount,
@@ -14,6 +16,7 @@ function NoteCard({
   events = [],
   resolveEventById,
   onPublish, publishEvent, onPrepend,
+  publishHighlight,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   delay,
   replyingToPubkey = null,
@@ -21,6 +24,8 @@ function NoteCard({
 }) {
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
+  const [highlightDraft, setHighlightDraft] = useState(null);
+  const contentRef = useRef(null);
   const isBookmarkedFn = useCallback(() => bookmarked, [bookmarked]);
 
 
@@ -69,6 +74,14 @@ function NoteCard({
                 replying to <span className="ix-mention" style={{ marginLeft: 3 }}>@{displayName(replyingToPubkey, profiles)}</span>
               </div>
             )}
+            <div ref={contentRef}>
+            {publishHighlight && (
+              <HighlightPopover
+                sourceEvent={event}
+                containerRef={contentRef}
+                onHighlight={draft => setHighlightDraft(draft)}
+              />
+            )}
             <NoteContent
               content={event.content}
               profiles={profiles}
@@ -79,6 +92,7 @@ function NoteCard({
               resolveEventById={resolveEventById}
               collapsible
             />
+            </div>
             <NoteActions
               event={event}
               profiles={profiles}
@@ -108,6 +122,16 @@ function NoteCard({
       </div>
 
       {jsonOpen && <NoteJsonModal event={event} onClose={() => setJsonOpen(false)} />}
+      {highlightDraft && (
+        <HighlightSheet
+          text={highlightDraft.text}
+          context={highlightDraft.context}
+          sourceEvent={highlightDraft.sourceEvent}
+          publishHighlight={publishHighlight}
+          onPrepend={onPrepend}
+          onDismiss={() => setHighlightDraft(null)}
+        />
+      )}
     </>
   );
 }
