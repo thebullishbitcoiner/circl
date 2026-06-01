@@ -1,39 +1,15 @@
-import { useState, useCallback, useRef, useMemo, useEffect } from "react";
-import { PrimalCache } from "applesauce-extra";
-import { eventStore } from "../nostr.js";
-import { displayName, relativeTime, nip19 } from "../utils.js";
+import { useState, useCallback, useRef } from "react";
+import { pool, eventStore } from "../nostr.js";
+import { displayName, relativeTime, nip19, normPubkey, isHexPubkey } from "../utils.js";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 
-const ARCHIVES_API = "https://api.nostrarchives.com";
-
-async function searchRest(q, currentTab) {
-  const res = await fetch(
-    `${ARCHIVES_API}/v1/search?q=${encodeURIComponent(q)}&limit=30`,
-    { signal: AbortSignal.timeout(8000) }
-  );
-  if (!res.ok) throw new Error(res.statusText);
-  const data = await res.json();
-  if (currentTab === "people") {
-    return (data.profiles || []).map(p => ({
-      id: p.pubkey,
-      pubkey: p.pubkey,
-      kind: 0,
-      created_at: p.last_active_at || 0,
-      content: JSON.stringify({
-        name: p.name,
-        display_name: p.display_name,
-        picture: p.picture,
-        nip05: p.nip05,
-        lud16: p.lud16,
-        follower_count: p.follower_count,
-      }),
-      tags: [],
-      sig: "",
-    }));
-  }
-  return (data.notes || []).map(n => n.event).filter(Boolean);
-}
+// Relays that advertise NIP-50 search support
+const SEARCH_RELAYS = [
+  "wss://relay.nostr.band",
+  "wss://search.nos.today",
+  "wss://nostr.wine",
+];
 
 function ProfileResult({ ev, onOpenProfile }) {
   let meta = {};
@@ -41,7 +17,6 @@ function ProfileResult({ ev, onOpenProfile }) {
   const name = meta.display_name || meta.name || "";
   const pk = ev.pubkey;
   const npub = (() => { try { const n = nip19.npubEncode(pk); return n.slice(0, 8) + "…" + n.slice(-4); } catch { return ""; } })();
-  const followers = meta.follower_count != null ? meta.follower_count.toLocaleString() + " followers" : null;
 
   return (
     <div className="search-result" role="button" tabIndex={0}
@@ -55,7 +30,6 @@ function ProfileResult({ ev, onOpenProfile }) {
         <div className="search-result-name">{name || npub}</div>
         <div className="search-result-sub" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {meta.nip05 && <span>{meta.nip05}</span>}
-          {followers && <span>{followers}</span>}
           {!meta.nip05 && npub && <span style={{ fontFamily: "monospace", fontSize: 11 }}>{npub}</span>}
         </div>
       </div>
@@ -94,51 +68,55 @@ export default function SearchPage({ profiles, onOpenProfile, onOpenThread }) {
   const [tab, setTab] = useState("notes");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const abortRef = useRef(null);
-const primal = useMemo(() => new PrimalCache(), []);
-  useEffect(() => () => primal.close(), [primal]);
+  const subRef = useRef(null);
+  const seenRef = useRef(new Set());
 
-  const runSearch = useCallback(async (q, currentTab) => {
-    if (abortRef.current) abortRef.current.cancelled = true;
-    const abort = { cancelled: false };
-    abortRef.current = abort;
+  const runSearch = useCallback((q, currentTab) => {
+    // Cancel any in-flight subscription
+    subRef.current?.unsubscribe();
+    subRef.current = null;
 
     if (!q.trim()) { setResults([]); setLoading(false); return; }
 
     setLoading(true);
     setResults([]);
+    seenRef.current = new Set();
 
-    try {
-      let evs = [];
-      try {
-        evs = await searchRest(q.trim(), currentTab);
-      } catch {}
+    const kinds = currentTab === "people" ? [0] : [1];
+    const filter = { kinds, search: q.trim(), limit: 30 };
 
-      if (abort.cancelled) return;
+    const sub = pool.request(SEARCH_RELAYS, [filter]).subscribe({
+      next: ev => {
+        if (!ev?.id || seenRef.current.has(ev.id)) return;
+        seenRef.current.add(ev.id);
 
-      if (!evs.length) {
-        evs = currentTab === "people"
-          ? await primal.userSearch(q.trim(), 30)
-          : await primal.search({ query: q.trim(), limit: 30 });
+        // For profile results, also update the event store so avatars/names resolve
+        const pk = normPubkey(ev.pubkey);
+        if (isHexPubkey(pk)) eventStore.add(ev);
+
+        setResults(prev => [...prev, ev]);
+        setLoading(false);
+      },
+      complete: () => setLoading(false),
+      error: () => setLoading(false),
+    });
+
+    subRef.current = sub;
+
+    // Safety timeout — stop waiting after 10s
+    setTimeout(() => {
+      if (subRef.current === sub) {
+        sub.unsubscribe();
+        subRef.current = null;
+        setLoading(false);
       }
-
-      if (abort.cancelled) return;
-
-      for (const ev of evs) {
-        if (ev.sig) eventStore.add(ev);
-      }
-      setResults(evs);
-    } catch {
-      if (!abort.cancelled) setResults([]);
-    } finally {
-      if (!abort.cancelled) setLoading(false);
-    }
-  }, [primal]);
+    }, 10000);
+  }, []);
 
   const handleInput = e => {
     const q = e.target.value;
     setQuery(q);
-    if (!q.trim()) setResults([]);
+    if (!q.trim()) { setResults([]); subRef.current?.unsubscribe(); }
   };
 
   const handleKeyDown = e => {
@@ -166,7 +144,7 @@ const primal = useMemo(() => new PrimalCache(), []);
             autoFocus
           />
           {query && (
-            <button type="button" className="search-clear" onClick={() => { setQuery(""); setResults([]); }}>
+            <button type="button" className="search-clear" onClick={() => { setQuery(""); setResults([]); subRef.current?.unsubscribe(); }}>
               <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
               </svg>
@@ -199,7 +177,7 @@ const primal = useMemo(() => new PrimalCache(), []);
         )}
         {results.map(ev =>
           tab === "people"
-            ? <ProfileResult key={ev.id} ev={ev} profiles={profiles} onOpenProfile={onOpenProfile} />
+            ? <ProfileResult key={ev.id || ev.pubkey} ev={ev} profiles={profiles} onOpenProfile={onOpenProfile} />
             : <NoteResult key={ev.id} ev={ev} profiles={profiles} onOpenProfile={onOpenProfile} onOpenThread={onOpenThread} />
         )}
       </div>
