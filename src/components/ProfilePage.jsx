@@ -14,6 +14,7 @@ import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 import SkelCard from "./SkelCard.jsx";
 import ProfileMediaGrid from "./ProfileMediaGrid.jsx";
+import MediaLightbox from "./MediaLightbox.jsx";
 import LongformCard from "./LongformCard.jsx";
 import CalendarCard from "./CalendarCard.jsx";
 import StreamCard from "./StreamCard.jsx";
@@ -159,6 +160,7 @@ export default function ProfilePage({
   const [circleLoading, setCircleLoading] = useState(true);
   const [profileNotesMenuId, setProfileNotesMenuId] = useState(null);
   const [profileNotesJsonEvent, setProfileNotesJsonEvent] = useState(null);
+  const [lightboxUrl, setLightboxUrl] = useState(null);
 
   const [mediaItems, setMediaItems] = useState([]);
   const [mediaLoading, setMediaLoading] = useState(false);
@@ -471,7 +473,11 @@ export default function ProfilePage({
 
   return (
     <div ref={scrollRef} className="slide-panel-scroll" onScroll={handleProfileScroll}>
-      <div className="profile-banner" style={{ position: "relative" }}>
+      <div
+        className="profile-banner"
+        style={{ position: "relative", cursor: p.banner ? "pointer" : undefined }}
+        onClick={p.banner ? () => setLightboxUrl(p.banner) : undefined}
+      >
         {p.banner ? (
           <>
             <img className="profile-banner-image" src={p.banner} alt="" onError={e => { e.target.style.display = "none"; }} />
@@ -480,7 +486,11 @@ export default function ProfilePage({
         ) : (
           <div className="profile-banner-glyph">◎</div>
         )}
-        <button className="back-btn" onClick={onBack} style={{ position: "absolute", top: 12, left: 12, background: "rgba(0,0,0,.25)", backdropFilter: "blur(8px)", color: "white" }}>
+        <button
+          className="back-btn"
+          onClick={e => { e.stopPropagation(); onBack(); }}
+          style={{ position: "absolute", top: 12, left: 12, background: "rgba(0,0,0,.25)", backdropFilter: "blur(8px)", color: "white" }}
+        >
           <Bk s={16} />
         </button>
       </div>
@@ -489,8 +499,8 @@ export default function ProfilePage({
         <div className="profile-av-wrap">
           <div
             className={`profile-av${activeStream ? " profile-av-live" : ""}`}
-            onClick={activeStream ? () => onOpenStream?.(activeStream) : undefined}
-            style={activeStream ? { cursor: "pointer" } : undefined}
+            onClick={activeStream ? () => onOpenStream?.(activeStream) : (p.picture ? () => setLightboxUrl(p.picture) : undefined)}
+            style={(activeStream || p.picture) ? { cursor: "pointer" } : undefined}
           >
             {p.picture
               ? <img src={p.picture} alt={name} onError={e => { e.target.style.display = "none"; }} />
@@ -863,6 +873,14 @@ export default function ProfilePage({
       />
 
       {profileNotesJsonEvent && <NoteJsonModal event={profileNotesJsonEvent} onClose={() => setProfileNotesJsonEvent(null)} />}
+      {lightboxUrl && (
+        <MediaLightbox
+          items={[{ url: lightboxUrl, type: "image" }]}
+          index={0}
+          onClose={() => setLightboxUrl(null)}
+          onIndexChange={() => {}}
+        />
+      )}
 
       {/* Between us tab */}
       {renderedTab === "between" && !isOwn && (

@@ -437,7 +437,7 @@
   /* ── Profile ── */
   .profile-banner{width:100%;height:130px;background:linear-gradient(135deg,var(--surface2) 0%,var(--primary-soft) 50%,#DDD6FE 100%);position:relative;overflow:hidden;flex-shrink:0;}
   .profile-banner-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
-  .profile-banner-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.12),rgba(0,0,0,.22));}
+  .profile-banner-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.12),rgba(0,0,0,.22));pointer-events:none;}
   .profile-banner-glyph{position:absolute;right:-20px;bottom:-30px;font-family:'DM Sans',sans-serif;font-size:160px;color:rgba(109,40,217,.11);line-height:1;user-select:none;}
   .profile-identity{padding:0 20px 16px;margin-top:-26px;position:relative;z-index:2;}
   .profile-av-wrap{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:12px;}

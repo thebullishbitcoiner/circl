@@ -3,6 +3,9 @@ import { pool } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 import { parseBolt11Msats } from "../utils.js";
 
+// Warm-start cache: polls show last known counts instantly on remount while subscription reloads
+const _pollCache = new Map(); // event.id → { voteCounts, myVote, voteEvents }
+
 function parsePollOptions(event) {
   if (event.kind === 1068) {
     return event.tags
@@ -96,18 +99,20 @@ export default function usePollData({ event, myPubkey }) {
   const zapLimits = event.kind === 6969 ? parseZapLimits(event) : null;
 
   const [voteCounts, setVoteCounts] = useState(
-    Object.fromEntries(options.map(o => [o.id, 0]))
+    () => _pollCache.get(event.id)?.voteCounts ?? Object.fromEntries(options.map(o => [o.id, 0]))
   );
-  const [myVote, setMyVote] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [voteEvents, setVoteEvents] = useState([]);
+  const [myVote, setMyVote] = useState(() => _pollCache.get(event.id)?.myVote ?? null);
+  const [loading, setLoading] = useState(() => !_pollCache.has(event.id));
+  const [voteEvents, setVoteEvents] = useState(() => _pollCache.get(event.id)?.voteEvents ?? []);
   const rawEvents = useRef([]);
 
   const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
 
   useEffect(() => {
     if (!options.length) { setLoading(false); return; }
-    rawEvents.current = [];
+
+    const cached = _pollCache.get(event.id);
+    rawEvents.current = cached ? [...cached.voteEvents] : [];
 
     const filter = event.kind === 1068
       ? { kinds: [1018], "#e": [event.id] }
@@ -115,22 +120,23 @@ export default function usePollData({ event, myPubkey }) {
 
     const sub = pool.subscription(relayUrls, [filter]).subscribe({
       next: raw => {
+        if (rawEvents.current.some(e => e.id === raw.id)) return;
         rawEvents.current = [...rawEvents.current, raw];
         setVoteEvents([...rawEvents.current]);
+
+        let currentMyVote = null;
+        let counts;
         if (event.kind === 1068) {
-          const counts = countStandardVotes(rawEvents.current, options, polltype);
+          counts = countStandardVotes(rawEvents.current, options, polltype);
           setVoteCounts(counts);
           const myEv = rawEvents.current
             .filter(e => e.pubkey === myPubkey)
             .sort((a, b) => b.created_at - a.created_at)[0];
-          if (myEv) {
-            const resp = myEv.tags.find(t => t[0] === "response");
-            setMyVote(resp?.[1] ?? null);
-          }
+          if (myEv) currentMyVote = myEv.tags.find(t => t[0] === "response")?.[1] ?? null;
+          setMyVote(currentMyVote);
         } else {
-          const counts = countZapVotes(rawEvents.current, options, zapLimits);
+          counts = countZapVotes(rawEvents.current, options, zapLimits);
           setVoteCounts(counts);
-          // myVote for zap polls: check if any receipt's zap request was from myPubkey
           for (const receipt of rawEvents.current) {
             const descTag = receipt.tags.find(t => t[0] === "description");
             if (!descTag) continue;
@@ -138,11 +144,14 @@ export default function usePollData({ event, myPubkey }) {
               const zapReq = JSON.parse(descTag[1]);
               if (zapReq.pubkey === myPubkey) {
                 const optTag = (zapReq.tags || []).find(t => t[0] === "poll_option");
-                if (optTag) { setMyVote(optTag[1]); break; }
+                if (optTag) { currentMyVote = optTag[1]; break; }
               }
             } catch {}
           }
+          setMyVote(currentMyVote);
         }
+
+        _pollCache.set(event.id, { voteCounts: counts, myVote: currentMyVote, voteEvents: [...rawEvents.current] });
         setLoading(false);
       },
     });

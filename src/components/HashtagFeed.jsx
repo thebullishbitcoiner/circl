@@ -5,6 +5,9 @@ import { replyCount, repostAndQuoteCount } from "../utils.js";
 import NoteCard from "./NoteCard.jsx";
 import { Bk } from "./icons.jsx";
 
+const hashtagCache = new Map(); // hashtag → { notes, ts }
+const HASHTAG_CACHE_TTL = 5 * 60 * 1000;
+
 export default function HashtagFeed({
   hashtag, profiles, onBack, onOpenProfile, onOpenThread, onOpenHashtag,
   myPubkey, myProfile, onBookmark, isBookmarked,
@@ -18,19 +21,28 @@ export default function HashtagFeed({
 
   useEffect(() => {
     if (!hashtag) return;
+    const key = hashtag.toLowerCase();
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+
+    const cached = hashtagCache.get(key);
+    if (cached && Date.now() - cached.ts < HASHTAG_CACHE_TTL) {
+      setNotes(cached.notes);
+      setLoading(false);
+      return;
+    }
+
     setNotes([]);
     setLoading(true);
 
-    const sub = pool.subscription(RELAYS, {
-      kinds: [1],
-      "#t": [hashtag.toLowerCase()],
-      limit: 50,
-    }).subscribe({
+    const since = Math.floor(Date.now() / 1000) - 60 * 60 * 48;
+    const sub = pool.subscription(relayUrls, [{ kinds: [1], "#t": [key], since, limit: 50 }]).subscribe({
       next: ev => {
         eventStore.add(ev);
         setNotes(prev => {
           if (prev.some(e => e.id === ev.id)) return prev;
-          return [ev, ...prev].sort((a, b) => b.created_at - a.created_at);
+          const next = [ev, ...prev].sort((a, b) => b.created_at - a.created_at);
+          hashtagCache.set(key, { notes: next, ts: Date.now() });
+          return next;
         });
       },
       error: () => setLoading(false),

@@ -108,40 +108,62 @@ export default function App() {
     localEvents: bookmarkLocalPool,
   });
 
-  const mergedFeedPool = useMemo(() => {
+  const mergedFeedMap = useMemo(() => {
     const m = new Map(events.map(e => [e.id, e]));
     for (const e of bookmarkFeedEvents) m.set(e.id, e);
-    return [...m.values()];
+    return m;
   }, [events, bookmarkFeedEvents]);
 
+  const mergedFeedPool = useMemo(() => [...mergedFeedMap.values()], [mergedFeedMap]);
+
   const pendingEventFetches = useRef(new Set());
+  const batchQueueRef = useRef([]);
+  const batchTimerRef = useRef(null);
+
+  const flushBatch = useCallback(() => {
+    batchTimerRef.current = null;
+    const pending = batchQueueRef.current.splice(0);
+    if (!pending.length) return;
+    const resolvers = new Map(pending.map(p => [p.id, p.resolve]));
+    const ids = [...resolvers.keys()];
+    const sub = nostrSubscribe(
+      [{ ids, limit: ids.length }],
+      {
+        closeOnEose: true,
+        onEvent: e => {
+          const ev = e.rawEvent();
+          const res = resolvers.get(ev.id);
+          if (res) {
+            resolvers.delete(ev.id);
+            pendingEventFetches.current.delete(ev.id);
+            prependEvent(ev);
+            res(ev);
+          }
+        },
+        onEose: () => {
+          for (const [id, res] of resolvers) {
+            pendingEventFetches.current.delete(id);
+            res(null);
+          }
+          resolvers.clear();
+        },
+      }
+    );
+    setTimeout(() => sub.stop(), 5500);
+  }, [prependEvent]);
+
   const resolveEventById = useCallback(async eventId => {
     if (!eventId) return null;
-    const existing = mergedFeedPool.find(e => e.id === eventId);
+    const existing = mergedFeedMap.get(eventId);
     if (existing) return existing;
     if (pendingEventFetches.current.has(eventId)) return null;
     pendingEventFetches.current.add(eventId);
     return new Promise(resolve => {
-      let done = false;
-      const finish = ev => {
-        if (done) return;
-        done = true;
-        pendingEventFetches.current.delete(eventId);
-        if (ev) prependEvent(ev);
-        resolve(ev || null);
-      };
-      const timer = setTimeout(() => finish(null), 5000);
-      const sub = nostrSubscribe(
-        [{ ids: [eventId], limit: 1 }],
-        {
-          closeOnEose: true,
-          onEvent: e => { clearTimeout(timer); finish(e.rawEvent()); },
-          onEose: () => { clearTimeout(timer); finish(null); },
-        }
-      );
-      setTimeout(() => sub.stop(), 5500);
+      batchQueueRef.current.push({ id: eventId, resolve });
+      clearTimeout(batchTimerRef.current);
+      batchTimerRef.current = setTimeout(flushBatch, 100);
     });
-  }, [mergedFeedPool, prependEvent]);
+  }, [mergedFeedMap, flushBatch]);
 
   const allPks = useMemo(() => {
     const seen = new Set();

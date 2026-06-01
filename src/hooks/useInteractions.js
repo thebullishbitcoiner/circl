@@ -3,6 +3,9 @@ import { isHexPubkey, normPubkey } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 
+// Persists across mounts — revisiting the same profile pair skips the relay fetch
+const _cache = new Map(); // `${myPubkey}:${otherPubkey}` → extras[]
+
 export default function useInteractions({ myPubkey, otherPubkey, feedEvents }) {
   const [extras, setExtras] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -13,12 +16,22 @@ export default function useInteractions({ myPubkey, otherPubkey, feedEvents }) {
     const them = normPubkey(otherPubkey);
     if (!isHexPubkey(me) || !isHexPubkey(them)) return;
 
-    setExtras([]);
     seen.current.clear();
-    setLoading(true);
     feedEvents.forEach(e => seen.current.add(e.id));
 
+    const cacheKey = `${me}:${them}`;
+    const cached = _cache.get(cacheKey);
+    if (cached) {
+      setExtras(cached);
+      setLoading(false);
+      return;
+    }
+
+    setExtras([]);
+    setLoading(true);
+
     const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const collected = [];
 
     const sub = pool.request(
       relayUrls,
@@ -31,9 +44,13 @@ export default function useInteractions({ myPubkey, otherPubkey, feedEvents }) {
         eventStore.add(raw);
         if (seen.current.has(raw.id)) return;
         seen.current.add(raw.id);
-        setExtras(prev => [...prev, raw].sort((a, b) => a.created_at - b.created_at));
+        collected.push(raw);
+        setExtras([...collected].sort((a, b) => a.created_at - b.created_at));
       },
-      complete: () => setLoading(false),
+      complete: () => {
+        _cache.set(cacheKey, [...collected].sort((a, b) => a.created_at - b.created_at));
+        setLoading(false);
+      },
       error: () => setLoading(false),
     });
 
