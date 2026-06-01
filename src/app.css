@@ -542,7 +542,7 @@
   .notif-action{color:var(--text-muted);font-weight:400;}
   .notif-preview{margin-top:8px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);overflow:hidden;}
   .notif-preview .note-content-stack{margin-bottom:0;}
-  .notif-note-text{font-size:var(--font-base);color:var(--text-muted);line-height:1.5;}
+  .notif-note-text{font-size:var(--font-base);color:var(--text-muted);line-height:1.5;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;}
   .notif-zap-preview{display:flex;align-items:center;gap:6px;font-size:var(--font-base);}
   .notif-zap-amt{font-weight:700;color:var(--text);font-family:'DM Sans',sans-serif;}
   .notif-unread-dot{position:absolute;top:-2px;right:-2px;width:7px;height:7px;border-radius:50%;background:var(--primary);border:1.5px solid var(--bg);pointer-events:none;}
@@ -941,7 +941,7 @@
 
   /* ── Poll card ── */
   .poll-badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--primary-soft);color:var(--primary);margin-bottom:8px;letter-spacing:.2px;}
-  .poll-question{font-size:15px;font-weight:500;line-height:1.45;color:var(--text);margin-bottom:12px;}
+  .poll-question{font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;line-height:1.45;color:var(--text);margin-bottom:12px;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;}
   .poll-options{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
   .poll-option-btn{width:100%;text-align:left;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:border-color .15s,background .15s;display:flex;align-items:center;gap:6px;}
   .poll-option-btn:hover:not(:disabled){border-color:var(--primary);background:var(--primary-soft);}
@@ -959,6 +959,9 @@
   .poll-expiry{display:inline;}
   .poll-votes-link{background:none;border:none;padding:0;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--primary);cursor:pointer;font-weight:500;}
   .poll-votes-link:hover{text-decoration:underline;}
+
+  /* ── Poll preview (read-only embed / repost) ── */
+  .poll-preview-wrap{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
 
   /* ── Poll compose ── */
   .poll-compose{padding:12px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:12px;}

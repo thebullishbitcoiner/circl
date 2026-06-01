@@ -23,7 +23,7 @@ export default function StreamCard({ event, profiles, liked, bookmarked, likeCou
 
   return (
     <>
-    <div className="calendar-card stream-card" style={{ animationDelay: `${delay}s` }} onClick={() => onOpen(event)}>
+    <div className="calendar-card stream-card" style={{ animationDelay: `${delay}s`, zIndex: cardMenuOpen ? 1 : undefined }} onClick={() => onOpen(event)}>
       <div className="note-inner">
         <div onClick={e => { e.stopPropagation(); onOpenProfile?.(hostPk); }} style={{ cursor: "pointer", flexShrink: 0 }}>
           <Avatar pk={hostPk} profiles={profiles} size={36} />

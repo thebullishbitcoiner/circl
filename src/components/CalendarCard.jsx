@@ -22,7 +22,7 @@ export default function CalendarCard({ event, profiles, liked, bookmarked, likeC
 
   return (
     <>
-    <div className="calendar-card" style={{ animationDelay: `${delay}s` }} onClick={() => onOpen(event)}>
+    <div className="calendar-card" style={{ animationDelay: `${delay}s`, zIndex: cardMenuOpen ? 1 : undefined }} onClick={() => onOpen(event)}>
       <div className="note-inner">
         <div onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }} style={{ cursor: "pointer", flexShrink: 0 }}>
           <Avatar pk={event.pubkey} profiles={profiles} size={36} />

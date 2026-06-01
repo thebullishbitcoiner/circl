@@ -1,7 +1,8 @@
-import { useState, useRef, memo, useCallback } from "react";
+import { useState, useEffect, useRef, memo, useCallback } from "react";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteActions from "./NoteActions.jsx";
+import PollInline from "./PollInline.jsx";
 import { displayName, nip05OrNpub, relativeTime } from "../utils.js";
 import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
@@ -21,6 +22,7 @@ function NoteCard({
   delay,
   replyingToPubkey = null,
   sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail,
+  onOpenPollVotes,
 }) {
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
@@ -28,12 +30,36 @@ function NoteCard({
   const contentRef = useRef(null);
   const isBookmarkedFn = useCallback(() => bookmarked, [bookmarked]);
 
+  const qId = event.tags?.find(t => t[0] === "q")?.[1] ?? null;
+  const [quotedPollEvent, setQuotedPollEvent] = useState(() => {
+    const ev = qId ? events.find(e => e.id === qId) : null;
+    return (ev?.kind === 1068 || ev?.kind === 6969) ? ev : null;
+  });
+  const pollFetchFired = useRef(false);
+
+  useEffect(() => {
+    if (!qId || quotedPollEvent) return;
+    // Re-check pool whenever events updates (e.g. after prependEvent adds the fetched event)
+    const fromPool = events.find(e => e.id === qId);
+    if (fromPool?.kind === 1068 || fromPool?.kind === 6969) {
+      setQuotedPollEvent(fromPool);
+      return;
+    }
+    // Fire the relay fetch only once — no cleanup cancellation so the result survives
+    // subsequent events-prop changes that would otherwise cancel it
+    if (pollFetchFired.current || !resolveEventById) return;
+    pollFetchFired.current = true;
+    resolveEventById(qId).then(ev => {
+      if (ev?.kind === 1068 || ev?.kind === 6969) setQuotedPollEvent(ev);
+    });
+  }, [qId, events, resolveEventById]);
+
 
   return (
     <>
       <div
         className="note-card"
-        style={{ animationDelay: `${delay}s` }}
+        style={{ animationDelay: `${delay}s`, zIndex: cardMenuOpen ? 1 : undefined }}
         onClick={() => onOpenThread?.(event)}
       >
         <div className="note-inner">
@@ -83,16 +109,30 @@ function NoteCard({
               />
             )}
             <NoteContent
-              content={event.content}
+              content={quotedPollEvent ? event.content.replace(/nostr:\S+/g, "").trim() : event.content}
               profiles={profiles}
               onOpenProfile={onOpenProfile}
               onOpenHashtag={onOpenHashtag}
               allEvents={events}
               onOpenThread={onOpenThread}
               resolveEventById={resolveEventById}
+              allowEmbeds={!quotedPollEvent}
               collapsible
             />
             </div>
+            {quotedPollEvent && (
+              <PollInline
+                event={quotedPollEvent}
+                myPubkey={myPubkey}
+                sendZap={sendZap}
+                defaultZapAmount={defaultZapAmount}
+                defaultZapMsg={defaultZapMsg}
+                onZapFail={onZapFail}
+                profiles={profiles}
+                publishEvent={publishEvent}
+                onOpenVotes={onOpenPollVotes}
+              />
+            )}
             <NoteActions
               event={event}
               profiles={profiles}

@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteActions from "./NoteActions.jsx";
+import PollInline from "./PollInline.jsx";
 import { displayName, nip05OrNpub, relativeTime } from "../utils.js";
 
 export default function RepostCard({
@@ -10,12 +12,16 @@ export default function RepostCard({
   onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal, delay,
-  sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
+  sendZap, defaultZapAmount, defaultZapMsg, onZapFail, onOpenPollVotes,
 }) {
   const originalId  = event.tags.find(t => t[0] === "e")?.[1];
   const fromContent = (() => { try { return JSON.parse(event.content); } catch { return null; } })();
   const fromPool    = originalId ? events.find(e => e.id === originalId) : null;
   const original    = fromPool || fromContent;
+
+  useEffect(() => {
+    if (!original && originalId) resolveEventById?.(originalId);
+  }, [originalId, original]);
 
   return (
     <div className="note-card" style={{ animationDelay: `${delay}s` }}
@@ -52,7 +58,23 @@ export default function RepostCard({
               allEvents={events}
               onOpenThread={onOpenThread}
               resolveEventById={resolveEventById}
+              allowEmbeds={!(original.kind === 1068 || original.kind === 6969)}
             />
+            {(original.kind === 1068 || original.kind === 6969) && (
+              <PollInline
+                event={original}
+                myPubkey={myPubkey}
+                sendZap={sendZap}
+                defaultZapAmount={defaultZapAmount}
+                defaultZapMsg={defaultZapMsg}
+                onZapFail={onZapFail}
+                profiles={profiles}
+                publishEvent={publishEvent}
+                onRequestModal={onRequestModal}
+                onDismissModal={onDismissModal}
+                onOpenVotes={onOpenPollVotes}
+              />
+            )}
             <NoteActions
               event={original} profiles={profiles}
               myPubkey={myPubkey} myProfile={myProfile} events={events}

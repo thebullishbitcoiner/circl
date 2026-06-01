@@ -36,6 +36,7 @@ import LongformCard from "./components/LongformCard.jsx";
 import NoteCard from "./components/NoteCard.jsx";
 import RepostCard from "./components/RepostCard.jsx";
 import PollCard from "./components/PollCard.jsx";
+import PollInline from "./components/PollInline.jsx";
 import NoteActions from "./components/NoteActions.jsx";
 import ArticleReader from "./components/ArticleReader.jsx";
 import HighlightCard from "./components/HighlightCard.jsx";
@@ -498,7 +499,9 @@ export default function App() {
                                         reason === "no_lud16"  ? "⚡ No lightning address" :
                                         reason === "no_wallet" ? "⚡ No wallet connected" :
                                         `⚡ Zap failed: ${reason}`
-                                      )}                                      delay={0}
+                                      )}
+                                      onOpenPollVotes={handleOpenPollVotes}
+                                      delay={0}
                                     />
                                   )
                                   : (ev.kind === 1068 || ev.kind === 6969)
@@ -646,7 +649,9 @@ export default function App() {
                                           reason === "no_lud16"  ? "⚡ No lightning address" :
                                           reason === "no_wallet" ? "⚡ No wallet connected" :
                                           `⚡ Zap failed: ${reason}`
-                                        )}                                      delay={0}
+                                        )}
+                                        onOpenPollVotes={handleOpenPollVotes}
+                                        delay={0}
                                       />
                                     )
                             )}
@@ -1020,30 +1025,52 @@ export default function App() {
                                     resolveEventById={resolveEventById}
                                   />
                                 )}
-                                {isQ && repostedEv && (
-                                  <div
-                                    style={{ border: "1px solid var(--border)", borderRadius: 10,
-                                      padding: "10px 12px", background: "var(--surface)", marginTop: 4, cursor: "pointer" }}
-                                    onClick={() => handleOpenNote(repostedEv)}
-                                    role="presentation"
-                                  >
-                                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
-                                      <Avatar pk={repostedEv.pubkey} profiles={profiles} size={20} />
-                                      <span style={{ fontSize: 12, fontWeight: 500 }}>{displayName(repostedEv.pubkey, profiles)}</span>
-                                      <span style={{ fontSize: 10, color: "var(--text-faint)", marginLeft: "auto" }}>{relativeTime(repostedEv.created_at)}</span>
+                                {isQ && repostedEv && (() => {
+                                  const isRepostedPoll = repostedEv.kind === 1068 || repostedEv.kind === 6969;
+                                  return (
+                                    <div
+                                      style={{ border: "1px solid var(--border)", borderRadius: 10,
+                                        padding: "10px 12px", background: "var(--surface)", marginTop: 4, cursor: "pointer" }}
+                                      onClick={() => handleOpenThread(repostedEv)}
+                                      role="presentation"
+                                    >
+                                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
+                                        <Avatar pk={repostedEv.pubkey} profiles={profiles} size={20} />
+                                        <span style={{ fontSize: 12, fontWeight: 500 }}>{displayName(repostedEv.pubkey, profiles)}</span>
+                                        <span style={{ fontSize: 10, color: "var(--text-faint)", marginLeft: "auto" }}>{relativeTime(repostedEv.created_at)}</span>
+                                        {isRepostedPoll && <span className="poll-badge" style={{ marginLeft: 4 }}>{repostedEv.kind === 6969 ? "⚡ Zap Poll" : "Poll"}</span>}
+                                      </div>
+                                      <NoteContent
+                                        content={repostedEv.content}
+                                        profiles={profiles}
+                                        onOpenProfile={handleOpenProfile}
+                                        allEvents={mergedFeedPool}
+                                        onOpenThread={handleOpenThread}
+                                        resolveEventById={resolveEventById}
+                                        allowEmbeds={!isRepostedPoll}
+                                        className="note-text"
+                                        style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }}
+                                      />
+                                      {isRepostedPoll && (
+                                        <PollInline
+                                          event={repostedEv}
+                                          myPubkey={pubkey}
+                                          sendZap={sendZap}
+                                          defaultZapAmount={zapSettings.amount}
+                                          defaultZapMsg={zapSettings.msg}
+                                          onZapFail={reason => showToast(
+                                            reason === "no_lud16"  ? "⚡ No lightning address" :
+                                            reason === "no_wallet" ? "⚡ No wallet connected" :
+                                            `⚡ Zap failed: ${reason}`
+                                          )}
+                                          profiles={profiles}
+                                          publishEvent={publishEvent}
+                                          onOpenVotes={handleOpenPollVotes}
+                                        />
+                                      )}
                                     </div>
-                                    <NoteContent
-                                      content={repostedEv.content}
-                                      profiles={profiles}
-                                      onOpenProfile={handleOpenProfile}
-                                  allEvents={mergedFeedPool}
-                                  onOpenThread={handleOpenThread}
-                                  resolveEventById={resolveEventById}
-                                      className="note-text"
-                                      style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }}
-                                    />
-                                  </div>
-                                )}
+                                  );
+                                })()}
                                 <NoteActions
                                   event={ev}
                                   profiles={profiles}

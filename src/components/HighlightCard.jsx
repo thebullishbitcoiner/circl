@@ -112,7 +112,7 @@ function HighlightCard({
     <>
       <div
         className="note-card highlight-card"
-        style={{ animationDelay: `${delay}s` }}
+        style={{ animationDelay: `${delay}s`, zIndex: cardMenuOpen ? 1 : undefined }}
         onClick={() => onOpenThread?.(event)}
       >
         <div className="note-inner">

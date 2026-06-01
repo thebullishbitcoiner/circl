@@ -1,6 +1,7 @@
 import { useState, memo } from "react";
 import { createPortal } from "react-dom";
 import Avatar from "./Avatar.jsx";
+import NoteContent from "./NoteContent.jsx";
 import NoteActions from "./NoteActions.jsx";
 import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
@@ -115,7 +116,7 @@ function PollCard({
 
   return (
     <>
-      <div className="note-card" style={{ animationDelay: `${delay}s` }} onClick={() => onOpenThread?.(event)}>
+      <div className="note-card" style={{ animationDelay: `${delay}s`, zIndex: cardMenuOpen ? 1 : undefined }} onClick={() => onOpenThread?.(event)}>
         <div className="note-inner">
           <div onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }} style={{ cursor: "pointer", flexShrink: 0 }}>
             <Avatar pk={event.pubkey} profiles={profiles} size={36} />
@@ -143,7 +144,17 @@ function PollCard({
 
             <span className="poll-badge">{isZapPoll ? "⚡ Zap Poll" : "Poll"}</span>
 
-            <p className="poll-question" onClick={e => e.stopPropagation()}>{event.content}</p>
+            <NoteContent
+              content={event.content}
+              profiles={profiles}
+              onOpenProfile={onOpenProfile}
+              onOpenHashtag={onOpenHashtag}
+              allEvents={events}
+              onOpenThread={onOpenThread}
+              resolveEventById={resolveEventById}
+              allowEmbeds={false}
+              className="poll-question"
+            />
 
             <div className="poll-options" onClick={e => e.stopPropagation()}>
               {options.map(opt => {

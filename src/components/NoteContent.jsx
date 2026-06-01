@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import NoteText from "./NoteText.jsx";
 import Avatar from "./Avatar.jsx";
 import MediaLightbox from "./MediaLightbox.jsx";
+import PollPreview from "./PollPreview.jsx";
 import { parseNoteMediaSegments, groupNoteMediaSegments, displayName, relativeTime, nip19, isHexPubkey, normPubkey } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
@@ -64,6 +65,8 @@ function decodeNevent(nevent) {
 
 function EmbeddedEvent({ event, profiles, onOpenProfile, onOpenThread }) {
   if (!event) return null;
+  const isPoll = event.kind === 1068 || event.kind === 6969;
+  const isZapPoll = event.kind === 6969;
   return (
     <div
       className="note-embed"
@@ -82,6 +85,7 @@ function EmbeddedEvent({ event, profiles, onOpenProfile, onOpenThread }) {
           {displayName(event.pubkey, profiles)}
         </span>
         <span className="note-embed-time">{relativeTime(event.created_at)}</span>
+        {isPoll && <span className="poll-badge" style={{ marginLeft: "auto" }}>{isZapPoll ? "⚡ Zap Poll" : "Poll"}</span>}
       </div>
       <NoteContent
         content={event.content || ""}
@@ -92,6 +96,7 @@ function EmbeddedEvent({ event, profiles, onOpenProfile, onOpenThread }) {
         allowEmbeds={false}
         className="note-embed-text"
       />
+      {isPoll && <PollPreview event={event} />}
     </div>
   );
 }

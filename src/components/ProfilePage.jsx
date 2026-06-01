@@ -18,6 +18,7 @@ import LongformCard from "./LongformCard.jsx";
 import CalendarCard from "./CalendarCard.jsx";
 import StreamCard from "./StreamCard.jsx";
 import HighlightCard from "./HighlightCard.jsx";
+import PollInline from "./PollInline.jsx";
 import useActiveStream from "../hooks/useActiveStream.js";
 
 // Persists across component mounts so returning to a profile doesn't refetch
@@ -655,6 +656,7 @@ export default function ProfilePage({
 
               return (
                 <div className="note-card" key={e.id}
+                  style={profileNotesMenuId === e.id ? { zIndex: 1 } : undefined}
                   onClick={() => onOpenThread?.(isRepost && repostedEvent ? repostedEvent : e)}>
                   {isRepost && (
                     <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--text-faint)", marginBottom: 8, paddingLeft: 2 }}>
@@ -694,7 +696,22 @@ export default function ProfilePage({
                         <span className="note-time">{relativeTime(displayEv.created_at)}</span>
                       </div>
                       {isQuote && e.content && <NoteContent content={e.content.replace(/\nnostr:\S+/g, "").trim()} profiles={profiles} onOpenProfile={onOpenProfile} onOpenHashtag={onOpenHashtag} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} style={{ marginBottom: 8 }} collapsible />}
-                      {isRepost && repostedEvent && <NoteContent content={repostedEvent.content} profiles={profiles} onOpenProfile={onOpenProfile} onOpenHashtag={onOpenHashtag} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} collapsible />}
+                      {isRepost && repostedEvent && <NoteContent content={repostedEvent.content} profiles={profiles} onOpenProfile={onOpenProfile} onOpenHashtag={onOpenHashtag} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} allowEmbeds={!(repostedEvent.kind === 1068 || repostedEvent.kind === 6969)} collapsible />}
+                      {isRepost && repostedEvent && (repostedEvent.kind === 1068 || repostedEvent.kind === 6969) && (
+                        <PollInline
+                          event={repostedEvent}
+                          myPubkey={myPubkey}
+                          sendZap={sendZap}
+                          defaultZapAmount={defaultZapAmount}
+                          defaultZapMsg={defaultZapMsg}
+                          onZapFail={onZapFail}
+                          profiles={profiles}
+                          publishEvent={publishEvent}
+                          onRequestModal={onRequestModal}
+                          onDismissModal={onDismissModal}
+                          onOpenVotes={onOpenPollVotes}
+                        />
+                      )}
                       {isRepost && !repostedEvent && <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: "var(--text-faint)" }}>Original note not in feed</p>}
                       {!isRepost && !isQuote && <NoteContent content={e.content} profiles={profiles} onOpenProfile={onOpenProfile} onOpenHashtag={onOpenHashtag} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} collapsible />}
                       {isQuote && (
