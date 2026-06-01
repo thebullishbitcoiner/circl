@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { isHexPubkey, normPubkey, parseBolt11Msats, isQuoteRepost, fmtSats, parseArticle } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
+import useMailboxes from "./useMailboxes.js";
 
 const NOTIF_KINDS = [1, 6, 7, 9735, 30023];
 const SINCE_SEC = 60 * 60 * 24 * 30;
@@ -47,8 +48,10 @@ export default function useNotifications({ pubkey }) {
   const [loading, setLoading] = useState(false);
   const seen = useRef(new Set());
 
+  const pk = normPubkey(pubkey);
+  const { inboxes } = useMailboxes(isHexPubkey(pk) ? pk : null);
+
   useEffect(() => {
-    const pk = normPubkey(pubkey);
     if (!isHexPubkey(pk)) {
       setItems([]);
       setLoading(false);
@@ -59,7 +62,9 @@ export default function useNotifications({ pubkey }) {
     seen.current = new Set();
     setLoading(true);
 
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    // Use own read (inbox) relays if known, fall back to connected pool relays
+    const relayUrls = inboxes.length > 0 ? inboxes
+      : pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
     const since = Math.floor(Date.now() / 1000) - SINCE_SEC;
 
     const sub = pool.subscription(relayUrls, [{ kinds: NOTIF_KINDS, "#p": [pk], limit: 500, since }]).subscribe({
@@ -79,7 +84,7 @@ export default function useNotifications({ pubkey }) {
       clearTimeout(eoseTimer);
       sub.unsubscribe();
     };
-  }, [pubkey]);
+  }, [pk, inboxes.join(",")]);
 
   return { items, loading };
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { isHexPubkey, normPubkey } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
+import { RELAYS } from "../constants.js";
 
 function parseAddressTag(val) {
   if (typeof val !== "string") return null;

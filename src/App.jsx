@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { RELAYS } from "./constants.js";
 import {
   displayName,
   relativeTime,
@@ -46,6 +45,8 @@ import StreamCard from "./components/StreamCard.jsx";
 import StreamDetailView from "./components/StreamDetailView.jsx";
 import ComposeSheet from "./components/ComposeSheet.jsx";
 import ProfilePage from "./components/ProfilePage.jsx";
+import RelaysCard from "./components/RelaysCard.jsx";
+import ParticipantsCard from "./components/ParticipantsCard.jsx";
 import CirclePage from "./components/CirclePage.jsx";
 import ThreadView from "./components/ThreadView.jsx";
 import NotificationsFeed from "./components/NotificationsFeed.jsx";
@@ -196,6 +197,15 @@ export default function App() {
   const pushNav = entry => setNavStack(s => [...s, entry]);
   const popNav = () => setNavStack(s => s.slice(0, -1));
   const clearNav = () => setNavStack([]);
+
+  const topEntry = navStack[navStack.length - 1] ?? null;
+  // Walk the stack so profile relays persist when drilling into a note from a profile page
+  const viewedProfilePubkey = (() => {
+    for (let i = navStack.length - 1; i >= 0; i--) {
+      if (navStack[i].type === "profile") return navStack[i].payload;
+    }
+    return null;
+  })();
 
   const prevEntry = navStack[navStack.length - 2] ?? null;
   const backLabel = (() => {
@@ -1139,15 +1149,20 @@ export default function App() {
                   onSaveZapSettings={saveZapSettings}
                   textSize={textSize}
                   onTextSizeChange={setTextSize}
+                  signAndPublish={signAndPublish}
                 />
               </SwipePanel>
             </div>
 
             <div className="right-panel">
-              <div className="panel-card">
-                <div className="panel-title">Relays</div>
-                {RELAYS.map((r, i) => <div className="relay-item" key={i}><div className="relay-dot" />{r}</div>)}
-              </div>
+              <RelaysCard profilePubkey={viewedProfilePubkey} />
+              {topEntry?.type === "thread" && (
+                <ParticipantsCard
+                  event={topEntry.payload}
+                  profiles={profiles}
+                  onOpenProfile={handleOpenProfile}
+                />
+              )}
             </div>
           </div>
 

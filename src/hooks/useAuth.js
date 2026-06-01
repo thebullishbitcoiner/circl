@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { RELAYS, NOSTR_CLIENT_TAG } from "../constants.js";
 import { isHexPubkey, normPubkey } from "../utils.js";
 import { pool } from "../nostr.js";
+import useMailboxes from "./useMailboxes.js";
 
 function withTimeout(promise, ms, message) {
   let timer;
@@ -50,13 +51,20 @@ export default function useAuth() {
   }, []);
 
   const logout = useCallback(() => {
-    for (const url of RELAYS) {
+    for (const url of [...pool.relays.keys()]) {
       try { pool.remove(url); } catch {}
     }
     setPubkey(null);
     setStatus("idle");
     sessionStorage.removeItem("circl_pk");
   }, []);
+
+  // Connect to own outbox relays once kind 10002 is fetched
+  const { outboxes } = useMailboxes(pubkey);
+  useEffect(() => {
+    if (!pubkey || !outboxes.length) return;
+    for (const url of outboxes) pool.relay(url);
+  }, [pubkey, outboxes]);
 
   const signAndPublish = useCallback(async tmpl => {
     if (!pubkey || !window.nostr) throw new Error("Not connected");
@@ -73,12 +81,16 @@ export default function useAuth() {
       10000,
       "Extension did not sign in time."
     );
+    // Publish to own outboxes if known, union with bootstrap relays as fallback
+    const publishRelays = outboxes.length > 0
+      ? [...new Set([...RELAYS, ...outboxes])]
+      : RELAYS;
     await Promise.race([
-      pool.publish(RELAYS, signed),
+      pool.publish(publishRelays, signed),
       new Promise(resolve => setTimeout(resolve, 8000)),
     ]).catch(() => null);
     return signed;
-  }, [pubkey]);
+  }, [pubkey, outboxes]);
 
   return { pubkey, status, error, login, logout, signAndPublish };
 }

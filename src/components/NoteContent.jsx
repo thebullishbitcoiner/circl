@@ -2,7 +2,33 @@ import { useState, useMemo, useEffect } from "react";
 import NoteText from "./NoteText.jsx";
 import Avatar from "./Avatar.jsx";
 import MediaLightbox from "./MediaLightbox.jsx";
-import { parseNoteMediaSegments, groupNoteMediaSegments, displayName, relativeTime, nip19 } from "../utils.js";
+import { parseNoteMediaSegments, groupNoteMediaSegments, displayName, relativeTime, nip19, isHexPubkey, normPubkey } from "../utils.js";
+import { pool, eventStore } from "../nostr.js";
+import { RELAYS } from "../constants.js";
+
+// Deduplicate mention-profile fetches across all NoteContent instances
+const _mentionFetched = new Set();
+
+function fetchMentionedProfiles(content) {
+  if (!content || typeof content !== "string") return;
+  const refs = [...content.matchAll(/nostr:(?:npub1|nprofile1)[023456789acdefghjklmnpqrstuvwxyz]+/ig)];
+  if (!refs.length) return;
+  const pubkeys = refs.flatMap(m => {
+    try {
+      const d = nip19.decode(m[0].slice(6));
+      if (d?.type === "npub") return [normPubkey(d.data)].filter(isHexPubkey);
+      if (d?.type === "nprofile") return [normPubkey(d.data?.pubkey)].filter(isHexPubkey);
+    } catch {}
+    return [];
+  });
+  const toFetch = pubkeys.filter(pk => !_mentionFetched.has(pk));
+  if (!toFetch.length) return;
+  for (const pk of toFetch) _mentionFetched.add(pk);
+  const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+  pool.request(relayUrls, [{ kinds: [0], authors: toFetch }]).subscribe({
+    next: ev => eventStore.add(ev),
+  });
+}
 
 function splitNostrEventRefs(text) {
   const out = [];
@@ -232,6 +258,9 @@ export default function NoteContent({
   const [lightbox, setLightbox] = useState(null);
   const [resolvedRefs, setResolvedRefs] = useState({});
   const [expanded, setExpanded] = useState(false);
+
+  // Fetch profiles for any nprofile/npub mentions so display names resolve
+  useEffect(() => { fetchMentionedProfiles(content); }, [content]);
 
   const textLength = normalizedSegments
     .filter(s => s.type === "text")

@@ -1,4 +1,6 @@
 import { useState } from "react";
+import useMailboxes from "../hooks/useMailboxes.js";
+import { MailboxesFactory } from "applesauce-core";
 
 function RizfulConnect({ pubkey, onConnected }) {
   const [step,     setStep]   = useState("idle");
@@ -142,10 +144,142 @@ function NWCConnect({ onConnected }) {
   );
 }
 
+function normalizeRelayUrl(input) {
+  const s = (input || "").trim();
+  if (!s) return null;
+  const withScheme = s.startsWith("wss://") || s.startsWith("ws://") ? s : `wss://${s}`;
+  try { new URL(withScheme); return withScheme; } catch { return null; }
+}
+
+function RelayEditor({ pubkey, signAndPublish }) {
+  const { inboxes, outboxes } = useMailboxes(pubkey);
+  const [localInboxes, setLocalInboxes] = useState(null);
+  const [localOutboxes, setLocalOutboxes] = useState(null);
+  const [inboxInput, setInboxInput] = useState("");
+  const [outboxInput, setOutboxInput] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Sync local state from store once mailboxes load (don't overwrite mid-edit)
+  const effectiveInboxes = localInboxes ?? inboxes;
+  const effectiveOutboxes = localOutboxes ?? outboxes;
+
+  async function publish(nextInboxes, nextOutboxes) {
+    if (!signAndPublish) return;
+    setSaving(true);
+    try {
+      const template = await MailboxesFactory.create({ inboxes: nextInboxes, outboxes: nextOutboxes });
+      await signAndPublish(template);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function addInbox() {
+    const url = normalizeRelayUrl(inboxInput);
+    if (!url || effectiveInboxes.includes(url)) return;
+    const next = [...effectiveInboxes, url];
+    setLocalInboxes(next);
+    setInboxInput("");
+    publish(next, effectiveOutboxes);
+  }
+
+  function removeInbox(url) {
+    const next = effectiveInboxes.filter(r => r !== url);
+    setLocalInboxes(next);
+    publish(next, effectiveOutboxes);
+  }
+
+  function addOutbox() {
+    const url = normalizeRelayUrl(outboxInput);
+    if (!url || effectiveOutboxes.includes(url)) return;
+    const next = [...effectiveOutboxes, url];
+    setLocalOutboxes(next);
+    setOutboxInput("");
+    publish(effectiveInboxes, next);
+  }
+
+  function removeOutbox(url) {
+    const next = effectiveOutboxes.filter(r => r !== url);
+    setLocalOutboxes(next);
+    publish(effectiveInboxes, next);
+  }
+
+  const fmtUrl = url => url.replace(/^wss?:\/\//, "").replace(/\/$/, "");
+
+  const inputStyle = {
+    flex: 1, padding: "6px 8px", borderRadius: 8,
+    border: "1.5px solid var(--border)", background: "var(--bg)",
+    color: "var(--text)", fontFamily: "monospace", fontSize: 11, outline: "none",
+    minWidth: 0,
+  };
+  const addBtnStyle = {
+    padding: "6px 12px", borderRadius: 8, border: "none",
+    background: "var(--primary)", color: "white",
+    fontFamily: "'DM Sans',sans-serif", fontSize: 12, fontWeight: 600,
+    cursor: saving ? "default" : "pointer", opacity: saving ? 0.6 : 1,
+    flexShrink: 0,
+  };
+  const removeBtnStyle = {
+    padding: "2px 7px", borderRadius: 6, border: "1px solid var(--border)",
+    background: "transparent", color: "var(--text-faint)",
+    fontFamily: "'DM Sans',sans-serif", fontSize: 11, cursor: "pointer", flexShrink: 0,
+  };
+
+  function Section({ title, relays, input, onInputChange, onAdd, onRemove, onKeyDown }) {
+    return (
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.04em" }}>{title}</div>
+        {relays.map(r => (
+          <div key={r} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 5 }}>
+            <span style={{ fontFamily: "monospace", fontSize: 11, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fmtUrl(r)}</span>
+            <button style={removeBtnStyle} onClick={() => onRemove(r)} disabled={saving}>×</button>
+          </div>
+        ))}
+        <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+          <input
+            style={inputStyle}
+            value={input}
+            onChange={e => onInputChange(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="relay.example.com"
+            disabled={saving}
+          />
+          <button style={addBtnStyle} onClick={onAdd} disabled={saving}>Add</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ margin: "0 16px 4px", padding: "14px 16px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
+      <Section
+        title="Read"
+        relays={effectiveInboxes}
+        input={inboxInput}
+        onInputChange={setInboxInput}
+        onAdd={addInbox}
+        onKeyDown={e => e.key === "Enter" && addInbox()}
+        onRemove={removeInbox}
+      />
+      <Section
+        title="Write"
+        relays={effectiveOutboxes}
+        input={outboxInput}
+        onInputChange={setOutboxInput}
+        onAdd={addOutbox}
+        onKeyDown={e => e.key === "Enter" && addOutbox()}
+        onRemove={removeOutbox}
+      />
+      {saving && <div style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textAlign: "center" }}>Publishing relay list...</div>}
+    </div>
+  );
+}
+
 export default function SettingsPage({
   onBack, dark, toggleDark, onLogout, pubkey, wallet, onWalletConnected, onWalletDisconnect,
   zapSettings = { amount: 21, msg: "" }, onSaveZapSettings,
   textSize = "medium", onTextSizeChange,
+  signAndPublish,
 }) {
   const [walletTab,  setWalletTab]  = useState("rizful");
   const [zapAmount,  setZapAmount]  = useState(String(zapSettings.amount));
@@ -295,6 +429,9 @@ export default function SettingsPage({
           ))}
         </div>
       </div>
+
+      <div className="settings-section-title" style={{ marginTop: 16 }}>Relays</div>
+      <RelayEditor pubkey={pubkey} signAndPublish={signAndPublish} />
 
       <div className="settings-section-title">Account</div>
       <div className="settings-row" onClick={onLogout}>
