@@ -489,12 +489,12 @@
   .circle-card:hover .circle-card-av{outline-color:var(--primary);}
   .circle-card-av img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
   .circle-card-info{flex:1;min-width:0;overflow:hidden;}
-  .circle-card-name{font-size:12.5px;font-weight:500;color:var(--text);margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .circle-card-nip05{font-size:9.5px;color:var(--sage);display:flex;align-items:center;gap:2px;margin-bottom:3px;overflow:hidden;}
+  .circle-card-name{font-size:var(--font-base);font-weight:500;color:var(--text);margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .circle-card-nip05{font-size:calc(var(--font-base) - 3.5px);color:var(--sage);display:flex;align-items:center;gap:2px;margin-bottom:3px;overflow:hidden;}
   .circle-card-nip05 span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .circle-card-about{font-family:'DM Sans',sans-serif;font-size:11px;color:var(--text-muted);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-  .circle-card-npub{font-family:monospace;font-size:8.5px;color:var(--text-faint);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .circle-unfollow-btn{flex-shrink:0;padding:4px 9px;border-radius:50px;border:1px solid var(--border);background:none;color:var(--text-faint);font-family:'DM Sans',sans-serif;font-size:10px;cursor:pointer;transition:all .15s;align-self:center;}
+  .circle-card-about{font-family:'DM Sans',sans-serif;font-size:calc(var(--font-base) - 2px);color:var(--text-muted);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .circle-card-npub{font-family:monospace;font-size:calc(var(--font-base) - 4.5px);color:var(--text-faint);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .circle-unfollow-btn{flex-shrink:0;padding:4px 9px;border-radius:50px;border:1px solid var(--border);background:none;color:var(--text-faint);font-family:'DM Sans',sans-serif;font-size:calc(var(--font-base) - 3px);cursor:pointer;transition:all .15s;align-self:center;}
   .circle-unfollow-btn:hover{border-color:#ef4444;color:#ef4444;}
 
   .empty-state{padding:48px 20px;text-align:center;}

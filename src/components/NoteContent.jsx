@@ -233,7 +233,10 @@ export default function NoteContent({
   const [resolvedRefs, setResolvedRefs] = useState({});
   const [expanded, setExpanded] = useState(false);
 
-  const shouldCollapse = collapsible && (content?.length ?? 0) > COLLAPSE_THRESHOLD;
+  const textLength = normalizedSegments
+    .filter(s => s.type === "text")
+    .reduce((n, s) => n + (s.value?.length ?? 0), 0);
+  const shouldCollapse = collapsible && textLength > COLLAPSE_THRESHOLD;
   const isCollapsed = shouldCollapse && !expanded;
 
   useEffect(() => {
@@ -293,43 +296,41 @@ export default function NoteContent({
   return (
     <>
     <div className={`note-content-stack${isCollapsed ? " note-content-collapsed" : ""}`}>
-      {hoistMedia ? (
-        <>
-          {normalizedSegments.map((seg, i) => seg.type === "text" ? renderTextSegment(seg, i) : null)}
-          <MediaMosaic
-            items={allMediaItems}
-            onItemClick={idx => setLightbox({ items: allMediaItems, index: idx })}
-          />
-        </>
-      ) : (
-        normalizedSegments.map((seg, i) => {
-          if (seg.type === "text") return renderTextSegment(seg, i);
-          if (seg.type === "images" && seg.urls?.length) {
-            return (
-              <ImageMosaic
-                key={i}
-                urls={seg.urls}
-                onImageClick={idx => setLightbox({ items: seg.urls.map(url => ({ type: "image", url })), index: idx })}
-              />
-            );
-          }
-          if (seg.type === "video") {
-            return (
-              <div
-                key={i}
-                className="note-media note-media-video"
-                onClick={e => e.stopPropagation()}
-              >
-                <video src={seg.url} controls playsInline preload="metadata" />
-              </div>
-            );
-          }
-          return null;
-        })
-      )}
-
+      {normalizedSegments.map((seg, i) => seg.type === "text" ? renderTextSegment(seg, i) : null)}
       {isCollapsed && <div className="note-content-fade" />}
     </div>
+
+    {hoistMedia ? (
+      <MediaMosaic
+        items={allMediaItems}
+        onItemClick={idx => setLightbox({ items: allMediaItems, index: idx })}
+      />
+    ) : (
+      normalizedSegments.map((seg, i) => {
+        if (seg.type === "images" && seg.urls?.length) {
+          return (
+            <ImageMosaic
+              key={i}
+              urls={seg.urls}
+              onImageClick={idx => setLightbox({ items: seg.urls.map(url => ({ type: "image", url })), index: idx })}
+            />
+          );
+        }
+        if (seg.type === "video") {
+          return (
+            <div
+              key={i}
+              className="note-media note-media-video"
+              onClick={e => e.stopPropagation()}
+            >
+              <video src={seg.url} controls playsInline preload="metadata" />
+            </div>
+          );
+        }
+        return null;
+      })
+    )}
+
     {shouldCollapse && (
       <button
         type="button"

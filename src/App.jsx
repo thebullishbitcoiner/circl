@@ -60,7 +60,7 @@ import NoteContent from "./components/NoteContent.jsx";
 import { SbHome, SbBell, SbBook, SbZap, SbSearch, SbWallet, NavHome, NavBell, NavBook, NavZap, NavSearch, NavWallet, Bk } from "./components/icons.jsx";
 export default function App() {
   const { pubkey, status, error, login, logout, signAndPublish } = useAuth();
-  const { follows, loading: fl, follow: followPk, unfollow: unfollowPk } = useFollows({ pubkey, signAndPublish });
+  const { follows, loading: fl, follow: followPk, unfollow: unfollowPk, refresh: refreshFollows } = useFollows({ pubkey, signAndPublish });
 
   const [likes, setLikes] = useState({});
   const [zapsByEvent, setZapsByEvent] = useState({});
@@ -207,7 +207,7 @@ export default function App() {
     return "Note";
   })();
 
-  const handleOpenProfile     = pk => pushNav({ type: "profile", payload: pk });
+  const handleOpenProfile     = pk => { if (pk === pubkey) refreshFollows(); pushNav({ type: "profile", payload: pk }); };
   const handleOpenTransaction = tx => pushNav({ type: "transaction", payload: tx });
   const handleOpenCircle = ({ pubkey: cpk, follows: cFollows }) =>
     pushNav({ type: "circle", payload: { pubkey: cpk, follows: cFollows } });
@@ -312,7 +312,7 @@ export default function App() {
     setVisibleCount(20);
     setSettingsOpen(false);
     clearNav();
-    if (nav === "profile") pushNav({ type: "profile", payload: pubkey });
+    if (nav === "profile") { refreshFollows(); pushNav({ type: "profile", payload: pubkey }); }
     if (nav === "notifications") {
       const now = Math.floor(Date.now() / 1000);
       setLastNotifSeenAt(now);

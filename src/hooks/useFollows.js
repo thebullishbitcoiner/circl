@@ -7,6 +7,9 @@ export default function useFollows({ pubkey, signAndPublish }) {
   const [follows, setFollows] = useState([]);
   const [rawEvent, setRawEvent] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const refresh = useCallback(() => setRefreshKey(k => k + 1), []);
 
   useEffect(() => {
     if (!isHexPubkey(pubkey)) return;
@@ -34,7 +37,7 @@ export default function useFollows({ pubkey, signAndPublish }) {
     });
 
     return () => sub.unsubscribe();
-  }, [pubkey]);
+  }, [pubkey, refreshKey]);
 
   const unfollow = useCallback(async targetPk => {
     if (!signAndPublish || !rawEvent) return;
@@ -60,5 +63,5 @@ export default function useFollows({ pubkey, signAndPublish }) {
     }
   }, [rawEvent, signAndPublish]);
 
-  return { follows, loading, follow, unfollow };
+  return { follows, loading, follow, unfollow, refresh };
 }
