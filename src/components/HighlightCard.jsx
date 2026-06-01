@@ -144,6 +144,10 @@ function HighlightCard({
               <span className="note-time">{relativeTime(event.created_at)}</span>
             </div>
 
+            {comment && (
+              <div className="highlight-comment">{comment}</div>
+            )}
+
             <blockquote className="highlight-blockquote" onClick={e => e.stopPropagation()}>
               {text}
             </blockquote>
@@ -158,10 +162,6 @@ function HighlightCard({
                 onOpenArticle={onOpenArticle}
               />
             </div>
-
-            {comment && (
-              <div className="highlight-comment">{comment}</div>
-            )}
 
             <NoteActions
               event={event}
