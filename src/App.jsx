@@ -316,6 +316,9 @@ export default function App() {
   const hasUnread = (notificationEvents[0]?.created_at ?? 0) > lastNotifSeenAt;
 
   const navigate = nav => {
+    if (nav === activeNav && !settingsOpen && navStack.length === 0) {
+      feedScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    }
     setActiveNav(nav);
     setOpenArticle(null);
     setOpenCalendarEvent(null);

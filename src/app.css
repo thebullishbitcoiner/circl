@@ -228,7 +228,7 @@
   .note-card-menu-item:hover{background:var(--surface);}
   .note-meta{display:flex;align-items:baseline;gap:5px;margin-bottom:9px;flex-wrap:wrap;padding-right:32px;}
   .note-name{font-size:13px;font-weight:500;}
-  .note-npub{font-size:10.5px;color:var(--primary);opacity:.75;}
+  .note-npub{font-size:10.5px;color:var(--primary);opacity:.75;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;max-width:100%;}
   .meta-dot{font-size:10px;color:var(--text-faint);opacity:.8;}
   .note-time{font-size:10.5px;color:var(--text-faint);}
   .note-text{font-family:'DM Sans',sans-serif;font-size:var(--font-base);line-height:1.5;color:var(--text);margin-bottom:8px;word-break:break-word;overflow-wrap:anywhere;white-space:pre-wrap;}
