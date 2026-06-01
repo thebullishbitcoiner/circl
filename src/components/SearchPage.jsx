@@ -6,7 +6,7 @@ import NoteContent from "./NoteContent.jsx";
 
 // Relays that advertise NIP-50 search support
 const SEARCH_RELAYS = [
-  "wss://relay.nostr.band",
+  "wss://relay.primal.net",
   "wss://search.nos.today",
   "wss://nostr.wine",
 ];
