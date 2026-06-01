@@ -94,7 +94,7 @@ export default function SearchPage({ profiles, onOpenProfile, onOpenThread }) {
         const pk = normPubkey(ev.pubkey);
         if (isHexPubkey(pk)) eventStore.add(ev);
 
-        setResults(prev => [...prev, ev]);
+        setResults(prev => [...prev, ev].sort((a, b) => b.created_at - a.created_at));
         setLoading(false);
       },
       complete: () => setLoading(false),
