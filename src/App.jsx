@@ -186,6 +186,7 @@ export default function App() {
   const { textSize, setTextSize } = useTextSize();
 
   const [activeNav, setActiveNav] = useState("home");
+  const [profileScrollTrigger, setProfileScrollTrigger] = useState(0);
   const [lastNotifSeenAt, setLastNotifSeenAt] = useState(() => {
     try { return parseInt(localStorage.getItem("circl_notif_seen_v1") || "0", 10); } catch { return 0; }
   });
@@ -856,6 +857,7 @@ export default function App() {
                         onOpenArticle={setOpenArticle}
                         onOpenCalendarEvent={setOpenCalendarEvent}
                         onOpenStream={setOpenStreamEvent}
+                        scrollToTopTrigger={top.payload === pubkey ? profileScrollTrigger : 0}
                       />
                     );
                   }
@@ -1183,7 +1185,10 @@ export default function App() {
           <button
             type="button"
             className={`bottom-profile-btn${!settingsOpen && activeNav === "profile" ? " active" : ""}`}
-            onClick={() => navigate("profile")}
+            onClick={() => {
+              if (activeNav === "profile" && !settingsOpen && navStack.length <= 1) setProfileScrollTrigger(t => t + 1);
+              navigate("profile");
+            }}
           >
             <div className={`bottom-profile-av${!settingsOpen && activeNav === "profile" ? " active" : ""}`}>
               {myProfile?.picture

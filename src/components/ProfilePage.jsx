@@ -137,6 +137,7 @@ export default function ProfilePage({
   onRequestModal, onDismissModal, backLabel = "Your Circle", resolveEventById,
   onOpenCircle, onFollow, onUnfollow, onOpenPollVotes, onOpenArticle, onOpenCalendarEvent, onOpenStream,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
+  scrollToTopTrigger,
 }) {
   const [tab, setTab] = useState("notes");             // drives indicator immediately
   const [renderedTab, setRenderedTab] = useState("notes"); // drives content (deferred)
@@ -161,6 +162,11 @@ export default function ProfilePage({
   const [mediaItems, setMediaItems] = useState([]);
   const [mediaLoading, setMediaLoading] = useState(false);
   const [mediaExhausted, setMediaExhausted] = useState(false);
+  const scrollRef = useRef(null);
+  useEffect(() => {
+    if (scrollToTopTrigger > 0) scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, [scrollToTopTrigger]);
+
   const mediaUntilRef = useRef(null);
   const mediaFetchingRef = useRef(false);
   const mediaExhaustedRef = useRef(false);
@@ -463,7 +469,7 @@ export default function ProfilePage({
   );
 
   return (
-    <div className="slide-panel-scroll" onScroll={handleProfileScroll}>
+    <div ref={scrollRef} className="slide-panel-scroll" onScroll={handleProfileScroll}>
       <div className="profile-banner" style={{ position: "relative" }}>
         {p.banner ? (
           <>

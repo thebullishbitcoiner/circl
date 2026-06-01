@@ -3,6 +3,7 @@ import Overlay from "./Overlay.jsx";
 import Avatar from "./Avatar.jsx";
 import { displayName, avatarInitial, replyTagsForPublish, nip19 } from "../utils.js";
 import { GIPHY_KEY } from "../constants.js";
+import { broadcastEvent } from "../nostr.js";
 import EmojiPicker from "./EmojiPicker.jsx";
 import PollCompose from "./PollCompose.jsx";
 
@@ -99,6 +100,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
         const noteUri = `nostr:${nip19.noteEncode(quotedEvent.id)}`;
         finalContent = finalContent ? `${finalContent}\n${noteUri}` : noteUri;
       }
+      if (replyTo && replyTo.pubkey !== myPubkey) broadcastEvent(replyTo);
       const published = await publishEvent({ kind: 1, content: finalContent, tags });
       if (published) onPrepend?.(published);
     } else {

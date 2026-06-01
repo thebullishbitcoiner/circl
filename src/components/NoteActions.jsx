@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Zi, Hi, Ri, Rpi, Bi } from "./icons.jsx";
 import { haptic, fmtSatsVal, replyCount, repostAndQuoteCount } from "../utils.js";
+import { broadcastEvent } from "../nostr.js";
 import ZapBadges from "./ZapBadges.jsx";
 import ZapModal from "./ZapModal.jsx";
 import ZapAnimation from "./ZapAnimation.jsx";
@@ -56,6 +57,7 @@ export default function NoteActions({
     const coords = zapAnimCoords.current;
     if (coords) openModal(<ZapAnimation cx={coords.cx} cy={coords.cy} onDone={dismiss} />);
     setTimeout(() => { addZap({ amount, msg }); doSendZap({ amount, msg }); }, 680);
+    if (event.pubkey !== myPubkey) broadcastEvent(event);
   };
 
   const handleZapInstant = useCallback(() => {
@@ -65,7 +67,8 @@ export default function NoteActions({
       : null;
     if (coords) openModal(<ZapAnimation cx={coords.cx} cy={coords.cy} onDone={dismiss} />);
     setTimeout(() => { addZap({ amount: defaultZapAmount, msg: defaultZapMsg }); doSendZap({ amount: defaultZapAmount, msg: defaultZapMsg }); }, 680);
-  }, [localZaps, defaultZapAmount, defaultZapMsg, doSendZap]);
+    if (event.pubkey !== myPubkey) broadcastEvent(event);
+  }, [localZaps, defaultZapAmount, defaultZapMsg, doSendZap, event, myPubkey]);
 
   const publishReaction = useCallback(emoji => {
     publishEvent?.({ kind: 7, content: emoji, tags: [["e", event.id], ["p", event.pubkey]] });
@@ -77,14 +80,16 @@ export default function NoteActions({
     setReaction(emoji);
     if (setLocalReaction) setLocalReaction(event.id, myPubkey, emoji);
     publishReaction(emoji);
-  }, [reaction, publishReaction]);
+    if (event.pubkey !== myPubkey) broadcastEvent(event);
+  }, [reaction, publishReaction, event, myPubkey]);
 
   const handleReactPick = useCallback(emoji => {
     haptic.tap();
     setReaction(emoji);
     if (setLocalReaction) setLocalReaction(event.id, myPubkey, emoji);
     publishReaction(emoji);
-  }, [publishReaction]);
+    if (event.pubkey !== myPubkey) broadcastEvent(event);
+  }, [publishReaction, event, myPubkey]);
 
   return (
     <>

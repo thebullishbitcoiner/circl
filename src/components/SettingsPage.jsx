@@ -159,7 +159,6 @@ function RelayEditor({ pubkey, signAndPublish }) {
   const [outboxInput, setOutboxInput] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // Sync local state from store once mailboxes load (don't overwrite mid-edit)
   const effectiveInboxes = localInboxes ?? inboxes;
   const effectiveOutboxes = localOutboxes ?? outboxes;
 
@@ -206,45 +205,86 @@ function RelayEditor({ pubkey, signAndPublish }) {
 
   const fmtUrl = url => url.replace(/^wss?:\/\//, "").replace(/\/$/, "");
 
-  const inputStyle = {
-    flex: 1, padding: "6px 8px", borderRadius: 8,
-    border: "1.5px solid var(--border)", background: "var(--bg)",
-    color: "var(--text)", fontFamily: "monospace", fontSize: 11, outline: "none",
-    minWidth: 0,
-  };
-  const addBtnStyle = {
-    padding: "6px 12px", borderRadius: 8, border: "none",
-    background: "var(--primary)", color: "white",
-    fontFamily: "'DM Sans',sans-serif", fontSize: 12, fontWeight: 600,
-    cursor: saving ? "default" : "pointer", opacity: saving ? 0.6 : 1,
-    flexShrink: 0,
-  };
-  const removeBtnStyle = {
-    padding: "2px 7px", borderRadius: 6, border: "1px solid var(--border)",
-    background: "transparent", color: "var(--text-faint)",
-    fontFamily: "'DM Sans',sans-serif", fontSize: 11, cursor: "pointer", flexShrink: 0,
-  };
-
-  function Section({ title, relays, input, onInputChange, onAdd, onRemove, onKeyDown }) {
+  function RelaySection({ title, relays, input, onInputChange, onAdd, onRemove, onKeyDown }) {
     return (
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.04em" }}>{title}</div>
-        {relays.map(r => (
-          <div key={r} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 5 }}>
-            <span style={{ fontFamily: "monospace", fontSize: 11, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fmtUrl(r)}</span>
-            <button style={removeBtnStyle} onClick={() => onRemove(r)} disabled={saving}>×</button>
+      <div style={{ marginBottom: 18 }}>
+        {/* Section header */}
+        <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
+          <span style={{
+            fontSize: "calc(var(--font-base) - 3px)", fontWeight: 700,
+            color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif",
+            textTransform: "uppercase", letterSpacing: "0.07em",
+          }}>{title}</span>
+          <span style={{
+            fontSize: "calc(var(--font-base) - 4px)", color: "var(--text-faint)",
+            fontFamily: "'DM Sans',sans-serif", background: "var(--bg)",
+            border: "1px solid var(--border)", borderRadius: 20, padding: "1px 7px",
+          }}>{relays.length}</span>
+        </div>
+
+        {/* Relay rows */}
+        {relays.length === 0 ? (
+          <div style={{
+            fontSize: "calc(var(--font-base) - 2px)", color: "var(--text-faint)",
+            fontFamily: "monospace", padding: "6px 0",
+          }}>None configured</div>
+        ) : relays.map((r, i) => (
+          <div key={r} style={{
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "6px 0",
+            borderBottom: i < relays.length - 1 ? "1px solid var(--border)" : "none",
+          }}>
+            <span style={{
+              fontFamily: "monospace",
+              fontSize: "calc(var(--font-base) - 2px)",
+              color: "var(--text)",
+              flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>{fmtUrl(r)}</span>
+            <button
+              onClick={() => onRemove(r)}
+              disabled={saving}
+              style={{
+                padding: "3px 10px", borderRadius: 6,
+                border: "1px solid var(--border)", background: "transparent",
+                color: "var(--text-faint)", fontSize: "calc(var(--font-base) + 2px)",
+                fontFamily: "'DM Sans',sans-serif", cursor: saving ? "default" : "pointer",
+                lineHeight: 1, flexShrink: 0, opacity: saving ? 0.5 : 1,
+              }}
+            >×</button>
           </div>
         ))}
-        <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+
+        {/* Add row */}
+        <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
           <input
-            style={inputStyle}
             value={input}
             onChange={e => onInputChange(e.target.value)}
             onKeyDown={onKeyDown}
             placeholder="relay.example.com"
             disabled={saving}
+            style={{
+              flex: 1, padding: "0 10px", borderRadius: 8,
+              border: "1.5px solid var(--border)", background: "var(--bg)",
+              color: "var(--text)", fontFamily: "monospace",
+              fontSize: "calc(var(--font-base) - 2px)",
+              outline: "none", minWidth: 0, opacity: saving ? 0.5 : 1,
+              height: "calc(var(--font-base) + 20px)", boxSizing: "border-box",
+            }}
           />
-          <button style={addBtnStyle} onClick={onAdd} disabled={saving}>Add</button>
+          <button
+            onClick={onAdd}
+            disabled={saving}
+            style={{
+              padding: "0 14px", borderRadius: 8, border: "none",
+              background: "var(--primary)", color: "white",
+              fontFamily: "'DM Sans',sans-serif",
+              fontSize: "calc(var(--font-base) - 2px)",
+              fontWeight: 600,
+              cursor: saving ? "default" : "pointer",
+              opacity: saving ? 0.6 : 1, flexShrink: 0,
+              height: "calc(var(--font-base) + 20px)",
+            }}
+          >Add</button>
         </div>
       </div>
     );
@@ -252,7 +292,7 @@ function RelayEditor({ pubkey, signAndPublish }) {
 
   return (
     <div style={{ margin: "0 16px 4px", padding: "14px 16px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
-      <Section
+      <RelaySection
         title="Read"
         relays={effectiveInboxes}
         input={inboxInput}
@@ -261,7 +301,7 @@ function RelayEditor({ pubkey, signAndPublish }) {
         onKeyDown={e => e.key === "Enter" && addInbox()}
         onRemove={removeInbox}
       />
-      <Section
+      <RelaySection
         title="Write"
         relays={effectiveOutboxes}
         input={outboxInput}
@@ -270,7 +310,12 @@ function RelayEditor({ pubkey, signAndPublish }) {
         onKeyDown={e => e.key === "Enter" && addOutbox()}
         onRemove={removeOutbox}
       />
-      {saving && <div style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textAlign: "center" }}>Publishing relay list...</div>}
+      {saving && (
+        <div style={{
+          fontSize: "calc(var(--font-base) - 3px)", color: "var(--text-faint)",
+          fontFamily: "'DM Sans',sans-serif", textAlign: "center", paddingTop: 2,
+        }}>Publishing…</div>
+      )}
     </div>
   );
 }

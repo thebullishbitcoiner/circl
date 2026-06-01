@@ -41,6 +41,19 @@ eventStore.insert$.subscribe(event => {
   if (event.kind === 0) saveProfileToCache(event);
 });
 
+// ── Broadcast ───────────────────────────────────────────────────────────────
+// Re-publish an already-signed event to all currently connected relays
+// (which include the user's own outbox relays after login).
+
+export function broadcastEvent(event) {
+  if (!event?.id || !event?.sig) return Promise.resolve();
+  const relays = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+  return Promise.race([
+    pool.publish(relays, event),
+    new Promise(resolve => setTimeout(resolve, 8000)),
+  ]).catch(() => null);
+}
+
 // ── NDK-compat subscribe wrapper ────────────────────────────────────────────
 
 export function nostrSubscribe(filters, opts = {}) {
