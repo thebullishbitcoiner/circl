@@ -17,6 +17,7 @@ import ProfileMediaGrid from "./ProfileMediaGrid.jsx";
 import MediaLightbox from "./MediaLightbox.jsx";
 import LongformCard from "./LongformCard.jsx";
 import CalendarCard from "./CalendarCard.jsx";
+import FeedItem from "./FeedItem.jsx";
 import StreamCard from "./StreamCard.jsx";
 import HighlightCard from "./HighlightCard.jsx";
 import PollInline from "./PollInline.jsx";
@@ -584,181 +585,43 @@ export default function ProfilePage({
           ? [0, 1, 2].map(i => <SkelCard key={i} />)
           : topLevel.length === 0
             ? <div className="empty-state"><div className="empty-state-title">No notes yet</div><div className="empty-state-sub">Notes, reposts, and quote reposts will appear here</div></div>
-            : topLevel.slice(0, visibleNotes).map((e, i) => {
-              if (e.kind === 31922 || e.kind === 31923) {
-                return (
-                  <CalendarCard
-                    key={e.id}
-                    event={e}
-                    profiles={profiles}
-                    liked={false}
-                    bookmarked={isBookmarked?.(e) || false}
-                    likeCount={0}
-                    onLike={() => {}}
-                    onBookmark={onBookmark}
-                    onOpen={onOpenCalendarEvent}
-                    onOpenProfile={onOpenProfile}
-                    delay={0}
-                  />
-                );
-              }
-              if (e.kind === 30311) {
-                return (
-                  <StreamCard
-                    key={e.id}
-                    event={e}
-                    profiles={profiles}
-                    liked={false}
-                    bookmarked={isBookmarked?.(e) || false}
-                    likeCount={0}
-                    onLike={() => {}}
-                    onBookmark={onBookmark}
-                    onOpen={onOpenStream}
-                    onOpenProfile={onOpenProfile}
-                    delay={0}
-                  />
-                );
-              }
-              if (e.kind === 1068 || e.kind === 6969) {
-                return (
-                  <PollCard
-                    key={e.id}
-                    event={e}
-                    events={mergedEvents}
-                    resolveEventById={resolveEventById}
-                    profiles={profiles}
-                    myPubkey={myPubkey}
-                    myProfile={myProfile}
-                    onOpenProfile={onOpenProfile}
-                    onOpenThread={onOpenThread}
-                    onOpenHashtag={onOpenHashtag}
-                    onOpenZaps={onOpenZaps}
-                    onOpenReactions={onOpenReactions}
-                    onOpenReposts={onOpenReposts}
-                    onPublish={onPublish}
-                    publishEvent={publishEvent}
-                    onPrepend={onPrepend}
-                    getLocalZaps={getLocalZaps}
-                    addLocalZap={addLocalZap}
-                    getLocalReactions={getLocalReactions}
-                    setLocalReaction={setLocalReaction}
-                    onRequestModal={onRequestModal}
-                    onDismissModal={onDismissModal}
-                    sendZap={sendZap}
-                    defaultZapAmount={defaultZapAmount}
-                    defaultZapMsg={defaultZapMsg}
-                    onZapFail={onZapFail}
-                    onOpenVotes={onOpenPollVotes}
-                    delay={0}
-                  />
-                );
-              }
-              const isRepost      = e.kind === 6;
-              const isQuote       = isQuoteRepost(e);
-              const threadId      = threadTargetId(e);
-              let repostedEvent   = threadId ? mergedEvents.find(ev => ev.id === threadId) : null;
-              if (!repostedEvent && isRepost && threadId) {
-                const emb = parseKind6EmbeddedEvent(e);
-                if (emb?.id === threadId) repostedEvent = emb;
-              }
-              const displayPk     = isRepost && repostedEvent ? repostedEvent.pubkey : e.pubkey;
-              const displayEv     = isRepost && repostedEvent ? repostedEvent : e;
-
-              return (
-                <div className="note-card" key={e.id}
-                  style={profileNotesMenuId === e.id ? { zIndex: 1 } : undefined}
-                  onClick={() => onOpenThread?.(isRepost && repostedEvent ? repostedEvent : e)}>
-                  {isRepost && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--text-faint)", marginBottom: 8, paddingLeft: 2 }}>
-                      <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}><polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /></svg>
-                      <span style={{ cursor: "pointer", fontWeight: 500 }} onClick={e2 => { e2.stopPropagation(); onOpenProfile?.(e.pubkey); }}>{displayName(e.pubkey, profiles)}</span>
-                      &nbsp;reposted
-                    </div>
-                  )}
-                  <div className="note-inner">
-                    <div style={{ cursor: "pointer", flexShrink: 0 }} onClick={e2 => { e2.stopPropagation(); onOpenProfile?.(displayPk); }}>
-                      <Avatar pk={displayPk} profiles={profiles} size={36} />
-                    </div>
-                    <div className="note-body">
-                      <button
-                        type="button"
-                        className="note-card-menu-btn"
-                        onClick={e2 => { e2.stopPropagation(); setProfileNotesMenuId(id => (id === e.id ? null : e.id)); }}
-                        aria-label="More options"
-                      >
-                        <span />
-                        <span />
-                        <span />
-                      </button>
-                      {profileNotesMenuId === e.id && (
-                        <NoteContextMenu
-                          event={e}
-                          onClose={() => setProfileNotesMenuId(null)}
-                          onViewJson={setProfileNotesJsonEvent}
-                        />
-                      )}
-                      <div className="note-meta">
-                        <span className="note-name" style={{ cursor: "pointer" }} onClick={e2 => { e2.stopPropagation(); onOpenProfile?.(displayPk); }}>
-                          {displayName(displayPk, profiles)}
-                        </span>
-                        <span className="note-npub">{nip05OrNpub(displayPk, profiles)}</span>
-                        <span className="meta-dot" aria-hidden="true">·</span>
-                        <span className="note-time">{relativeTime(displayEv.created_at)}</span>
-                      </div>
-                      {isQuote && e.content && <NoteContent content={e.content.replace(/\nnostr:\S+/g, "").trim()} profiles={profiles} onOpenProfile={onOpenProfile} onOpenHashtag={onOpenHashtag} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} style={{ marginBottom: 8 }} collapsible />}
-                      {isRepost && repostedEvent && <NoteContent content={repostedEvent.content} profiles={profiles} onOpenProfile={onOpenProfile} onOpenHashtag={onOpenHashtag} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} allowEmbeds={!(repostedEvent.kind === 1068 || repostedEvent.kind === 6969)} collapsible />}
-                      {isRepost && repostedEvent && (repostedEvent.kind === 1068 || repostedEvent.kind === 6969) && (
-                        <PollInline
-                          event={repostedEvent}
-                          myPubkey={myPubkey}
-                          sendZap={sendZap}
-                          defaultZapAmount={defaultZapAmount}
-                          defaultZapMsg={defaultZapMsg}
-                          onZapFail={onZapFail}
-                          profiles={profiles}
-                          publishEvent={publishEvent}
-                          onRequestModal={onRequestModal}
-                          onDismissModal={onDismissModal}
-                          onOpenVotes={onOpenPollVotes}
-                        />
-                      )}
-                      {isRepost && !repostedEvent && <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: "var(--text-faint)" }}>Original note not in feed</p>}
-                      {!isRepost && !isQuote && <NoteContent content={e.content} profiles={profiles} onOpenProfile={onOpenProfile} onOpenHashtag={onOpenHashtag} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} collapsible />}
-                      {isQuote && (
-                        repostedEvent ? (
-                          <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px", background: "var(--surface)", marginBottom: 4, cursor: "pointer" }}
-                            onClick={e2 => { e2.stopPropagation(); onOpenThread?.(repostedEvent); }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
-                              <Avatar pk={repostedEvent.pubkey} profiles={profiles} size={20} />
-                              <span style={{ fontSize: 12, fontWeight: 500, cursor: "pointer" }} onClick={e2 => { e2.stopPropagation(); onOpenProfile?.(repostedEvent.pubkey); }}>{displayName(repostedEvent.pubkey, profiles)}</span>
-                              <span style={{ fontSize: 10, color: "var(--text-faint)", marginLeft: "auto" }}>{relativeTime(repostedEvent.created_at)}</span>
-                            </div>
-                            <div style={{ maxHeight: 220, overflow: "hidden" }}>
-                              <NoteContent content={repostedEvent.content} profiles={profiles} onOpenProfile={onOpenProfile} onOpenHashtag={onOpenHashtag} allEvents={mergedEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} className="note-text" style={{ fontSize: 13, lineHeight: 1.55, color: "var(--text-muted)", margin: 0 }} />
-                            </div>
-                          </div>
-                        ) : (
-                          <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px", background: "var(--surface)", fontSize: 12, color: "var(--text-faint)", fontStyle: "italic" }}>Note not in feed</div>
-                        )
-                      )}
-                      <NoteActions
-                        event={isRepost && repostedEvent ? repostedEvent : e}
-                        profiles={profiles} myPubkey={myPubkey} myProfile={myProfile} events={mergedEvents}
-                        onOpenThread={onOpenThread} onOpenZaps={onOpenZaps}
-                        onOpenReactions={onOpenReactions} onOpenReposts={onOpenReposts}
-                        onPublish={onPublish} publishEvent={publishEvent} onPrepend={onPrepend}
-                        onBookmark={onBookmark} isBookmarked={isBookmarked}
-                        getLocalZaps={getLocalZaps} addLocalZap={addLocalZap}
-                        getLocalReactions={getLocalReactions} setLocalReaction={setLocalReaction}
-                        onRequestModal={onRequestModal} onDismissModal={onDismissModal}
-                        sendZap={sendZap} defaultZapAmount={defaultZapAmount}
-                        defaultZapMsg={defaultZapMsg} onZapFail={onZapFail}
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })
+            : topLevel.slice(0, visibleNotes).map(e =>
+                <FeedItem
+                  key={e.id}
+                  event={e}
+                  profiles={profiles}
+                  myPubkey={myPubkey}
+                  myProfile={myProfile}
+                  events={mergedEvents}
+                  resolveEventById={resolveEventById}
+                  isBookmarked={isBookmarked}
+                  onBookmark={onBookmark}
+                  onOpenProfile={onOpenProfile}
+                  onOpenThread={onOpenThread}
+                  onOpenHashtag={onOpenHashtag}
+                  onOpenArticle={onOpenArticle}
+                  onOpenCalendarEvent={onOpenCalendarEvent}
+                  onOpenStream={onOpenStream}
+                  onOpenZaps={onOpenZaps}
+                  onOpenReactions={onOpenReactions}
+                  onOpenReposts={onOpenReposts}
+                  onOpenPollVotes={onOpenPollVotes}
+                  onPublish={onPublish}
+                  publishEvent={publishEvent}
+                  onPrepend={onPrepend}
+                  onRequestModal={onRequestModal}
+                  onDismissModal={onDismissModal}
+                  getLocalZaps={getLocalZaps}
+                  addLocalZap={addLocalZap}
+                  getLocalReactions={getLocalReactions}
+                  setLocalReaction={setLocalReaction}
+                  sendZap={sendZap}
+                  defaultZapAmount={defaultZapAmount}
+                  defaultZapMsg={defaultZapMsg}
+                  onZapFail={onZapFail}
+                  delay={0}
+                />
+            )
       )}
 
       {/* Replies tab */}

@@ -991,8 +991,7 @@
   .cal-date-line{font-size:11px;color:var(--primary);font-weight:500;margin-bottom:4px;}
   .cal-meta-row{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-muted);margin-bottom:3px;}
   .cal-meta-row span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .cal-summary{font-family:'DM Sans',sans-serif;font-size:12px;line-height:1.5;color:var(--text-muted);margin:5px 0 8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-  .cal-footer{display:flex;align-items:center;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--border);}
+  .cal-summary{font-family:'DM Sans',sans-serif;font-size:12px;line-height:1.5;color:var(--text-muted);margin:5px 0 6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 
   /* ── Event detail view ── */
   .cal-hero-glyph{color:var(--primary);opacity:.5;}

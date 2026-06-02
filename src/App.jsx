@@ -42,6 +42,7 @@ import ArticleReader from "./components/ArticleReader.jsx";
 import HighlightCard from "./components/HighlightCard.jsx";
 import CalendarCard from "./components/CalendarCard.jsx";
 import EventDetailView from "./components/EventDetailView.jsx";
+import FeedItem from "./components/FeedItem.jsx";
 import StreamCard from "./components/StreamCard.jsx";
 import StreamDetailView from "./components/StreamDetailView.jsx";
 import ComposeSheet from "./components/ComposeSheet.jsx";
@@ -471,211 +472,47 @@ export default function App() {
                         return (
                           <>
                             {visible.map(ev =>
-                              ev.kind === 30023
-                                ? (
-                                  <LongformCard
-                                    key={ev.id}
-                                    event={ev}
-                                    profiles={profiles}
-                                    liked={getLike(ev.id).liked}
-                                    bookmarked={isBookmarked(ev)}
-                                    likeCount={getLike(ev.id).count}
-                                    onLike={handleLike}
-                                    onBookmark={handleBookmark}
-                                    onOpen={setOpenArticle}
-                                    onOpenProfile={handleOpenProfile}
-                                    delay={0}
-                                  />
-                                )
-                                : ev.kind === 6
-                                  ? (
-                                    <RepostCard
-                                      key={ev.id}
-                                      event={ev}
-                                      profiles={profiles}
-                                      events={mergedFeedPool}
-                                      resolveEventById={resolveEventById}
-                                      myPubkey={pubkey}
-                                      myProfile={myProfile}
-                                      onOpenProfile={handleOpenProfile}
-                                      onOpenThread={handleOpenThread}
-                                      onOpenHashtag={handleOpenHashtag}
-                                      onOpenZaps={handleOpenZaps}
-                                      onOpenReactions={handleOpenReactions}
-                                      onOpenReposts={handleOpenReposts}
-                                      onPublish={prependEvent}
-                                      publishEvent={publishEvent}
-                                      onPrepend={prependEvent}
-                                      onBookmark={handleBookmark}
-                                      isBookmarked={isBookmarked}
-                                      getLocalZaps={getLocalZaps}
-                                      addLocalZap={addLocalZap}
-                                      getLocalReactions={getLocalReactions}
-                                      setLocalReaction={setLocalReaction}
-                                      onRequestModal={setPanelModal}
-                                      onDismissModal={() => setPanelModal(null)}
-                                      sendZap={sendZap}
-                                      defaultZapAmount={zapSettings.amount}
-                                      defaultZapMsg={zapSettings.msg}
-                                      onZapFail={reason => showToast(
-                                        reason === "no_lud16"  ? "⚡ No lightning address" :
-                                        reason === "no_wallet" ? "⚡ No wallet connected" :
-                                        `⚡ Zap failed: ${reason}`
-                                      )}
-                                      onOpenPollVotes={handleOpenPollVotes}
-                                      delay={0}
-                                    />
-                                  )
-                                  : (ev.kind === 1068 || ev.kind === 6969)
-                                    ? (
-                                      <PollCard
-                                        key={ev.id}
-                                        event={ev}
-                                        events={mergedFeedPool}
-                                        resolveEventById={resolveEventById}
-                                        profiles={profiles}
-                                        myPubkey={pubkey}
-                                        myProfile={myProfile}
-                                        onOpenProfile={handleOpenProfile}
-                                        onOpenThread={handleOpenThread}
-                                        onOpenHashtag={handleOpenHashtag}
-                                        onOpenZaps={handleOpenZaps}
-                                        onOpenReactions={handleOpenReactions}
-                                        onOpenReposts={handleOpenReposts}
-                                        onPublish={prependEvent}
-                                        publishEvent={publishEvent}
-                                        onPrepend={prependEvent}
-                                        getLocalZaps={getLocalZaps}
-                                        addLocalZap={addLocalZap}
-                                        getLocalReactions={getLocalReactions}
-                                        setLocalReaction={setLocalReaction}
-                                        sendZap={sendZap}
-                                        defaultZapAmount={zapSettings.amount}
-                                        defaultZapMsg={zapSettings.msg}
-                                        onZapFail={reason => showToast(
-                                          reason === "no_lud16"  ? "⚡ No lightning address" :
-                                          reason === "no_wallet" ? "⚡ No wallet connected" :
-                                          `⚡ Zap failed: ${reason}`
-                                        )}
-                                        onOpenVotes={handleOpenPollVotes}
-                                        delay={0}
-                                      />
-                                    )
-                                    : (ev.kind === 31922 || ev.kind === 31923)
-                                      ? (
-                                        <CalendarCard
-                                          key={ev.id}
-                                          event={ev}
-                                          profiles={profiles}
-                                          liked={getLike(ev.id).liked}
-                                          bookmarked={isBookmarked(ev)}
-                                          likeCount={getLike(ev.id).count}
-                                          onLike={handleLike}
-                                          onBookmark={handleBookmark}
-                                          onOpen={setOpenCalendarEvent}
-                                          onOpenProfile={handleOpenProfile}
-                                          delay={0}
-                                        />
-                                      )
-                                    : ev.kind === 30311
-                                      ? (
-                                        <StreamCard
-                                          key={ev.id}
-                                          event={ev}
-                                          profiles={profiles}
-                                          liked={getLike(ev.id).liked}
-                                          bookmarked={isBookmarked(ev)}
-                                          likeCount={getLike(ev.id).count}
-                                          onLike={handleLike}
-                                          onBookmark={handleBookmark}
-                                          onOpen={setOpenStreamEvent}
-                                          onOpenProfile={handleOpenProfile}
-                                          delay={0}
-                                        />
-                                      )
-                                    : ev.kind === 9802
-                                      ? (
-                                        <HighlightCard
-                                          key={ev.id}
-                                          event={ev}
-                                          profiles={profiles}
-                                          liked={getLike(ev.id).liked}
-                                          bookmarked={isBookmarked(ev)}
-                                          likeCount={getLike(ev.id).count}
-                                          myPubkey={pubkey}
-                                          myProfile={myProfile}
-                                          onLike={handleLike}
-                                          onBookmark={handleBookmark}
-                                          onOpenProfile={handleOpenProfile}
-                                          onOpenThread={handleOpenThread}
-                                          onOpenArticle={setOpenArticle}
-                                          onOpenHashtag={handleOpenHashtag}
-                                          onOpenZaps={handleOpenZaps}
-                                          onOpenReactions={handleOpenReactions}
-                                          onOpenReposts={handleOpenReposts}
-                                          onPublish={prependEvent}
-                                          publishEvent={publishEvent}
-                                          onPrepend={prependEvent}
-                                          getLocalZaps={getLocalZaps}
-                                          addLocalZap={addLocalZap}
-                                          getLocalReactions={getLocalReactions}
-                                          setLocalReaction={setLocalReaction}
-                                          onRequestModal={setPanelModal}
-                                          onDismissModal={() => setPanelModal(null)}
-                                          sendZap={sendZap}
-                                          defaultZapAmount={zapSettings.amount}
-                                          defaultZapMsg={zapSettings.msg}
-                                          onZapFail={reason => showToast(
-                                            reason === "no_lud16"  ? "⚡ No lightning address" :
-                                            reason === "no_wallet" ? "⚡ No wallet connected" :
-                                            `⚡ Zap failed: ${reason}`
-                                          )}
-                                          resolveEventById={resolveEventById}
-                                          delay={0}
-                                        />
-                                      )
-                                    : (
-                                      <NoteCard
-                                        key={ev.id}
-                                        event={ev}
-                                        events={mergedFeedPool}
-                                        resolveEventById={resolveEventById}
-                                        profiles={profiles}
-                                        liked={getLike(ev.id).liked}
-                                        bookmarked={isBookmarked(ev)}
-                                        likeCount={getLike(ev.id).count}
-                                        replyCount={replyCount(ev.id, mergedFeedPool)}
-                                        repostCount={repostAndQuoteCount(ev.id, mergedFeedPool)}
-                                        myPubkey={pubkey}
-                                        myProfile={myProfile}
-                                        onLike={handleLike}
-                                        onBookmark={handleBookmark}
-                                        onOpenProfile={handleOpenProfile}
-                                        onOpenThread={handleOpenThread}
-                                        onOpenHashtag={handleOpenHashtag}
-                                        onOpenZaps={handleOpenZaps}
-                                        onOpenReactions={handleOpenReactions}
-                                        onOpenReposts={handleOpenReposts}
-                                        onPublish={prependEvent}
-                                        publishEvent={publishEvent}
-                                        publishHighlight={publishHighlight}
-                                        onPrepend={prependEvent}
-                                        getLocalZaps={getLocalZaps}
-                                        addLocalZap={addLocalZap}
-                                        getLocalReactions={getLocalReactions}
-                                        setLocalReaction={setLocalReaction}
-                                        sendZap={sendZap}
-                                        defaultZapAmount={zapSettings.amount}
-                                        defaultZapMsg={zapSettings.msg}
-                                        onZapFail={reason => showToast(
-                                          reason === "no_lud16"  ? "⚡ No lightning address" :
-                                          reason === "no_wallet" ? "⚡ No wallet connected" :
-                                          `⚡ Zap failed: ${reason}`
-                                        )}
-                                        onOpenPollVotes={handleOpenPollVotes}
-                                        delay={0}
-                                      />
-                                    )
+                              <FeedItem
+                                key={ev.id}
+                                event={ev}
+                                profiles={profiles}
+                                myPubkey={pubkey}
+                                myProfile={myProfile}
+                                events={mergedFeedPool}
+                                resolveEventById={resolveEventById}
+                                getLike={getLike}
+                                onLike={handleLike}
+                                isBookmarked={isBookmarked}
+                                onBookmark={handleBookmark}
+                                onOpenProfile={handleOpenProfile}
+                                onOpenThread={handleOpenThread}
+                                onOpenHashtag={handleOpenHashtag}
+                                onOpenArticle={setOpenArticle}
+                                onOpenCalendarEvent={setOpenCalendarEvent}
+                                onOpenStream={setOpenStreamEvent}
+                                onOpenZaps={handleOpenZaps}
+                                onOpenReactions={handleOpenReactions}
+                                onOpenReposts={handleOpenReposts}
+                                onOpenPollVotes={handleOpenPollVotes}
+                                onPublish={prependEvent}
+                                publishEvent={publishEvent}
+                                onPrepend={prependEvent}
+                                onRequestModal={setPanelModal}
+                                onDismissModal={() => setPanelModal(null)}
+                                getLocalZaps={getLocalZaps}
+                                addLocalZap={addLocalZap}
+                                getLocalReactions={getLocalReactions}
+                                setLocalReaction={setLocalReaction}
+                                sendZap={sendZap}
+                                defaultZapAmount={zapSettings.amount}
+                                defaultZapMsg={zapSettings.msg}
+                                onZapFail={reason => showToast(
+                                  reason === "no_lud16"  ? "⚡ No lightning address" :
+                                  reason === "no_wallet" ? "⚡ No wallet connected" :
+                                  `⚡ Zap failed: ${reason}`
+                                )}
+                                delay={0}
+                              />
                             )}
                             {visible.length < filtered.length && (
                               <div style={{ padding: "20px", textAlign: "center" }}>

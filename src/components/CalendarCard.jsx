@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Avatar from "./Avatar.jsx";
-import { Hi, Bi } from "./icons.jsx";
+import NoteActions from "./NoteActions.jsx";
 import { displayName, nip05OrNpub, relativeTime, parseCalendarEvent, formatCalendarDate } from "../utils.js";
 import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
@@ -12,7 +12,15 @@ const MapPin = () => (
   </svg>
 );
 
-export default function CalendarCard({ event, profiles, liked, bookmarked, likeCount, onLike, onBookmark, onOpen, onOpenProfile, delay }) {
+export default function CalendarCard({
+  event, profiles, onOpen, onOpenProfile, delay,
+  myPubkey, myProfile, events,
+  onOpenThread, onOpenZaps, onOpenReactions, onOpenReposts,
+  onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
+  getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
+  onRequestModal, onDismissModal,
+  sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
+}) {
   const cal = parseCalendarEvent(event);
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
@@ -73,14 +81,35 @@ export default function CalendarCard({ event, profiles, liked, bookmarked, likeC
                   {cal.hashtags.slice(0, 4).map(t => <span key={t}>#{t}</span>)}
                 </div>
               ) : null}
-              <div className="cal-footer">
-                <div className="lf-actions">
-                  <button className={`action-btn ${liked ? "liked" : ""}`} onClick={e => { e.stopPropagation(); onLike(event.id); }}><Hi f={liked} />{likeCount}</button>
-                  <button className={`action-btn ${bookmarked ? "saved" : ""}`} onClick={e => { e.stopPropagation(); onBookmark(event); }}><Bi f={bookmarked} /></button>
-                </div>
-              </div>
             </div>
           </div>
+
+          <NoteActions
+            event={event}
+            profiles={profiles}
+            myPubkey={myPubkey}
+            myProfile={myProfile}
+            events={events}
+            onOpenThread={onOpenThread}
+            onOpenZaps={onOpenZaps}
+            onOpenReactions={onOpenReactions}
+            onOpenReposts={onOpenReposts}
+            onPublish={onPublish}
+            publishEvent={publishEvent}
+            onPrepend={onPrepend}
+            onBookmark={onBookmark}
+            isBookmarked={isBookmarked}
+            getLocalZaps={getLocalZaps}
+            addLocalZap={addLocalZap}
+            getLocalReactions={getLocalReactions}
+            setLocalReaction={setLocalReaction}
+            onRequestModal={onRequestModal}
+            onDismissModal={onDismissModal}
+            sendZap={sendZap}
+            defaultZapAmount={defaultZapAmount}
+            defaultZapMsg={defaultZapMsg}
+            onZapFail={onZapFail}
+          />
         </div>
       </div>
     </div>
