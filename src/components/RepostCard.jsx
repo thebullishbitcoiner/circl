@@ -67,33 +67,34 @@ export default function RepostCard({
       </div>
 
       {original ? (
-        <div className="note-inner">
+        <>
+        <div className="note-header">
           <div onClick={e => { e.stopPropagation(); onOpenProfile?.(original.pubkey); }} style={{ cursor: "pointer", flexShrink: 0 }}>
             <Avatar pk={original.pubkey} profiles={profiles} size={36} />
           </div>
-          <div className="note-body">
-            <button
-              type="button"
-              className="note-card-menu-btn"
-              onClick={e => { e.stopPropagation(); setMenuOpen(v => !v); }}
-              aria-label="More options"
-            >
-              <span /><span /><span />
-            </button>
-            {menuOpen && (
-              <NoteContextMenu
-                event={original ?? event}
-                onClose={() => setMenuOpen(false)}
-                onViewJson={() => setJsonOpen(true)}
-              />
-            )}
-            <div className="note-meta">
-              <span className="note-name" style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); onOpenProfile?.(original.pubkey); }}>
-                {displayName(original.pubkey, profiles)}
-              </span>
-              <span className="note-npub">{nip05OrNpub(original.pubkey, profiles)}</span>
-              <span className="note-time">{relativeTime(original.created_at)}</span>
-            </div>
+          <div className="note-meta">
+            <span className="note-name" style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); onOpenProfile?.(original.pubkey); }}>
+              {displayName(original.pubkey, profiles)}
+            </span>
+            <span className="note-npub">{nip05OrNpub(original.pubkey, profiles)}</span>
+            <span className="note-time">{relativeTime(original.created_at)}</span>
+          </div>
+          <button
+            type="button"
+            className="note-card-menu-btn"
+            onClick={e => { e.stopPropagation(); setMenuOpen(v => !v); }}
+            aria-label="More options"
+          >
+            <span /><span /><span />
+          </button>
+          {menuOpen && (
+            <NoteContextMenu
+              event={original ?? event}
+              onClose={() => setMenuOpen(false)}
+              onViewJson={() => setJsonOpen(true)}
+            />
+          )}
+        </div>
             {(original.kind === 31922 || original.kind === 31923)
               ? <CalendarInline event={original} onOpen={onOpenCalendarEvent ?? onOpenThread} />
               : <NoteContent
@@ -135,8 +136,7 @@ export default function RepostCard({
               sendZap={sendZap} defaultZapAmount={defaultZapAmount}
               defaultZapMsg={defaultZapMsg} onZapFail={onZapFail}
             />
-          </div>
-        </div>
+        </>
       ) : (
         <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: "var(--text-faint)", padding: "4px 0" }}>
           Original note not available

@@ -44,41 +44,41 @@ function ThreadNoteRow({
       style={threadMenuId === event.id ? { zIndex: 1 } : undefined}
       onClick={clickable ? () => onOpenThread?.(event) : undefined}
     >
-      <div className="note-inner">
+      <div className="note-header">
         <div onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }} style={{ cursor: "pointer", flexShrink: 0 }}>
           <Avatar pk={event.pubkey} profiles={profiles} size={focused ? 40 : 34} />
         </div>
-        <div className="note-body">
-          <button
-            type="button"
-            className="note-card-menu-btn"
-            onClick={e => {
-              e.stopPropagation();
-              setThreadMenuId(id => (id === event.id ? null : event.id));
-            }}
-            aria-label="More options"
-          >
-            <span />
-            <span />
-            <span />
-          </button>
-          {threadMenuId === event.id && (
-            <NoteContextMenu
-              event={event}
-              onClose={() => setThreadMenuId(null)}
-              onViewJson={onShowThreadJson}
-            />
-          )}
-          <div className="note-meta">
-            <span className="note-name" style={{ cursor: "pointer", fontSize: focused ? 14 : 13 }}
-              onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }}>
-              {displayName(event.pubkey, profiles)}
-            </span>
-            <span className="note-npub">{nip05OrNpub(event.pubkey, profiles)}</span>
-            <span className="meta-dot" aria-hidden="true">·</span>
-            <span className="note-time">{relativeTime(event.created_at)}</span>
-          </div>
-          <div ref={contentRef}>
+        <div className="note-meta">
+          <span className="note-name" style={{ cursor: "pointer", fontSize: focused ? 14 : 13 }}
+            onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }}>
+            {displayName(event.pubkey, profiles)}
+          </span>
+          <span className="note-npub">{nip05OrNpub(event.pubkey, profiles)}</span>
+          <span className="meta-dot" aria-hidden="true">·</span>
+          <span className="note-time">{relativeTime(event.created_at)}</span>
+        </div>
+        <button
+          type="button"
+          className="note-card-menu-btn"
+          onClick={e => {
+            e.stopPropagation();
+            setThreadMenuId(id => (id === event.id ? null : event.id));
+          }}
+          aria-label="More options"
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+        {threadMenuId === event.id && (
+          <NoteContextMenu
+            event={event}
+            onClose={() => setThreadMenuId(null)}
+            onViewJson={onShowThreadJson}
+          />
+        )}
+      </div>
+      <div ref={contentRef}>
           {publishHighlight && (
             <HighlightPopover
               sourceEvent={event}
@@ -161,8 +161,6 @@ function ThreadNoteRow({
               defaultZapMsg={defaultZapMsg} onZapFail={onZapFail}
             />
           )}
-        </div>
-      </div>
     </div>
     {highlightDraft && (
       <HighlightSheet

@@ -209,15 +209,17 @@
   .avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
   .note-body{flex:1;min-width:0;}
   .note-body{position:relative;}
+  .note-header{display:flex;align-items:center;gap:8px;margin-bottom:7px;position:relative;}
+  .note-header .note-meta{margin-bottom:0;padding-right:0;flex:1;min-width:0;}
   .note-card-menu-btn{
-    position:absolute;top:-2px;right:-3px;z-index:2;
     width:20px;height:17px;border:none;background:none;cursor:pointer;
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-    color:var(--text-faint);
+    color:var(--text-faint);flex-shrink:0;
   }
+
   .note-card-menu-btn span{width:2.5px;height:2.5px;border-radius:50%;background:currentColor;display:block;}
   .note-card-menu{
-    position:absolute;top:19px;right:-3px;z-index:20;min-width:170px;
+    position:absolute;top:100%;right:0;z-index:20;min-width:170px;
     border:1px solid var(--border);border-radius:10px;background:var(--bg);
     box-shadow:0 8px 28px var(--shadow-md);overflow:hidden;
   }

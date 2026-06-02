@@ -115,90 +115,88 @@ function HighlightCard({
         style={{ animationDelay: `${delay}s`, zIndex: cardMenuOpen ? 1 : undefined }}
         onClick={() => onOpenThread?.(event)}
       >
-        <div className="note-inner">
+        <div className="note-header">
           <div onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }} style={{ cursor: "pointer", flexShrink: 0 }}>
             <Avatar pk={event.pubkey} profiles={profiles} size={36} />
           </div>
-          <div className="note-body">
-            <button
-              type="button"
-              className="note-card-menu-btn"
-              onClick={e => { e.stopPropagation(); setCardMenuOpen(v => !v); }}
-              aria-label="More options"
-            >
-              <span /><span /><span />
-            </button>
-            {cardMenuOpen && (
-              <NoteContextMenu
-                event={event}
-                onClose={() => setCardMenuOpen(false)}
-                onViewJson={() => setJsonOpen(true)}
-              />
-            )}
-            <div className="note-meta">
-              <span className="note-name" style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }}>
-                {displayName(event.pubkey, profiles)}
-              </span>
-              <span className="note-npub">{nip05OrNpub(event.pubkey, profiles)}</span>
-              <span className="meta-dot" aria-hidden="true">·</span>
-              <span className="note-time">{relativeTime(event.created_at)}</span>
-            </div>
-
-            {comment && (
-              <div className="highlight-comment">{comment}</div>
-            )}
-
-            <blockquote className="highlight-blockquote" onClick={e => e.stopPropagation()}>
-              {text}
-              {(authorPubkey || sourceEvent?.pubkey) && (
-                <span
-                  className="highlight-attribution"
-                  onClick={e => { e.stopPropagation(); onOpenProfile?.(authorPubkey || sourceEvent.pubkey); }}
-                >
-                  — {displayName(authorPubkey || sourceEvent.pubkey, profiles)}
-                </span>
-              )}
-            </blockquote>
-
-            <div className="highlight-meta" onClick={e => e.stopPropagation()}>
-              <span className="highlight-from-label">from</span>
-              <SourceChip
-                sourceTag={sourceTag}
-                sourceRef={sourceRef}
-                sourceEvent={sourceEvent}
-                onOpenThread={onOpenThread}
-                onOpenArticle={onOpenArticle}
-              />
-            </div>
-
-            <NoteActions
-              event={event}
-              profiles={profiles}
-              myPubkey={myPubkey}
-              myProfile={myProfile}
-              events={[]}
-              onOpenThread={onOpenThread}
-              onOpenZaps={onOpenZaps}
-              onOpenReactions={onOpenReactions}
-              onOpenReposts={onOpenReposts}
-              onPublish={onPublish}
-              publishEvent={publishEvent}
-              onPrepend={onPrepend}
-              onBookmark={onBookmark}
-              isBookmarked={() => bookmarked}
-              getLocalZaps={getLocalZaps}
-              addLocalZap={addLocalZap}
-              getLocalReactions={getLocalReactions}
-              setLocalReaction={setLocalReaction}
-              onRequestModal={onRequestModal}
-              onDismissModal={onDismissModal}
-              sendZap={sendZap}
-              defaultZapAmount={defaultZapAmount}
-              defaultZapMsg={defaultZapMsg}
-              onZapFail={onZapFail}
-            />
+          <div className="note-meta">
+            <span className="note-name" style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }}>
+              {displayName(event.pubkey, profiles)}
+            </span>
+            <span className="note-npub">{nip05OrNpub(event.pubkey, profiles)}</span>
+            <span className="meta-dot" aria-hidden="true">·</span>
+            <span className="note-time">{relativeTime(event.created_at)}</span>
           </div>
+          <button
+            type="button"
+            className="note-card-menu-btn"
+            onClick={e => { e.stopPropagation(); setCardMenuOpen(v => !v); }}
+            aria-label="More options"
+          >
+            <span /><span /><span />
+          </button>
+          {cardMenuOpen && (
+            <NoteContextMenu
+              event={event}
+              onClose={() => setCardMenuOpen(false)}
+              onViewJson={() => setJsonOpen(true)}
+            />
+          )}
         </div>
+
+        {comment && (
+          <div className="highlight-comment">{comment}</div>
+        )}
+
+        <blockquote className="highlight-blockquote" onClick={e => e.stopPropagation()}>
+          {text}
+          {(authorPubkey || sourceEvent?.pubkey) && (
+            <span
+              className="highlight-attribution"
+              onClick={e => { e.stopPropagation(); onOpenProfile?.(authorPubkey || sourceEvent.pubkey); }}
+            >
+              — {displayName(authorPubkey || sourceEvent.pubkey, profiles)}
+            </span>
+          )}
+        </blockquote>
+
+        <div className="highlight-meta" onClick={e => e.stopPropagation()}>
+          <span className="highlight-from-label">from</span>
+          <SourceChip
+            sourceTag={sourceTag}
+            sourceRef={sourceRef}
+            sourceEvent={sourceEvent}
+            onOpenThread={onOpenThread}
+            onOpenArticle={onOpenArticle}
+          />
+        </div>
+
+        <NoteActions
+          event={event}
+          profiles={profiles}
+          myPubkey={myPubkey}
+          myProfile={myProfile}
+          events={[]}
+          onOpenThread={onOpenThread}
+          onOpenZaps={onOpenZaps}
+          onOpenReactions={onOpenReactions}
+          onOpenReposts={onOpenReposts}
+          onPublish={onPublish}
+          publishEvent={publishEvent}
+          onPrepend={onPrepend}
+          onBookmark={onBookmark}
+          isBookmarked={() => bookmarked}
+          getLocalZaps={getLocalZaps}
+          addLocalZap={addLocalZap}
+          getLocalReactions={getLocalReactions}
+          setLocalReaction={setLocalReaction}
+          onRequestModal={onRequestModal}
+          onDismissModal={onDismissModal}
+          sendZap={sendZap}
+          defaultZapAmount={defaultZapAmount}
+          defaultZapMsg={defaultZapMsg}
+          onZapFail={onZapFail}
+        />
       </div>
 
       {jsonOpen && <NoteJsonModal event={event} onClose={() => setJsonOpen(false)} />}

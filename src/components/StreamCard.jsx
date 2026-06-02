@@ -24,36 +24,36 @@ export default function StreamCard({ event, profiles, liked, bookmarked, likeCou
   return (
     <>
     <div className="calendar-card stream-card" style={{ animationDelay: `${delay}s`, zIndex: cardMenuOpen ? 1 : undefined }} onClick={() => onOpen(event)}>
-      <div className="note-inner">
+      <div className="note-header">
         <div onClick={e => { e.stopPropagation(); onOpenProfile?.(hostPk); }} style={{ cursor: "pointer", flexShrink: 0 }}>
           <Avatar pk={hostPk} profiles={profiles} size={36} />
         </div>
-        <div className="note-body">
-          <button
-            type="button"
-            className="note-card-menu-btn"
-            onClick={e => { e.stopPropagation(); setCardMenuOpen(v => !v); }}
-            aria-label="More options"
-          >
-            <span /><span /><span />
-          </button>
-          {cardMenuOpen && (
-            <NoteContextMenu
-              event={event}
-              onClose={() => setCardMenuOpen(false)}
-              onViewJson={() => setJsonOpen(true)}
-            />
-          )}
-          <div className="note-meta">
-            <span className="note-name" style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); onOpenProfile?.(hostPk); }}>
-              {displayName(hostPk, profiles)}
-            </span>
-            <span className="note-npub">{nip05OrNpub(hostPk, profiles)}</span>
-            <span className="meta-dot" aria-hidden="true">·</span>
-            <span className="note-time">{relativeTime(event.created_at)}</span>
-          </div>
+        <div className="note-meta">
+          <span className="note-name" style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); onOpenProfile?.(hostPk); }}>
+            {displayName(hostPk, profiles)}
+          </span>
+          <span className="note-npub">{nip05OrNpub(hostPk, profiles)}</span>
+          <span className="meta-dot" aria-hidden="true">·</span>
+          <span className="note-time">{relativeTime(event.created_at)}</span>
+        </div>
+        <button
+          type="button"
+          className="note-card-menu-btn"
+          onClick={e => { e.stopPropagation(); setCardMenuOpen(v => !v); }}
+          aria-label="More options"
+        >
+          <span /><span /><span />
+        </button>
+        {cardMenuOpen && (
+          <NoteContextMenu
+            event={event}
+            onClose={() => setCardMenuOpen(false)}
+            onViewJson={() => setJsonOpen(true)}
+          />
+        )}
+      </div>
 
-          <div className="cal-inner">
+      <div className="cal-inner">
             {stream.image && (
               <img className="cal-cover-image" src={stream.image} alt={stream.title} loading="lazy" decoding="async" referrerPolicy="no-referrer" />
             )}
@@ -81,8 +81,6 @@ export default function StreamCard({ event, profiles, liked, bookmarked, likeCou
               </div>
             </div>
           </div>
-        </div>
-      </div>
     </div>
     {jsonOpen && <NoteJsonModal event={event} onClose={() => setJsonOpen(false)} />}
     </>
