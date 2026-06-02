@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import Avatar from "./Avatar.jsx";
 import ArticleBody from "./ArticleBody.jsx";
+import NoteActions from "./NoteActions.jsx";
 import { Bk } from "./icons.jsx";
 import { displayName, nip05OrNpub, relativeTime, parseCalendarEvent, formatCalendarDate } from "../utils.js";
 import useCalendarRSVPs from "../hooks/useCalendarRSVPs.js";
@@ -28,12 +29,31 @@ export default function EventDetailView({
   event,
   profiles,
   pubkey,
+  myProfile,
+  events = [],
   publishEvent,
   onBack,
   onOpenProfile,
+  onOpenThread,
+  onOpenZaps,
+  onOpenReactions,
+  onOpenReposts,
+  onPublish,
+  onPrepend,
+  onBookmark,
+  isBookmarked,
+  getLocalZaps,
+  addLocalZap,
+  getLocalReactions,
+  setLocalReaction,
+  onRequestModal,
+  onDismissModal,
+  sendZap,
+  defaultZapAmount,
+  defaultZapMsg,
+  onZapFail,
 }) {
   const ref = useRef(null);
-  const [progress, setProgress] = useState(0);
   const [rsvping, setRsvping] = useState(false);
   const [localMyRsvp, setLocalMyRsvp] = useState(null);
 
@@ -51,14 +71,6 @@ export default function EventDetailView({
     });
   }, [grouped.accepted.join(","), grouped.tentative.join(","), grouped.declined.join(",")]);
 
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const fn = () => setProgress(Math.min((el.scrollTop / (el.scrollHeight - el.clientHeight)) * 100 || 0, 100));
-    el.addEventListener("scroll", fn);
-    return () => el.removeEventListener("scroll", fn);
-  }, []);
-
   async function handleRsvp(status) {
     if (rsvping) return;
     setRsvping(true);
@@ -74,7 +86,6 @@ export default function EventDetailView({
 
   return (
     <div ref={ref} className="slide-panel-scroll">
-      <div className="read-progress" style={{ width: `${progress}%` }} />
       <div className="panel-bar">
         <button className="back-btn" onClick={onBack}><Bk s={16} /></button>
         <span className="panel-bar-logo">Circl</span>
@@ -94,7 +105,6 @@ export default function EventDetailView({
       <div className="reader-content">
         <div className="reader-header">
           <div className="reader-title">{cal.title || "Untitled Event"}</div>
-          {cal.summary && <div className="reader-summary">{cal.summary}</div>}
 
           <div className="cal-detail-meta">
             {dateStr && (
@@ -133,6 +143,35 @@ export default function EventDetailView({
         {event.content?.trim() ? (
           <ArticleBody content={event.content} profiles={profiles} onOpenProfile={onOpenProfile} />
         ) : null}
+
+        <div className="cal-detail-actions">
+          <NoteActions
+            event={event}
+            profiles={profiles}
+            myPubkey={pubkey}
+            myProfile={myProfile}
+            events={events}
+            onOpenThread={onOpenThread}
+            onOpenZaps={onOpenZaps}
+            onOpenReactions={onOpenReactions}
+            onOpenReposts={onOpenReposts}
+            onPublish={onPublish}
+            publishEvent={publishEvent}
+            onPrepend={onPrepend}
+            onBookmark={onBookmark}
+            isBookmarked={isBookmarked}
+            getLocalZaps={getLocalZaps}
+            addLocalZap={addLocalZap}
+            getLocalReactions={getLocalReactions}
+            setLocalReaction={setLocalReaction}
+            onRequestModal={onRequestModal}
+            onDismissModal={onDismissModal}
+            sendZap={sendZap}
+            defaultZapAmount={defaultZapAmount}
+            defaultZapMsg={defaultZapMsg}
+            onZapFail={onZapFail}
+          />
+        </div>
 
         <div className="cal-rsvp-section">
           <div className="cal-rsvp-buttons">

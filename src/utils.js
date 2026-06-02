@@ -94,7 +94,7 @@ export function parseCalendarEvent(event) {
     end,
     isDateBased,
     timezone: getCalendarEventStartTimezone(event) ?? null,
-    locations: getCalendarEventLocations(event) ?? [],
+    locations: (getCalendarEventLocations(event) ?? []).filter(l => l.trim()),
     hashtags: getCalendarEventHashtags(event) ?? [],
     d: event.tags?.find(t => t[0] === "d")?.[1] ?? "",
   };

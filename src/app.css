@@ -997,7 +997,8 @@
   .cal-hero-glyph{color:var(--primary);opacity:.5;}
   .cal-detail-meta{display:flex;flex-direction:column;gap:6px;margin:12px 0;}
   .cal-detail-row{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--text-muted);}
-  .cal-rsvp-section{margin-top:32px;padding-top:20px;border-top:1px solid var(--border);}
+  .cal-detail-actions{margin-top:16px;padding-top:4px;border-top:1px solid var(--border);}
+  .cal-rsvp-section{margin-top:24px;padding-top:20px;border-top:1px solid var(--border);}
   .cal-rsvp-counts{display:flex;gap:14px;margin-bottom:14px;}
   .cal-rsvp-count{font-size:12px;color:var(--text-muted);font-weight:500;}
   .cal-rsvp-count.accepted{color:#16a34a;}

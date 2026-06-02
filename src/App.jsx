@@ -632,9 +632,33 @@ export default function App() {
                     event={openCalendarEvent}
                     profiles={profiles}
                     pubkey={pubkey}
+                    myProfile={myProfile}
+                    events={mergedFeedPool}
                     publishEvent={publishEvent}
                     onBack={() => setOpenCalendarEvent(null)}
                     onOpenProfile={pk => { setOpenCalendarEvent(null); handleOpenProfile(pk); }}
+                    onOpenThread={handleOpenThread}
+                    onOpenZaps={handleOpenZaps}
+                    onOpenReactions={handleOpenReactions}
+                    onOpenReposts={handleOpenReposts}
+                    onPublish={prependEvent}
+                    onPrepend={prependEvent}
+                    onBookmark={handleBookmark}
+                    isBookmarked={isBookmarked}
+                    getLocalZaps={getLocalZaps}
+                    addLocalZap={addLocalZap}
+                    getLocalReactions={getLocalReactions}
+                    setLocalReaction={setLocalReaction}
+                    onRequestModal={setPanelModal}
+                    onDismissModal={() => setPanelModal(null)}
+                    sendZap={sendZap}
+                    defaultZapAmount={zapSettings.amount}
+                    defaultZapMsg={zapSettings.msg}
+                    onZapFail={reason => showToast(
+                      reason === "no_lud16"  ? "⚡ No lightning address" :
+                      reason === "no_wallet" ? "⚡ No wallet connected" :
+                      `⚡ Zap failed: ${reason}`
+                    )}
                   />
                 )}
               </div>

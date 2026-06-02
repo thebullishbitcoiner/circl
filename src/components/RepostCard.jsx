@@ -1,7 +1,9 @@
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteActions from "./NoteActions.jsx";
+import NoteContextMenu from "./NoteContextMenu.jsx";
+import NoteJsonModal from "./NoteJsonModal.jsx";
 import PollInline from "./PollInline.jsx";
 import { displayName, nip05OrNpub, relativeTime, parseCalendarEvent, formatCalendarDate } from "../utils.js";
 
@@ -42,13 +44,16 @@ export default function RepostCard({
   const fromContent = (() => { try { return JSON.parse(event.content); } catch { return null; } })();
   const fromPool    = originalId ? events.find(e => e.id === originalId) : null;
   const original    = fromPool || fromContent;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [jsonOpen, setJsonOpen] = useState(false);
 
   useEffect(() => {
     if (!original && originalId) resolveEventById?.(originalId);
   }, [originalId, original]);
 
   return (
-    <div className="note-card" style={{ animationDelay: `${delay}s` }}
+    <>
+    <div className="note-card" style={{ animationDelay: `${delay}s`, zIndex: menuOpen ? 1 : undefined }}
       onClick={() => original && onOpenThread?.(original)}>
       <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--text-faint)", marginBottom: 8, paddingLeft: 2 }}>
         <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
@@ -67,6 +72,21 @@ export default function RepostCard({
             <Avatar pk={original.pubkey} profiles={profiles} size={36} />
           </div>
           <div className="note-body">
+            <button
+              type="button"
+              className="note-card-menu-btn"
+              onClick={e => { e.stopPropagation(); setMenuOpen(v => !v); }}
+              aria-label="More options"
+            >
+              <span /><span /><span />
+            </button>
+            {menuOpen && (
+              <NoteContextMenu
+                event={original ?? event}
+                onClose={() => setMenuOpen(false)}
+                onViewJson={() => setJsonOpen(true)}
+              />
+            )}
             <div className="note-meta">
               <span className="note-name" style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); onOpenProfile?.(original.pubkey); }}>
                 {displayName(original.pubkey, profiles)}
@@ -123,5 +143,7 @@ export default function RepostCard({
         </div>
       )}
     </div>
+    {jsonOpen && <NoteJsonModal event={original ?? event} onClose={() => setJsonOpen(false)} />}
+    </>
   );
 }
