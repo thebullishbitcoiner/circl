@@ -788,6 +788,7 @@ export default function App() {
                         myProfile={myProfile}
                         onPublish={prependEvent}
                         publishEvent={publishEvent}
+                        publishHighlight={publishHighlight}
                         onPrepend={prependEvent}
                         onBookmark={handleBookmark}
                         isBookmarked={isBookmarked}

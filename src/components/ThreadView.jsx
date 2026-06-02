@@ -3,6 +3,8 @@ import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteActions from "./NoteActions.jsx";
 import FocusedStatsRow from "./FocusedStatsRow.jsx";
+import HighlightPopover from "./HighlightPopover.jsx";
+import HighlightSheet from "./HighlightSheet.jsx";
 import { Bk } from "./icons.jsx";
 import { displayName, nip05OrNpub, relativeTime, isQuoteRepost, replyCount, buildParentChain, buildSelfReplyChain, directReplyParentId } from "../utils.js";
 import NoteContextMenu from "./NoteContextMenu.jsx";
@@ -15,6 +17,7 @@ function ThreadNoteRow({
   event, variant = "normal", profiles, allEvents, onOpenProfile, onOpenThread, onOpenHashtag,
   onOpenZaps, onOpenReactions, onOpenReposts,
   myPubkey, myProfile, onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
+  publishHighlight,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, onRequestModal, onDismissModal,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
   resolveEventById, onOpenPollVotes,
@@ -22,6 +25,8 @@ function ThreadNoteRow({
   threadMenuId, setThreadMenuId, onShowThreadJson,
 }) {
   const rCount    = replyCount(event.id, allEvents);
+  const [highlightDraft, setHighlightDraft] = useState(null);
+  const contentRef = useRef(null);
   const focused   = variant === "focused";
   const isParent  = variant === "parent";
   const isSelf    = variant === "self-reply";
@@ -32,6 +37,7 @@ function ThreadNoteRow({
   const reactions = getLocalReactions?.(event.id) ?? [];
 
   return (
+    <>
     <div
       ref={focused ? focusRef : null}
       className={`thread-note${focused ? " focused" : ""}${isParent ? " parent" : ""}${isSelf ? " self-thread" : ""}${isReply ? " reply" : ""}${hasConnector ? " has-connector" : ""}`}
@@ -72,6 +78,14 @@ function ThreadNoteRow({
             <span className="meta-dot" aria-hidden="true">·</span>
             <span className="note-time">{relativeTime(event.created_at)}</span>
           </div>
+          <div ref={contentRef}>
+          {publishHighlight && (
+            <HighlightPopover
+              sourceEvent={event}
+              containerRef={contentRef}
+              onHighlight={draft => setHighlightDraft(draft)}
+            />
+          )}
           {(() => {
             const isPoll    = event.kind === 1068 || event.kind === 6969;
             const isQuote   = isQuoteRepost(event);
@@ -126,6 +140,7 @@ function ThreadNoteRow({
               </>
             );
           })()}
+          </div>
           {focused && (
             <FocusedStatsRow eventId={event.id} rCount={rCount} allEvents={allEvents}
               zaps={zaps} reactions={reactions}
@@ -149,6 +164,17 @@ function ThreadNoteRow({
         </div>
       </div>
     </div>
+    {highlightDraft && (
+      <HighlightSheet
+        text={highlightDraft.text}
+        context={highlightDraft.context}
+        sourceEvent={highlightDraft.sourceEvent}
+        publishHighlight={publishHighlight}
+        onPrepend={onPrepend}
+        onDismiss={() => setHighlightDraft(null)}
+      />
+    )}
+    </>
   );
 }
 
@@ -162,6 +188,7 @@ export default function ThreadView({
   focusedEvent, events, profiles, onBack, onOpenProfile, onOpenThread, onOpenHashtag,
   onOpenZaps, onOpenReactions, onOpenReposts,
   myPubkey, myProfile, onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
+  publishHighlight,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, onRequestModal, onDismissModal,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
   resolveEventById, onOpenPollVotes,
@@ -243,6 +270,7 @@ export default function ThreadView({
     profiles, allEvents,
     onOpenProfile, onOpenThread, onOpenHashtag, onOpenZaps, onOpenReactions, onOpenReposts,
     myPubkey, myProfile, onPublish, publishEvent, onPrepend,
+    publishHighlight,
     onBookmark, isBookmarked, getLocalZaps, addLocalZap,
     getLocalReactions, setLocalReaction, onRequestModal, onDismissModal,
     sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
