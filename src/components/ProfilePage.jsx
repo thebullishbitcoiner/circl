@@ -382,13 +382,13 @@ export default function ProfilePage({
   }, [events, profileEvents, repostExtras]);
 
   const theirEvents = useMemo(
-    () => mergedEvents.filter(e => e.pubkey === pubkey && (e.kind === 1 || e.kind === 6 || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311)),
+    () => mergedEvents.filter(e => e.pubkey === pubkey && (e.kind === 1 || e.kind === 6 || e.kind === 9802 || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311)),
     [mergedEvents, pubkey]
   );
 
   const topLevel = useMemo(
     () => theirEvents
-      .filter(e => e.kind === 6 || isQuoteRepost(e) || (e.kind === 1 && !hasNonMentionETag(e)) || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311)
+      .filter(e => e.kind === 6 || e.kind === 9802 || isQuoteRepost(e) || (e.kind === 1 && !hasNonMentionETag(e)) || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311)
       .sort((a, b) => b.created_at - a.created_at),
     [theirEvents]
   );

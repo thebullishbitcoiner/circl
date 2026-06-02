@@ -84,7 +84,7 @@ function HighlightCard({
   const [jsonOpen, setJsonOpen] = useState(false);
   const [sourceEvent, setSourceEvent] = useState(null);
 
-  const { text, sourceTag, sourceRef, comment } = parseHighlight(event);
+  const { text, sourceTag, sourceRef, authorPubkey, comment } = parseHighlight(event);
 
   useEffect(() => {
     if (!sourceRef || sourceTag === "r") return;
@@ -150,6 +150,14 @@ function HighlightCard({
 
             <blockquote className="highlight-blockquote" onClick={e => e.stopPropagation()}>
               {text}
+              {(authorPubkey || sourceEvent?.pubkey) && (
+                <span
+                  className="highlight-attribution"
+                  onClick={e => { e.stopPropagation(); onOpenProfile?.(authorPubkey || sourceEvent.pubkey); }}
+                >
+                  — {displayName(authorPubkey || sourceEvent.pubkey, profiles)}
+                </span>
+              )}
             </blockquote>
 
             <div className="highlight-meta" onClick={e => e.stopPropagation()}>

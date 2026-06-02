@@ -30,7 +30,10 @@ export default function usePublish({ signAndPublish, pubkey }) {
     if (comment?.trim()) tags.push(["comment", comment.trim()]);
     try {
       return await signAndPublish({ kind: 9802, content: text.trim(), tags });
-    } catch { return null; }
+    } catch (e) {
+      console.error("[highlight] publish failed:", e);
+      return null;
+    }
   }, [signAndPublish]);
 
   return { publish, publishEvent, publishHighlight };

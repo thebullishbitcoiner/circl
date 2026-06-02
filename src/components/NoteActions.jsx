@@ -96,7 +96,7 @@ export default function NoteActions({
       <div onClick={e => e.stopPropagation()}>
         <ZapBadges zaps={localZaps} eventId={event.id} profiles={profiles}
           onOpenZaps={() => onOpenZaps?.({ eventId: event.id, zaps: localZaps })} />
-        <div className="note-actions" style={{ marginTop: 2 }}>
+        <div className="note-actions">
           <button ref={zapBtnRef} className="action-btn"
             onClick={e => { e.stopPropagation(); handleZapInstant(); }}
             onMouseDown={e => { e.stopPropagation(); const t = setTimeout(() => { haptic.longPress(); setShowZapModal(true); }, 600); window.addEventListener("mouseup", () => clearTimeout(t), { once: true }); }}
