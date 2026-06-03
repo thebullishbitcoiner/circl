@@ -121,7 +121,6 @@ function IxNote({ event, myPubkey, profiles, onOpenProfile, onOpenThread, resolv
           </div>
           {mentionedName && (
             <div className="ix-direction">
-              <span className="ix-dir-arrow">↩</span>
               replying to <span className="ix-mention" style={{ marginLeft: 3 }}>@{mentionedName}</span>
             </div>
           )}
@@ -134,11 +133,11 @@ function IxNote({ event, myPubkey, profiles, onOpenProfile, onOpenThread, resolv
 
 export default function ProfilePage({
   pubkey, myPubkey, profiles, follows, events, isOwn,
-  onBack, onOpenProfile, onOpenNote, onOpenThread, onOpenGoal, onOpenHashtag, onOpenZaps, onOpenReactions, onOpenReposts,
+  onBack, onOpenProfile, onOpenNote, onOpenThread, onOpenHashtag, onOpenZaps, onOpenReactions, onOpenReposts,
   myProfile, onPublish, publishEvent, publishHighlight, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal, backLabel = "Your Circle", resolveEventById,
-  onOpenCircle, onFollow, onUnfollow, onOpenPollVotes, onOpenArticle, onOpenCalendarEvent, onOpenStream,
+  onOpenCircle, onFollow, onUnfollow, onOpenPollVotes, onOpenArticle, onOpenStream,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
   scrollToTopTrigger,
 }) {
@@ -608,10 +607,8 @@ export default function ProfilePage({
                   onBookmark={onBookmark}
                   onOpenProfile={onOpenProfile}
                   onOpenThread={onOpenThread}
-                  onOpenGoal={onOpenGoal}
                   onOpenHashtag={onOpenHashtag}
                   onOpenArticle={onOpenArticle}
-                  onOpenCalendarEvent={onOpenCalendarEvent}
                   onOpenStream={onOpenStream}
                   onOpenZaps={onOpenZaps}
                   onOpenReactions={onOpenReactions}
@@ -755,7 +752,7 @@ export default function ProfilePage({
                   onBookmark={onBookmark}
                   onOpenProfile={onOpenProfile}
                   onOpenThread={onOpenThread}
-                  onOpenGoal={onOpenGoal}
+
                   onOpenHashtag={onOpenHashtag}
                   onOpenZaps={onOpenZaps}
                   onOpenReactions={onOpenReactions}

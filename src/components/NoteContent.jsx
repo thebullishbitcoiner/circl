@@ -3,9 +3,11 @@ import NoteText from "./NoteText.jsx";
 import Avatar from "./Avatar.jsx";
 import MediaLightbox from "./MediaLightbox.jsx";
 import PollPreview from "./PollPreview.jsx";
+import CalendarInlineCard from "./CalendarInlineCard.jsx";
 import { parseNoteMediaSegments, groupNoteMediaSegments, displayName, relativeTime, nip19, isHexPubkey, normPubkey } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
+import { useNavigation } from "../context/NavigationContext.jsx";
 
 // Deduplicate mention-profile fetches across all NoteContent instances
 const _mentionFetched = new Set();
@@ -63,14 +65,21 @@ function decodeNevent(nevent) {
   return null;
 }
 
-function EmbeddedEvent({ event, profiles, onOpenProfile, onOpenThread }) {
+function EmbeddedEvent({ event, profiles, onOpenProfile }) {
+  const { onOpenThread, onOpenCalendarEvent, onOpenPoll } = useNavigation();
   if (!event) return null;
   const isPoll = event.kind === 1068 || event.kind === 6969;
+  const isCalendar = event.kind === 31922 || event.kind === 31923;
   const isZapPoll = event.kind === 6969;
+
+  if (isCalendar) {
+    return <CalendarInlineCard event={event} onOpen={onOpenCalendarEvent ?? onOpenThread} />;
+  }
+
   return (
     <div
       className="note-embed"
-      onClick={e => { e.stopPropagation(); onOpenThread?.(event); }}
+      onClick={e => { e.stopPropagation(); (isPoll ? (onOpenPoll ?? onOpenThread) : onOpenThread)?.(event); }}
       role="presentation"
     >
       <div className="note-embed-head">
@@ -404,7 +413,6 @@ export default function NoteContent({
           event={refEvent}
           profiles={profiles}
           onOpenProfile={onOpenProfile}
-          onOpenThread={onOpenThread}
         />
       );
     })}

@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, memo, useCallback } from "react";
+import { useNavigation } from "../context/NavigationContext.jsx";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteActions from "./NoteActions.jsx";
-import PollInline from "./PollInline.jsx";
 import CalendarInlineCard from "./CalendarInlineCard.jsx";
 import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
 import { displayName, nip05OrNpub, relativeTime } from "../utils.js";
@@ -26,6 +26,7 @@ function NoteCard({
   sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail,
   onOpenPollVotes,
 }) {
+  const { onOpenGoal, onOpenPoll, onOpenCalendarEvent } = useNavigation();
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
   const [highlightDraft, setHighlightDraft] = useState(null);
@@ -131,21 +132,33 @@ function NoteCard({
               collapsible
             />
             </div>
-            {quotedPollEvent && (
-              <PollInline
-                event={quotedPollEvent}
-                myPubkey={myPubkey}
-                sendZap={sendZap}
-                defaultZapAmount={defaultZapAmount}
-                defaultZapMsg={defaultZapMsg}
-                onZapFail={onZapFail}
-                profiles={profiles}
-                publishEvent={publishEvent}
-                onOpenVotes={onOpenPollVotes}
-              />
-            )}
+            {quotedPollEvent && (() => {
+              const isZapPoll = quotedPollEvent.kind === 6969;
+              const opts = quotedPollEvent.tags
+                .filter(t => t[0] === (isZapPoll ? "poll_option" : "option") && t[1] && t[2])
+                .map(t => ({ id: t[1], label: t[2] }));
+              return (
+                <div className="note-embed" onClick={e => { e.stopPropagation(); (onOpenPoll ?? onOpenThread)?.(quotedPollEvent); }}>
+                  <div className="note-embed-head">
+                    <Avatar pk={quotedPollEvent.pubkey} profiles={profiles} size={20} />
+                    <span className="note-embed-name" onClick={e => { e.stopPropagation(); onOpenProfile?.(quotedPollEvent.pubkey); }}>{displayName(quotedPollEvent.pubkey, profiles)}</span>
+                    <span className="poll-badge" style={{ marginLeft: "auto" }}>{isZapPoll ? "⚡ Zap Poll" : "Poll"}</span>
+                  </div>
+                  {quotedPollEvent.content && (
+                    <NoteContent content={quotedPollEvent.content} tags={quotedPollEvent.tags} profiles={profiles} allowEmbeds={false} className="note-text" />
+                  )}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
+                    {opts.map(opt => (
+                      <button key={opt.id} type="button" className="poll-option-btn" disabled style={{ pointerEvents: "none" }}>
+                        {isZapPoll && <span className="poll-zap-icon">⚡</span>}{opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
             {quotedGoalEvent && (
-              <div className="note-embed" onClick={e => { e.stopPropagation(); onOpenThread?.(quotedGoalEvent); }}>
+              <div className="note-embed" onClick={e => { e.stopPropagation(); (onOpenGoal ?? onOpenThread)?.(quotedGoalEvent); }}>
                 <div className="note-embed-head">
                   <Avatar pk={quotedGoalEvent.pubkey} profiles={profiles} size={20} />
                   <span className="note-embed-name" onClick={e => { e.stopPropagation(); onOpenProfile?.(quotedGoalEvent.pubkey); }}>{displayName(quotedGoalEvent.pubkey, profiles)}</span>
@@ -158,7 +171,7 @@ function NoteCard({
               </div>
             )}
             {quotedCalendarEvent && (
-              <CalendarInlineCard event={quotedCalendarEvent} onOpen={onOpenThread} />
+              <CalendarInlineCard event={quotedCalendarEvent} onOpen={onOpenCalendarEvent ?? onOpenThread} />
             )}
             <NoteActions
               event={event}

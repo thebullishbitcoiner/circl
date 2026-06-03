@@ -88,7 +88,7 @@ export default function EventDetailView({
     <div ref={ref} className="slide-panel-scroll">
       <div className="panel-bar">
         <button className="back-btn" onClick={onBack}><Bk s={16} /></button>
-        <span className="panel-bar-logo">Circl</span>
+        <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 15, fontWeight: 600, color: "var(--text)" }}>Event</span>
         <div style={{ display: "flex", gap: 3 }} />
       </div>
 

@@ -1,4 +1,5 @@
 import { useState, memo } from "react";
+import { useNavigation } from "../context/NavigationContext.jsx";
 import { createPortal } from "react-dom";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
@@ -38,6 +39,7 @@ function PollCard({
   onOpenVotes,
   delay = 0,
 }) {
+  const { onOpenPoll } = useNavigation();
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
   const [localModal, setLocalModal] = useState(null);
@@ -116,7 +118,7 @@ function PollCard({
 
   return (
     <>
-      <div className="note-card" style={{ animationDelay: `${delay}s`, zIndex: cardMenuOpen ? 1 : undefined }} onClick={() => onOpenThread?.(event)}>
+      <div className="note-card" style={{ animationDelay: `${delay}s`, zIndex: cardMenuOpen ? 1 : undefined }} onClick={() => (onOpenPoll ?? onOpenThread)?.(event)}>
         <div className="note-header">
           <div onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }} style={{ cursor: "pointer", flexShrink: 0 }}>
             <Avatar pk={event.pubkey} profiles={profiles} size={36} />
@@ -156,7 +158,7 @@ function PollCard({
               className="poll-question"
             />
 
-            <div className="poll-options" onClick={e => e.stopPropagation()}>
+            <div className="poll-options">
               {options.map(opt => {
                 const count = effectiveCounts[opt.id] ?? 0;
                 const p = pct(count, effectiveTotal);
@@ -184,7 +186,7 @@ function PollCard({
                     key={opt.id}
                     type="button"
                     className="poll-option-btn"
-                    onClick={() => handleOptionClick(opt.id)}
+                    onClick={e => { e.stopPropagation(); handleOptionClick(opt.id); }}
                     disabled={loading}
                   >
                     {isZapPoll && <span className="poll-zap-icon">⚡</span>}

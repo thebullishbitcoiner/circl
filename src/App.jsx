@@ -38,10 +38,12 @@ import RepostCard from "./components/RepostCard.jsx";
 import PollCard from "./components/PollCard.jsx";
 import PollInline from "./components/PollInline.jsx";
 import NoteActions from "./components/NoteActions.jsx";
+import NavigationContext from "./context/NavigationContext.jsx";
 import ArticleReader from "./components/ArticleReader.jsx";
 import HighlightCard from "./components/HighlightCard.jsx";
 import CalendarCard from "./components/CalendarCard.jsx";
 import EventDetailView from "./components/EventDetailView.jsx";
+import PollPage from "./components/PollPage.jsx";
 import FeedItem from "./components/FeedItem.jsx";
 import StreamCard from "./components/StreamCard.jsx";
 import StreamDetailView from "./components/StreamDetailView.jsx";
@@ -219,7 +221,6 @@ export default function App() {
     try { return parseInt(localStorage.getItem("circl_notif_seen_v1") || "0", 10); } catch { return 0; }
   });
   const [openArticle, setOpenArticle] = useState(null);
-  const [openCalendarEvent, setOpenCalendarEvent] = useState(null);
   const [openStreamEvent, setOpenStreamEvent] = useState(null);
   const [navStack, setNavStack] = useState([]);
 
@@ -252,7 +253,9 @@ export default function App() {
     pushNav({ type: "circle", payload: { pubkey: cpk, follows: cFollows } });
   const handleOpenNote = event => pushNav({ type: "note", payload: event });
   const handleOpenThread = event => pushNav({ type: "thread", payload: event });
-  const handleOpenGoal   = event => pushNav({ type: "goal",   payload: event });
+  const handleOpenGoal            = event => pushNav({ type: "goal",     payload: event });
+  const handleOpenCalendarEvent   = event => pushNav({ type: "calendar", payload: event });
+  const handleOpenPoll            = event => pushNav({ type: "poll",     payload: event });
   const handleOpenZaps = ({ eventId, zaps }) => pushNav({ type: "zaps", payload: { eventId, zaps } });
   const handleOpenReactions = ({ eventId, reactions }) => pushNav({ type: "reactions", payload: { eventId, reactions } });
   const handleOpenReposts = ({ eventId, reposts }) => pushNav({ type: "reposts", payload: { eventId, reposts } });
@@ -359,7 +362,6 @@ export default function App() {
     }
     setActiveNav(nav);
     setOpenArticle(null);
-    setOpenCalendarEvent(null);
     setOpenStreamEvent(null);
     setVisibleCount(20);
     setSettingsOpen(false);
@@ -375,7 +377,7 @@ export default function App() {
 
   const displayEvs = activeNav === "bookmarks" ? bookmarkFeedEvents : events;
   const isLoading = fl || el;
-  const anyPanelOpen = settingsOpen || !!openArticle || !!openCalendarEvent || !!openStreamEvent || navStack.length > 0;
+  const anyPanelOpen = settingsOpen || !!openArticle || !!openStreamEvent || navStack.length > 0;
   const myProfile = profiles[pubkey];
   const myDisplayName = displayName(pubkey, profiles);
   const myNpub = (() => {
@@ -406,6 +408,20 @@ export default function App() {
   }
 
   return (
+    <NavigationContext.Provider value={{
+      onOpenThread: handleOpenThread,
+      onOpenProfile: handleOpenProfile,
+      onOpenGoal: handleOpenGoal,
+      onOpenPoll: handleOpenPoll,
+      onOpenCalendarEvent: handleOpenCalendarEvent,
+      onOpenStream: setOpenStreamEvent,
+      onOpenArticle: setOpenArticle,
+      onOpenHashtag: handleOpenHashtag,
+      onOpenZaps: handleOpenZaps,
+      onOpenReactions: handleOpenReactions,
+      onOpenReposts: handleOpenReposts,
+      onOpenPollVotes: handleOpenPollVotes,
+    }}>
     <>
       <div className="app-shell">
 
@@ -420,7 +436,7 @@ export default function App() {
               {item.label}
             </button>
           ))}
-          <button className={`nav-item ${settingsOpen ? "active" : ""}`} onClick={() => { setOpenArticle(null); setOpenCalendarEvent(null); clearNav(); setSettingsOpen(true); }}>
+          <button className={`nav-item ${settingsOpen ? "active" : ""}`} onClick={() => { setOpenArticle(null); clearNav(); setSettingsOpen(true); }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="nav-icon">
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
@@ -501,10 +517,8 @@ export default function App() {
                                 onBookmark={handleBookmark}
                                 onOpenProfile={handleOpenProfile}
                                 onOpenThread={handleOpenThread}
-                                onOpenGoal={handleOpenGoal}
                                 onOpenHashtag={handleOpenHashtag}
                                 onOpenArticle={setOpenArticle}
-                                onOpenCalendarEvent={setOpenCalendarEvent}
                                 onOpenStream={setOpenStreamEvent}
                                 onOpenZaps={handleOpenZaps}
                                 onOpenReactions={handleOpenReactions}
@@ -642,43 +656,6 @@ export default function App() {
                 )}
               </div>
 
-              <div className={`slide-panel ${openCalendarEvent ? "open" : ""}`}>
-                {openCalendarEvent && (
-                  <EventDetailView
-                    event={openCalendarEvent}
-                    profiles={profiles}
-                    pubkey={pubkey}
-                    myProfile={myProfile}
-                    events={mergedFeedPool}
-                    publishEvent={publishEvent}
-                    onBack={() => setOpenCalendarEvent(null)}
-                    onOpenProfile={pk => { setOpenCalendarEvent(null); handleOpenProfile(pk); }}
-                    onOpenThread={handleOpenThread}
-                    onOpenZaps={handleOpenZaps}
-                    onOpenReactions={handleOpenReactions}
-                    onOpenReposts={handleOpenReposts}
-                    onPublish={prependEvent}
-                    onPrepend={prependEvent}
-                    onBookmark={handleBookmark}
-                    isBookmarked={isBookmarked}
-                    getLocalZaps={getLocalZaps}
-                    addLocalZap={addLocalZap}
-                    getLocalReactions={getLocalReactions}
-                    setLocalReaction={setLocalReaction}
-                    onRequestModal={setPanelModal}
-                    onDismissModal={() => setPanelModal(null)}
-                    sendZap={sendZap}
-                    defaultZapAmount={zapSettings.amount}
-                    defaultZapMsg={zapSettings.msg}
-                    onZapFail={reason => showToast(
-                      reason === "no_lud16"  ? "⚡ No lightning address" :
-                      reason === "no_wallet" ? "⚡ No wallet connected" :
-                      `⚡ Zap failed: ${reason}`
-                    )}
-                  />
-                )}
-              </div>
-
               <div className={`slide-panel ${openStreamEvent ? "open" : ""}`}>
                 {openStreamEvent && (
                   <StreamDetailView
@@ -691,9 +668,9 @@ export default function App() {
                 )}
               </div>
 
-              <SwipePanel open={navStack.length > 0 && !openArticle && !openCalendarEvent && !openStreamEvent && !settingsOpen} onSwipeRight={handleBack}>
-                {/* Keep the previous circle entry mounted when a profile is open on top of it */}
-                {navStack.length >= 2 && !openArticle && !openCalendarEvent && !openStreamEvent && !settingsOpen && (() => {
+              <SwipePanel open={navStack.length > 0 && !openArticle && !openStreamEvent && !settingsOpen} onSwipeRight={handleBack}>
+                {/* Keep CirclePage mounted when a profile is opened on top of it */}
+                {navStack.length >= 2 && !openArticle && !openStreamEvent && !settingsOpen && (() => {
                   const prev = navStack[navStack.length - 2];
                   const top  = navStack[navStack.length - 1];
                   if (prev.type !== "circle" || top.type !== "profile") return null;
@@ -714,25 +691,34 @@ export default function App() {
                     </div>
                   );
                 })()}
-                {navStack.length > 0 && !openArticle && !openCalendarEvent && !openStreamEvent && !settingsOpen && (() => {
-                  const top = navStack[navStack.length - 1];
-
-                  if (top.type === "profile") {
-                    return (
+                {/* ProfilePage: always rendered when in navStack, CSS-hidden when not top.
+                    Keeping the same React element alive preserves scroll position. */}
+                {!openArticle && !openStreamEvent && !settingsOpen && (() => {
+                  const entries = navStack.map((e, i) => ({ e, i }));
+                  const found = [...entries].reverse().find(({ e }) => e.type === "profile");
+                  if (!found) return null;
+                  const { e: profileEntry, i: idx } = found;
+                  const isTop = idx === navStack.length - 1;
+                  return (
+                    <div
+                      key={`profile-${profileEntry.payload}`}
+                      style={isTop
+                        ? { height: "100%" }
+                        : { position: "absolute", inset: 0, visibility: "hidden", pointerEvents: "none", overflow: "hidden" }}
+                    >
                       <ProfilePage
-                        key={top.payload}
-                        pubkey={top.payload}
+                        key={profileEntry.payload}
+                        pubkey={profileEntry.payload}
                         myPubkey={pubkey}
                         profiles={profiles}
                         follows={follows}
                         events={mergedFeedPool}
-                        isOwn={top.payload === pubkey}
+                        isOwn={profileEntry.payload === pubkey}
                         backLabel={backLabel}
                         onBack={handleBack}
                         onOpenProfile={handleOpenProfile}
                         onOpenNote={handleOpenNote}
                         onOpenThread={handleOpenThread}
-                        onOpenGoal={handleOpenGoal}
                         onOpenHashtag={handleOpenHashtag}
                         onOpenZaps={handleOpenZaps}
                         onOpenReactions={handleOpenReactions}
@@ -752,10 +738,11 @@ export default function App() {
                         defaultZapAmount={zapSettings.amount}
                         defaultZapMsg={zapSettings.msg}
                         onZapFail={reason => showToast(
-                                        reason === "no_lud16"  ? "⚡ No lightning address" :
-                                        reason === "no_wallet" ? "⚡ No wallet connected" :
-                                        `⚡ Zap failed: ${reason}`
-                                      )}                        onRequestModal={setPanelModal}
+                          reason === "no_lud16"  ? "⚡ No lightning address" :
+                          reason === "no_wallet" ? "⚡ No wallet connected" :
+                          `⚡ Zap failed: ${reason}`
+                        )}
+                        onRequestModal={setPanelModal}
                         onDismissModal={() => setPanelModal(null)}
                         resolveEventById={resolveEventById}
                         onOpenCircle={handleOpenCircle}
@@ -763,12 +750,16 @@ export default function App() {
                         onUnfollow={unfollowPk}
                         onOpenPollVotes={handleOpenPollVotes}
                         onOpenArticle={setOpenArticle}
-                        onOpenCalendarEvent={setOpenCalendarEvent}
                         onOpenStream={setOpenStreamEvent}
-                        scrollToTopTrigger={top.payload === pubkey ? profileScrollTrigger : 0}
+                        scrollToTopTrigger={isTop && profileEntry.payload === pubkey ? profileScrollTrigger : 0}
                       />
-                    );
-                  }
+                    </div>
+                  );
+                })()}
+                {navStack.length > 0 && !openArticle && !openStreamEvent && !settingsOpen && (() => {
+                  const top = navStack[navStack.length - 1];
+
+                  if (top.type === "profile") return null; // rendered persistently above
 
                   if (top.type === "circle") {
                     const isOwnCircle = top.payload.pubkey === pubkey;
@@ -845,6 +836,82 @@ export default function App() {
                         onOpenReposts={handleOpenReposts}
                         onPublish={prependEvent}
                         publishEvent={publishEvent}
+                        onPrepend={prependEvent}
+                        onBookmark={handleBookmark}
+                        isBookmarked={isBookmarked}
+                        getLocalZaps={getLocalZaps}
+                        addLocalZap={addLocalZap}
+                        getLocalReactions={getLocalReactions}
+                        setLocalReaction={setLocalReaction}
+                        onRequestModal={setPanelModal}
+                        onDismissModal={() => setPanelModal(null)}
+                        sendZap={sendZap}
+                        defaultZapAmount={zapSettings.amount}
+                        defaultZapMsg={zapSettings.msg}
+                        onZapFail={reason => showToast(
+                          reason === "no_lud16"  ? "⚡ No lightning address" :
+                          reason === "no_wallet" ? "⚡ No wallet connected" :
+                          `⚡ Zap failed: ${reason}`
+                        )}
+                      />
+                    );
+                  }
+
+                  if (top.type === "calendar") {
+                    return (
+                      <EventDetailView
+                        key={top.payload.id}
+                        event={top.payload}
+                        profiles={profiles}
+                        pubkey={pubkey}
+                        myProfile={myProfile}
+                        events={mergedFeedPool}
+                        publishEvent={publishEvent}
+                        onBack={handleBack}
+                        onOpenProfile={handleOpenProfile}
+                        onOpenThread={handleOpenThread}
+                        onOpenZaps={handleOpenZaps}
+                        onOpenReactions={handleOpenReactions}
+                        onOpenReposts={handleOpenReposts}
+                        onPublish={prependEvent}
+                        onPrepend={prependEvent}
+                        onBookmark={handleBookmark}
+                        isBookmarked={isBookmarked}
+                        getLocalZaps={getLocalZaps}
+                        addLocalZap={addLocalZap}
+                        getLocalReactions={getLocalReactions}
+                        setLocalReaction={setLocalReaction}
+                        onRequestModal={setPanelModal}
+                        onDismissModal={() => setPanelModal(null)}
+                        sendZap={sendZap}
+                        defaultZapAmount={zapSettings.amount}
+                        defaultZapMsg={zapSettings.msg}
+                        onZapFail={reason => showToast(
+                          reason === "no_lud16"  ? "⚡ No lightning address" :
+                          reason === "no_wallet" ? "⚡ No wallet connected" :
+                          `⚡ Zap failed: ${reason}`
+                        )}
+                      />
+                    );
+                  }
+
+                  if (top.type === "poll") {
+                    return (
+                      <PollPage
+                        key={top.payload.id}
+                        event={top.payload}
+                        profiles={profiles}
+                        myPubkey={pubkey}
+                        myProfile={myProfile}
+                        events={mergedFeedPool}
+                        publishEvent={publishEvent}
+                        onBack={handleBack}
+                        onOpenProfile={handleOpenProfile}
+                        onOpenThread={handleOpenThread}
+                        onOpenZaps={handleOpenZaps}
+                        onOpenReactions={handleOpenReactions}
+                        onOpenReposts={handleOpenReposts}
+                        onPublish={prependEvent}
                         onPrepend={prependEvent}
                         onBookmark={handleBookmark}
                         isBookmarked={isBookmarked}
@@ -1175,7 +1242,7 @@ export default function App() {
             </button>
           ))}
 
-          <button type="button" className={`bottom-settings-btn${settingsOpen ? " active" : ""}`} onClick={() => { setOpenArticle(null); setOpenCalendarEvent(null); clearNav(); setSettingsOpen(true); }}>
+          <button type="button" className={`bottom-settings-btn${settingsOpen ? " active" : ""}`} onClick={() => { setOpenArticle(null); clearNav(); setSettingsOpen(true); }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
@@ -1188,5 +1255,6 @@ export default function App() {
 
       <div className={`toast ${toast.show ? "show" : ""}`}>{toast.msg}</div>
     </>
+    </NavigationContext.Provider>
   );
 }

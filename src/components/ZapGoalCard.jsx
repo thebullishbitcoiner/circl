@@ -1,4 +1,5 @@
 import { useState, memo } from "react";
+import { useNavigation } from "../context/NavigationContext.jsx";
 import { createPortal } from "react-dom";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
@@ -13,7 +14,7 @@ function ZapGoalCard({
   myPubkey, myProfile,
   events = [],
   resolveEventById,
-  onOpenProfile, onOpenGoal, onOpenThread, onOpenHashtag, onOpenZaps, onOpenReactions, onOpenReposts,
+  onOpenProfile, onOpenThread, onOpenHashtag, onOpenZaps, onOpenReactions, onOpenReposts,
   onPublish, publishEvent, onPrepend,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail,
@@ -21,6 +22,7 @@ function ZapGoalCard({
   isBookmarked, onBookmark,
   delay = 0,
 }) {
+  const { onOpenGoal } = useNavigation();
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [jsonOpen, setJsonOpen]         = useState(false);
 

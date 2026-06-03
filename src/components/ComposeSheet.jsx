@@ -335,9 +335,9 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
             <div className="compose-sheet-context-label">Replying to</div>
             <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
               <Avatar pk={replyTo.pubkey} profiles={profiles} size={24} />
-              <div>
+              <div style={{ minWidth: 0, flex: 1 }}>
                 <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted)" }}>{displayName(replyTo.pubkey, profiles)}</span>
-                <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12.5, color: "var(--text-muted)", margin: "2px 0 0", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12.5, color: "var(--text-muted)", margin: "2px 0 0", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "break-word", overflowWrap: "anywhere" }}>
                   {replyTo.content}
                 </p>
               </div>

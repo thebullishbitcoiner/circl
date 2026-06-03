@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigation } from "../context/NavigationContext.jsx";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteActions from "./NoteActions.jsx";
@@ -11,12 +12,13 @@ import CalendarInlineCard from "./CalendarInlineCard.jsx";
 export default function RepostCard({
   event, profiles, events, myPubkey, myProfile,
   resolveEventById,
-  onOpenProfile, onOpenThread, onOpenHashtag, onOpenCalendarEvent, onOpenZaps, onOpenReactions, onOpenReposts,
+  onOpenProfile, onOpenThread, onOpenHashtag, onOpenZaps, onOpenReactions, onOpenReposts,
   onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal, delay,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail, onOpenPollVotes,
 }) {
+  const { onOpenCalendarEvent } = useNavigation();
   const originalId  = event.tags.find(t => t[0] === "e")?.[1];
   const fromContent = (() => { try { return JSON.parse(event.content); } catch { return null; } })();
   const fromPool    = originalId ? events.find(e => e.id === originalId) : null;

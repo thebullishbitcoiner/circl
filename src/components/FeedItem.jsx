@@ -20,8 +20,8 @@ export default function FeedItem({
   profiles, events = [], resolveEventById,
   myPubkey, myProfile,
   // openers
-  onOpenProfile, onOpenThread, onOpenGoal, onOpenHashtag,
-  onOpenArticle, onOpenCalendarEvent, onOpenStream,
+  onOpenProfile, onOpenThread, onOpenHashtag,
+  onOpenArticle, onOpenStream,
   onOpenZaps, onOpenReactions, onOpenReposts, onOpenPollVotes,
   // interactions — getLike/onLike are optional (cards using NoteActions handle their own state)
   getLike, onLike,
@@ -76,7 +76,6 @@ export default function FeedItem({
         onOpenProfile={onOpenProfile}
         onOpenThread={onOpenThread}
         onOpenHashtag={onOpenHashtag}
-        onOpenCalendarEvent={onOpenCalendarEvent}
         onOpenZaps={onOpenZaps}
         onOpenReactions={onOpenReactions}
         onOpenReposts={onOpenReposts}
@@ -112,7 +111,6 @@ export default function FeedItem({
         myPubkey={myPubkey}
         myProfile={myProfile}
         onOpenProfile={onOpenProfile}
-        onOpenGoal={onOpenGoal}
         onOpenThread={onOpenThread}
         onOpenHashtag={onOpenHashtag}
         {...noteActionProps}
@@ -150,7 +148,6 @@ export default function FeedItem({
         myPubkey={myPubkey}
         myProfile={myProfile}
         events={events}
-        onOpen={onOpenCalendarEvent}
         onOpenProfile={onOpenProfile}
         onOpenThread={onOpenThread}
         onOpenHashtag={onOpenHashtag}

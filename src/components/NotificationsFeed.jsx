@@ -4,6 +4,21 @@ import { displayName, relativeTime, zapCommentFromKind9735, zapperPubkeyFromKind
 import { getNotificationSummary } from "../hooks/useNotifications.js";
 import { eventStore } from "../nostr.js";
 
+function resolveEmoji(content, tags) {
+  const m = content?.match(/^:([a-zA-Z0-9_]+):$/);
+  if (!m) return content;
+  const url = tags?.find(t => t[0] === "emoji" && t[1] === m[1])?.[2];
+  return url ? { url, name: content } : content;
+}
+
+function EmojiOrText({ value }) {
+  if (!value) return null;
+  if (typeof value === "object" && value.url) {
+    return <img src={value.url} alt={value.name} className="note-custom-emoji" style={{ height: "1.1em", verticalAlign: "middle" }} />;
+  }
+  return <>{value}</>;
+}
+
 const AV_SIZE = 36;
 const MAX_AV = 4;
 const AV_OVERLAP = 10;
@@ -81,7 +96,7 @@ function NotePreview({ ev, profiles }) {
   );
 }
 
-const timeStyle = { position: "absolute", top: 14, right: ROW_PAD, fontSize: 11, color: "var(--text-faint)", whiteSpace: "nowrap" };
+const timeStyle = { fontSize: 11, color: "var(--text-faint)", whiteSpace: "nowrap", flexShrink: 0, marginLeft: "auto", paddingLeft: 8 };
 
 export default function NotificationsFeed({ items, profiles, onOpenProfile, onOpenNotification, allEvents }) {
   if (!items.length) {
@@ -100,14 +115,14 @@ export default function NotificationsFeed({ items, profiles, onOpenProfile, onOp
     <>
       {grouped.map((entry, i) => {
         const delay = { animationDelay: `${Math.min(i, 12) * 0.03}s` };
-        const rowStyle = { ...delay, position: "relative", display: "flex", flexDirection: "column", paddingRight: ROW_PAD + 44 };
+        const rowStyle = { ...delay, display: "flex", flexDirection: "column" };
 
         if (entry.type === "group") {
           const { kind, targetId, actors, latestAt } = entry;
           const targetEv = evById.get(targetId);
           const pubkeys = [...new Set(actors.map(a => a.pubkey))];
-          const emoji = kind === 7 ? (actors[0].content === "+" || !actors[0].content ? "💜" : actors[0].content) : null;
-          const verb = kind === 7 ? `reacted ${emoji} to your note` : kind === 1018 ? "voted in your poll" : "reposted your note";
+          const rawEmoji = kind === 7 ? (actors[0].content === "+" || !actors[0].content ? "💜" : actors[0].content) : null;
+          const emoji = rawEmoji ? resolveEmoji(rawEmoji, actors[0].tags) : null;
           const single = pubkeys.length === 1;
 
           return (
@@ -115,7 +130,6 @@ export default function NotificationsFeed({ items, profiles, onOpenProfile, onOp
               onClick={() => onOpenNotification?.(actors[0])} role="button" tabIndex={0}
               onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenNotification?.(actors[0]); } }}
             >
-              <span style={timeStyle}>{relativeTime(latestAt)}</span>
               {single ? (
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                   <div onClick={e => e.stopPropagation()} style={{ flexShrink: 0 }}>
@@ -123,17 +137,23 @@ export default function NotificationsFeed({ items, profiles, onOpenProfile, onOp
                   </div>
                   <div className="notif-text" style={{ margin: 0 }}>
                     <ActorNames actors={actors} profiles={profiles} onOpenProfile={onOpenProfile} />
-                    {" "}<span className="notif-action">{verb}</span>
+                    {" "}<span className="notif-action">
+                      {kind === 7 ? <>reacted <EmojiOrText value={emoji} /> to your note</> : kind === 1018 ? "voted in your poll" : "reposted your note"}
+                    </span>
                   </div>
+                  <span style={timeStyle}>{relativeTime(latestAt)}</span>
                 </div>
               ) : (
                 <>
-                  <div onClick={e => e.stopPropagation()} style={{ marginBottom: 6 }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 6 }} onClick={e => e.stopPropagation()}>
                     <AvatarStack pubkeys={pubkeys} profiles={profiles} onOpenProfile={onOpenProfile} />
+                    <span style={{ ...timeStyle, marginLeft: "auto" }}>{relativeTime(latestAt)}</span>
                   </div>
                   <div className="notif-text">
                     <ActorNames actors={actors} profiles={profiles} onOpenProfile={onOpenProfile} />
-                    {" "}<span className="notif-action">{verb}</span>
+                    {" "}<span className="notif-action">
+                      {kind === 7 ? <>reacted <EmojiOrText value={emoji} /> to your note</> : kind === 1018 ? "voted in your poll" : "reposted your note"}
+                    </span>
                   </div>
                 </>
               )}
@@ -181,7 +201,6 @@ export default function NotificationsFeed({ items, profiles, onOpenProfile, onOp
             onClick={() => onOpenNotification?.(ev)} role="button" tabIndex={0}
             onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenNotification?.(ev); } }}
           >
-            <span style={timeStyle}>{relativeTime(ev.created_at)}</span>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
               <div onClick={e => e.stopPropagation()} style={{ flexShrink: 0 }}>
                 <AvatarStack pubkeys={[actorPubkey]} profiles={profiles} onOpenProfile={onOpenProfile} />
@@ -195,6 +214,7 @@ export default function NotificationsFeed({ items, profiles, onOpenProfile, onOp
                 </span>
                 <span className="notif-action"> {headline}{detail ? ` · ${detail}` : ""}</span>
               </div>
+              <span style={timeStyle}>{relativeTime(ev.created_at)}</span>
             </div>
             {preview}
           </div>

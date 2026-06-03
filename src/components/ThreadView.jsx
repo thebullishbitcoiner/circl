@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState, useMemo } from "react";
+import { useNavigation } from "../context/NavigationContext.jsx";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteActions from "./NoteActions.jsx";
@@ -26,6 +27,7 @@ function ThreadNoteRow({
   focusRef, hasConnector = false,
   threadMenuId, setThreadMenuId, onShowThreadJson,
 }) {
+  const { onOpenGoal, onOpenPoll, onOpenCalendarEvent } = useNavigation();
   const rCount    = replyCount(event.id, allEvents);
   const [highlightDraft, setHighlightDraft] = useState(null);
   const contentRef = useRef(null);
@@ -121,6 +123,7 @@ function ThreadNoteRow({
                     allEvents={allEvents}
                     onOpenThread={onOpenThread}
                     resolveEventById={resolveEventById}
+                    onOpenCalendarEvent={onOpenCalendarEvent}
                     className="note-text"
                     collapsible={!focused} />
                 ) : null}
@@ -142,9 +145,34 @@ function ThreadNoteRow({
                 )}
                 {isQuote && quotedEv && (() => {
                   const qKind = quotedEv.kind;
+                  if (qKind === 1068 || qKind === 6969) {
+                    const isZapPoll = qKind === 6969;
+                    const opts = quotedEv.tags
+                      .filter(t => t[0] === (isZapPoll ? "poll_option" : "option") && t[1] && t[2])
+                      .map(t => ({ id: t[1], label: t[2] }));
+                    return (
+                      <div className="note-embed" onClick={e => { e.stopPropagation(); (onOpenPoll ?? onOpenThread)?.(quotedEv); }}>
+                        <div className="note-embed-head">
+                          <Avatar pk={quotedEv.pubkey} profiles={profiles} size={20} />
+                          <span className="note-embed-name" onClick={e => { e.stopPropagation(); onOpenProfile?.(quotedEv.pubkey); }}>{displayName(quotedEv.pubkey, profiles)}</span>
+                          <span className="poll-badge" style={{ marginLeft: "auto" }}>{isZapPoll ? "⚡ Zap Poll" : "Poll"}</span>
+                        </div>
+                        {quotedEv.content && (
+                          <NoteContent content={quotedEv.content} tags={quotedEv.tags} profiles={profiles} allowEmbeds={false} className="note-text" />
+                        )}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
+                          {opts.map(opt => (
+                            <button key={opt.id} type="button" className="poll-option-btn" disabled style={{ pointerEvents: "none" }}>
+                              {isZapPoll && <span className="poll-zap-icon">⚡</span>}{opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }
                   if (qKind === 9041) {
                     return (
-                      <div className="note-embed" onClick={e => { e.stopPropagation(); onOpenThread?.(quotedEv); }}>
+                      <div className="note-embed" onClick={e => { e.stopPropagation(); (onOpenGoal ?? onOpenThread)?.(quotedEv); }}>
                         <div className="note-embed-head">
                           <Avatar pk={quotedEv.pubkey} profiles={profiles} size={20} />
                           <span className="note-embed-name" onClick={e => { e.stopPropagation(); onOpenProfile?.(quotedEv.pubkey); }}>{displayName(quotedEv.pubkey, profiles)}</span>
@@ -158,7 +186,7 @@ function ThreadNoteRow({
                     );
                   }
                   if (qKind === 31922 || qKind === 31923) {
-                    return <CalendarInlineCard event={quotedEv} onOpen={onOpenThread} />;
+                    return <CalendarInlineCard event={quotedEv} onOpen={onOpenCalendarEvent ?? onOpenThread} />;
                   }
                   return (
                     <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px", background: "var(--surface)", marginTop: 6, cursor: "pointer" }}
@@ -305,7 +333,8 @@ export default function ThreadView({
 
   const rowProps = {
     profiles, allEvents,
-    onOpenProfile, onOpenThread, onOpenHashtag, onOpenZaps, onOpenReactions, onOpenReposts,
+    onOpenProfile, onOpenThread, onOpenHashtag,
+    onOpenZaps, onOpenReactions, onOpenReposts,
     myPubkey, myProfile, onPublish, publishEvent, onPrepend,
     publishHighlight,
     onBookmark, isBookmarked, getLocalZaps, addLocalZap,

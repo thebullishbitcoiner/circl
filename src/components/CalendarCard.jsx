@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigation } from "../context/NavigationContext.jsx";
 import Avatar from "./Avatar.jsx";
 import NoteActions from "./NoteActions.jsx";
 import { displayName, nip05OrNpub, relativeTime, parseCalendarEvent, formatCalendarDate } from "../utils.js";
@@ -13,7 +14,7 @@ const MapPin = () => (
 );
 
 export default function CalendarCard({
-  event, profiles, onOpen, onOpenProfile, delay,
+  event, profiles, onOpenProfile, delay,
   myPubkey, myProfile, events,
   onOpenThread, onOpenZaps, onOpenReactions, onOpenReposts,
   onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
@@ -21,6 +22,7 @@ export default function CalendarCard({
   onRequestModal, onDismissModal,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
 }) {
+  const { onOpenCalendarEvent } = useNavigation();
   const cal = parseCalendarEvent(event);
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
@@ -30,7 +32,7 @@ export default function CalendarCard({
 
   return (
     <>
-    <div className="calendar-card" style={{ animationDelay: `${delay}s`, zIndex: cardMenuOpen ? 1 : undefined }} onClick={() => onOpen(event)}>
+    <div className="calendar-card" style={{ animationDelay: `${delay}s`, zIndex: cardMenuOpen ? 1 : undefined }} onClick={() => onOpenCalendarEvent(event)}>
       <div className="note-header">
         <div onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }} style={{ cursor: "pointer", flexShrink: 0 }}>
           <Avatar pk={event.pubkey} profiles={profiles} size={36} />
