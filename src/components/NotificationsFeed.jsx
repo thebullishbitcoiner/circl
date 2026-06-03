@@ -2,6 +2,7 @@ import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import { displayName, relativeTime, zapCommentFromKind9735, zapperPubkeyFromKind9735, parseArticle, fmtSats, parseBolt11Msats } from "../utils.js";
 import { getNotificationSummary } from "../hooks/useNotifications.js";
+import { eventStore } from "../nostr.js";
 
 const AV_SIZE = 36;
 const MAX_AV = 4;
@@ -13,7 +14,7 @@ function groupItems(items) {
   const result = [];
   for (const ev of items) {
     const targetId = ev.tags?.find(t => t[0] === "e")?.[1];
-    if ((ev.kind === 7 || ev.kind === 6) && targetId) {
+    if ((ev.kind === 7 || ev.kind === 6 || ev.kind === 1018) && targetId) {
       const key = `${ev.kind}:${targetId}`;
       if (seen.has(key)) {
         result[seen.get(key)].actors.push(ev);
@@ -106,7 +107,7 @@ export default function NotificationsFeed({ items, profiles, onOpenProfile, onOp
           const targetEv = evById.get(targetId);
           const pubkeys = [...new Set(actors.map(a => a.pubkey))];
           const emoji = kind === 7 ? (actors[0].content === "+" || !actors[0].content ? "💜" : actors[0].content) : null;
-          const verb = kind === 7 ? `reacted ${emoji} to your note` : "reposted your note";
+          const verb = kind === 7 ? `reacted ${emoji} to your note` : kind === 1018 ? "voted in your poll" : "reposted your note";
           const single = pubkeys.length === 1;
 
           return (
@@ -153,10 +154,19 @@ export default function NotificationsFeed({ items, profiles, onOpenProfile, onOp
           const satsStr = fmtSats(msats);
           const satsLabel = msats === 1000 ? "sat" : "sats";
           const zappedEventId = ev.tags?.find(t => t[0] === "e")?.[1];
-          const zappedEv = zappedEventId ? evById.get(zappedEventId) : null;
-          headline = zappedEv
-            ? `zapped your note ${satsStr} ${satsLabel}`
-            : `zapped you ${satsStr} ${satsLabel}`;
+          const zappedEv = zappedEventId
+            ? (evById.get(zappedEventId) ?? eventStore.getTimeline([{ ids: [zappedEventId] }])?.[0])
+            : null;
+          const zappedKind = zappedEv?.kind;
+          if (zappedKind === 9041) {
+            headline = `zapped your goal ${satsStr} ${satsLabel}`;
+          } else if (zappedKind === 1068 || zappedKind === 6969) {
+            headline = `zap-voted in your poll ${satsStr} ${satsLabel}`;
+          } else if (zappedEv) {
+            headline = `zapped your note ${satsStr} ${satsLabel}`;
+          } else {
+            headline = `zapped you ${satsStr} ${satsLabel}`;
+          }
           detail = comment;
           preview = zappedEv ? <NotePreview ev={zappedEv} profiles={profiles} /> : null;
         } else {

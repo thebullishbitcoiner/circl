@@ -985,6 +985,28 @@
   .poll-compose-zap-limits{display:flex;align-items:center;gap:8px;}
   input[type="datetime-local"].poll-compose-option-input{color-scheme:light dark;}
 
+  /* ── Zap goal card ── */
+  .zap-goal-title-row{display:block;}
+  .zap-goal-title-row .note-content-stack{display:inline;margin:0;}
+  .zap-goal-title-row .note-text{display:inline;margin:0;}
+  .zap-goal-badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--primary-soft);color:var(--primary);letter-spacing:.2px;margin-left:6px;vertical-align:middle;}
+  .zap-goal-badge-row{display:flex;align-items:center;gap:6px;margin-bottom:6px;}
+  .zap-goal-badge-closed{background:var(--surface2);color:var(--text-faint);}
+  .zap-goal-image{border-radius:12px;overflow:hidden;border:1px solid var(--border);margin-bottom:10px;}
+  .zap-goal-image img{display:block;width:100%;max-height:220px;object-fit:cover;}
+  .zap-goal-summary{font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-muted);margin:8px 0 10px;line-height:1.5;}
+  .zap-goal-progress{margin:8px 0 4px;}
+  .zap-goal-bar-wrap{position:relative;height:8px;border-radius:999px;background:var(--surface2);overflow:hidden;margin-bottom:6px;}
+  .zap-goal-bar-fill{position:absolute;left:0;top:0;height:100%;width:var(--pct,0%);background:var(--primary);border-radius:999px;transition:width .5s ease;}
+  .zap-goal-stats{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;}
+  .zap-goal-raised{font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);}
+  .zap-goal-raised strong{font-weight:600;}
+  .zap-goal-meta{font-size:12px;color:var(--text-faint);}
+  .goal-compose-preview{display:none;width:100%;max-height:140px;object-fit:cover;border-radius:8px;margin-top:6px;border:1px solid var(--border);}
+  .goal-compose-description{resize:vertical;min-height:64px;}
+  .zap-goal-contributors-head{display:flex;align-items:center;gap:8px;padding:16px 16px 8px;border-top:1px solid var(--border);margin-top:8px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;color:var(--text);}
+  .zap-goal-contributors-count{display:inline-flex;align-items:center;justify-content:center;min-width:20px;padding:1px 6px;border-radius:999px;background:var(--surface2);font-size:11px;font-weight:600;color:var(--text-muted);}
+
   /* ── Calendar card ── */
   .calendar-card{padding:13px 18px;border-bottom:1px solid var(--border);cursor:pointer;animation:fadeUp .3s ease both;position:relative;}
   .cal-inner{background:var(--surface);border-radius:14px;overflow:hidden;border:1px solid var(--border);transition:box-shadow .2s,transform .2s;}

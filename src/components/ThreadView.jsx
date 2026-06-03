@@ -12,6 +12,7 @@ import NoteJsonModal from "./NoteJsonModal.jsx";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 import PollInline from "./PollInline.jsx";
+import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
 
 function ThreadNoteRow({
   event, variant = "normal", profiles, allEvents, onOpenProfile, onOpenThread, onOpenHashtag,
@@ -87,6 +88,7 @@ function ThreadNoteRow({
             />
           )}
           {(() => {
+            const isGoal    = event.kind === 9041;
             const isPoll    = event.kind === 1068 || event.kind === 6969;
             const isQuote   = isQuoteRepost(event);
             const quotedId  = isQuote ? event.tags.find(t => t[0] === "q")?.[1] : null;
@@ -94,9 +96,25 @@ function ThreadNoteRow({
             const displayContent = isQuote
               ? event.content.replace(/\nnostr:\S+/g, "").replace(/nostr:\S+/g, "").trim()
               : event.content;
+            const goalClosed = isGoal && (() => {
+              const ts = event.tags?.find(t => t[0] === "closed_at")?.[1];
+              return ts ? Math.floor(Date.now() / 1000) > Number(ts) : false;
+            })();
             return (
               <>
-                {displayContent && (
+                {isGoal && displayContent ? (
+                  <div className="zap-goal-title-row">
+                    <NoteContent content={displayContent} tags={event.tags} profiles={profiles} onOpenProfile={onOpenProfile}
+                      onOpenHashtag={onOpenHashtag}
+                      allEvents={allEvents}
+                      onOpenThread={onOpenThread}
+                      resolveEventById={resolveEventById}
+                      className="note-text"
+                      collapsible={!focused} />
+                    <span className="zap-goal-badge">⚡ Goal</span>
+                    {goalClosed && <span className="zap-goal-badge zap-goal-badge-closed">Closed</span>}
+                  </div>
+                ) : displayContent ? (
                   <NoteContent content={displayContent} tags={event.tags} profiles={profiles} onOpenProfile={onOpenProfile}
                     onOpenHashtag={onOpenHashtag}
                     allEvents={allEvents}
@@ -104,7 +122,8 @@ function ThreadNoteRow({
                     resolveEventById={resolveEventById}
                     className="note-text"
                     collapsible={!focused} />
-                )}
+                ) : null}
+                {isGoal && <ZapGoalProgressBlock event={event} hideBadge />}
                 {isPoll && (
                   <PollInline
                     event={event}

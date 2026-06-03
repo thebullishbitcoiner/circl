@@ -2,10 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import Overlay from "./Overlay.jsx";
 import Avatar from "./Avatar.jsx";
 import { displayName, avatarInitial, replyTagsForPublish, nip19 } from "../utils.js";
-import { GIPHY_KEY } from "../constants.js";
-import { broadcastEvent } from "../nostr.js";
+import { GIPHY_KEY, RELAYS } from "../constants.js";
+import { broadcastEvent, pool } from "../nostr.js";
 import EmojiPicker from "./EmojiPicker.jsx";
 import PollCompose from "./PollCompose.jsx";
+import GoalCompose from "./GoalCompose.jsx";
 
 export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey, myProfile, onPost, onDismiss, publishEvent, onPrepend, events = [] }) {
   const [hasText,        setHasText]        = useState(false);
@@ -27,12 +28,19 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   const [pollExpiry,     setPollExpiry]     = useState("");
   const [zapMin,         setZapMin]         = useState("");
   const [zapMax,         setZapMax]         = useState("");
+  const [goalMode,        setGoalMode]        = useState(false);
+  const [goalTitle,       setGoalTitle]       = useState("");
+  const [goalDescription, setGoalDescription] = useState("");
+  const [goalAmount,      setGoalAmount]      = useState("");
+  const [goalClosedAt,    setGoalClosedAt]    = useState("");
+  const [goalImage,       setGoalImage]       = useState("");
   const fileRef   = useRef(null);
   const editorRef = useRef(null);
 
-  const title   = quotedEvent ? "Quote repost" : replyTo ? "Reply" : pollMode ? "New Poll" : "New note";
+  const title   = quotedEvent ? "Quote repost" : replyTo ? "Reply" : goalMode ? "New Goal" : pollMode ? "New Poll" : "New note";
   const pollValid = pollMode && pollOptions.filter(o => o.trim()).length >= 2;
-  const canPost = pollMode ? pollValid : (hasText || media.length > 0);
+  const goalValid = goalMode && goalTitle.trim().length > 0 && Number(goalAmount) > 0;
+  const canPost = goalMode ? goalValid : pollMode ? pollValid : (hasText || media.length > 0);
 
   // Walk the contenteditable DOM and produce the final content string,
   // converting mention chip spans back to their nostr: URIs.
@@ -80,6 +88,22 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
 
       const published = await publishEvent({ kind: isZap ? 6969 : 1068, content: question, tags });
       if (published) onPrepend?.(published);
+      onDismiss?.();
+      return;
+    }
+
+    if (goalMode && publishEvent) {
+      const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+      const tags = [
+        ["amount", String(Math.round(Number(goalAmount) * 1000))],
+        ["relays", ...relayUrls],
+      ];
+      if (goalDescription.trim()) tags.push(["summary", goalDescription.trim()]);
+      if (goalClosedAt) tags.push(["closed_at", String(Math.floor(new Date(goalClosedAt).getTime() / 1000))]);
+      if (goalImage.trim()) tags.push(["image", goalImage.trim()]);
+      const published = await publishEvent({ kind: 9041, content: goalTitle.trim(), tags });
+      if (!published) { setUploadErr("Failed to publish — please try again."); return; }
+      onPrepend?.(published);
       onDismiss?.();
       return;
     }
@@ -321,7 +345,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
           </div>
         )}
 
-        <div className="compose-sheet-body">
+        {!goalMode && <div className="compose-sheet-body">
           <div className="compose-sheet-av">
             {myProfile?.picture
               ? <img src={myProfile.picture} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
@@ -337,7 +361,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
             onPaste={handlePaste}
             data-placeholder={replyTo ? "Write your reply…" : "What's on your mind?"}
           />
-        </div>
+        </div>}
 
         {pollMode && (
           <PollCompose
@@ -353,6 +377,21 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
             onChangeZapMin={setZapMin}
             zapMax={zapMax}
             onChangeZapMax={setZapMax}
+          />
+        )}
+
+        {goalMode && (
+          <GoalCompose
+            title={goalTitle}
+            onChangeTitle={setGoalTitle}
+            description={goalDescription}
+            onChangeDescription={setGoalDescription}
+            amount={goalAmount}
+            onChangeAmount={setGoalAmount}
+            closedAt={goalClosedAt}
+            onChangeClosedAt={setGoalClosedAt}
+            image={goalImage}
+            onChangeImage={setGoalImage}
           />
         )}
 
@@ -464,7 +503,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
               type="button"
               className="compose-media-btn"
               title="Create poll"
-              onClick={() => { setShowEmoji(false); setShowGif(false); setPollMode(v => !v); }}
+              onClick={() => { setShowEmoji(false); setShowGif(false); setGoalMode(false); setPollMode(v => !v); }}
               style={pollMode ? { color: "var(--primary)", background: "var(--surface)" } : {}}
               aria-pressed={pollMode}
             >
@@ -472,6 +511,22 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
                 <line x1="18" y1="20" x2="18" y2="10" />
                 <line x1="12" y1="20" x2="12" y2="4" />
                 <line x1="6" y1="20" x2="6" y2="14" />
+              </svg>
+            </button>
+          )}
+          {!replyTo && !quotedEvent && (
+            <button
+              type="button"
+              className="compose-media-btn"
+              title="Create goal"
+              onClick={() => { setShowEmoji(false); setShowGif(false); setPollMode(false); setGoalMode(v => !v); }}
+              style={goalMode ? { color: "var(--primary)", background: "var(--surface)" } : {}}
+              aria-pressed={goalMode}
+            >
+              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <circle cx="12" cy="12" r="6" />
+                <circle cx="12" cy="12" r="2" />
               </svg>
             </button>
           )}

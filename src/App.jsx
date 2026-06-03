@@ -58,6 +58,7 @@ import SearchPage from "./components/SearchPage.jsx";
 import HashtagFeed from "./components/HashtagFeed.jsx";
 import { ZapsScreen, ReactionsScreen, RepostsScreen, PollVotesScreen } from "./components/ListScreens.jsx";
 import SwipePanel from "./components/SwipePanel.jsx";
+import ZapGoalPage from "./components/ZapGoalPage.jsx";
 import Avatar from "./components/Avatar.jsx";
 import NoteContent from "./components/NoteContent.jsx";
 import { SbHome, SbBell, SbBook, SbZap, SbSearch, SbWallet, NavHome, NavBell, NavBook, NavZap, NavSearch, NavWallet, Bk } from "./components/icons.jsx";
@@ -77,8 +78,11 @@ export default function App() {
     setZapsByEvent(prev => {
       const current = prev[eventId] ?? [];
       if (zap.id && current.some(z => z.id === zap.id)) return prev;
-      const updated = [...current, zap].sort((a, b) => b.amount - a.amount);
-      return { ...prev, [eventId]: updated };
+      // Confirmed receipt arrived: drop the optimistic placeholder from the same zapper
+      const base = (zap.id && zap.zapper)
+        ? current.filter(z => !(z.zapper === zap.zapper && !z.id))
+        : current;
+      return { ...prev, [eventId]: [...base, zap].sort((a, b) => b.amount - a.amount) };
     });
   }, []);
 
@@ -248,6 +252,7 @@ export default function App() {
     pushNav({ type: "circle", payload: { pubkey: cpk, follows: cFollows } });
   const handleOpenNote = event => pushNav({ type: "note", payload: event });
   const handleOpenThread = event => pushNav({ type: "thread", payload: event });
+  const handleOpenGoal   = event => pushNav({ type: "goal",   payload: event });
   const handleOpenZaps = ({ eventId, zaps }) => pushNav({ type: "zaps", payload: { eventId, zaps } });
   const handleOpenReactions = ({ eventId, reactions }) => pushNav({ type: "reactions", payload: { eventId, reactions } });
   const handleOpenReposts = ({ eventId, reposts }) => pushNav({ type: "reposts", payload: { eventId, reposts } });
@@ -308,6 +313,14 @@ export default function App() {
       }
       return;
     }
+    if (ev.kind === 1018) {
+      const id = ev.tags?.find(t => t[0] === "e")?.[1];
+      if (!id) return;
+      const r = await resolveEventById(id);
+      if (r) handleOpenThread(r);
+      else showToast("Could not load that poll");
+      return;
+    }
     if (ev.kind === 7 || ev.kind === 9735) {
       const id = ev.tags?.find(t => t[0] === "e")?.[1];
       if (!id) {
@@ -315,8 +328,9 @@ export default function App() {
         return;
       }
       const r = await resolveEventById(id);
-      if (r) handleOpenThread(r);
-      else showToast("Could not load that note");
+      if (!r) { showToast("Could not load that note"); return; }
+      if (r.kind === 9041) handleOpenGoal(r);
+      else handleOpenThread(r);
     }
   };
 
@@ -466,6 +480,7 @@ export default function App() {
                               ev.kind === 9802 ||
                               ev.kind === 31922 ||
                               ev.kind === 31923 ||
+                              ev.kind === 9041 ||
                               !ev.tags.some(t => t[0] === "e" && t[3] !== "mention")
                             );
                         const visible = filtered.slice(0, visibleCount);
@@ -486,6 +501,7 @@ export default function App() {
                                 onBookmark={handleBookmark}
                                 onOpenProfile={handleOpenProfile}
                                 onOpenThread={handleOpenThread}
+                                onOpenGoal={handleOpenGoal}
                                 onOpenHashtag={handleOpenHashtag}
                                 onOpenArticle={setOpenArticle}
                                 onOpenCalendarEvent={setOpenCalendarEvent}
@@ -716,6 +732,7 @@ export default function App() {
                         onOpenProfile={handleOpenProfile}
                         onOpenNote={handleOpenNote}
                         onOpenThread={handleOpenThread}
+                        onOpenGoal={handleOpenGoal}
                         onOpenHashtag={handleOpenHashtag}
                         onOpenZaps={handleOpenZaps}
                         onOpenReactions={handleOpenReactions}
@@ -807,6 +824,44 @@ export default function App() {
                           `⚡ Zap failed: ${reason}`
                         )}                        resolveEventById={resolveEventById}
                         onOpenPollVotes={handleOpenPollVotes}
+                      />
+                    );
+                  }
+
+                  if (top.type === "goal") {
+                    return (
+                      <ZapGoalPage
+                        key={top.payload.id}
+                        event={top.payload}
+                        profiles={profiles}
+                        myPubkey={pubkey}
+                        myProfile={myProfile}
+                        onBack={handleBack}
+                        onOpenProfile={handleOpenProfile}
+                        onOpenThread={handleOpenThread}
+                        onOpenHashtag={handleOpenHashtag}
+                        onOpenZaps={handleOpenZaps}
+                        onOpenReactions={handleOpenReactions}
+                        onOpenReposts={handleOpenReposts}
+                        onPublish={prependEvent}
+                        publishEvent={publishEvent}
+                        onPrepend={prependEvent}
+                        onBookmark={handleBookmark}
+                        isBookmarked={isBookmarked}
+                        getLocalZaps={getLocalZaps}
+                        addLocalZap={addLocalZap}
+                        getLocalReactions={getLocalReactions}
+                        setLocalReaction={setLocalReaction}
+                        onRequestModal={setPanelModal}
+                        onDismissModal={() => setPanelModal(null)}
+                        sendZap={sendZap}
+                        defaultZapAmount={zapSettings.amount}
+                        defaultZapMsg={zapSettings.msg}
+                        onZapFail={reason => showToast(
+                          reason === "no_lud16"  ? "⚡ No lightning address" :
+                          reason === "no_wallet" ? "⚡ No wallet connected" :
+                          `⚡ Zap failed: ${reason}`
+                        )}
                       />
                     );
                   }

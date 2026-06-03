@@ -134,7 +134,7 @@ function IxNote({ event, myPubkey, profiles, onOpenProfile, onOpenThread, resolv
 
 export default function ProfilePage({
   pubkey, myPubkey, profiles, follows, events, isOwn,
-  onBack, onOpenProfile, onOpenNote, onOpenThread, onOpenHashtag, onOpenZaps, onOpenReactions, onOpenReposts,
+  onBack, onOpenProfile, onOpenNote, onOpenThread, onOpenGoal, onOpenHashtag, onOpenZaps, onOpenReactions, onOpenReposts,
   myProfile, onPublish, publishEvent, publishHighlight, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal, backLabel = "Your Circle", resolveEventById,
@@ -332,8 +332,8 @@ export default function ProfilePage({
     });
     activeSubs.push(notesSub);
 
-    // Phase 2 — reposts, polls, and calendar events in parallel; merges into same byId
-    const otherSub = pool.request(relayUrls, [{ kinds: [6, 1068, 6969, 31922, 31923, 30311], authors: [pubkey], limit: 100 }]).subscribe({
+    // Phase 2 — reposts, polls, calendar events, and goals in parallel; merges into same byId
+    const otherSub = pool.request(relayUrls, [{ kinds: [6, 1068, 6969, 31922, 31923, 30311, 9041], authors: [pubkey], limit: 100 }]).subscribe({
       next: raw => { eventStore.add(raw); byId.set(raw.id, raw); },
       complete: flush,
     });
@@ -382,15 +382,22 @@ export default function ProfilePage({
   }, [events, profileEvents, repostExtras]);
 
   const theirEvents = useMemo(
-    () => mergedEvents.filter(e => e.pubkey === pubkey && (e.kind === 1 || e.kind === 6 || e.kind === 9802 || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311)),
+    () => mergedEvents.filter(e => e.pubkey === pubkey && (e.kind === 1 || e.kind === 6 || e.kind === 9802 || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311 || e.kind === 9041)),
     [mergedEvents, pubkey]
   );
 
   const topLevel = useMemo(
     () => theirEvents
-      .filter(e => e.kind === 6 || e.kind === 9802 || isQuoteRepost(e) || (e.kind === 1 && !hasNonMentionETag(e)) || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311)
+      .filter(e => e.kind === 6 || e.kind === 9802 || isQuoteRepost(e) || (e.kind === 1 && !hasNonMentionETag(e)) || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311 || e.kind === 9041)
       .sort((a, b) => b.created_at - a.created_at),
     [theirEvents]
+  );
+
+  const goals = useMemo(
+    () => mergedEvents
+      .filter(e => e.pubkey === pubkey && e.kind === 9041)
+      .sort((a, b) => b.created_at - a.created_at),
+    [mergedEvents, pubkey]
   );
 
   const replies = useMemo(
@@ -572,6 +579,9 @@ export default function ProfilePage({
         <div className={`profile-stat ${tab === "highlights" ? "active" : ""}`} onClick={() => switchTab("highlights")}>
           <div className="profile-stat-label">Highlights</div>
         </div>
+        <div className={`profile-stat ${tab === "goals" ? "active" : ""}`} onClick={() => switchTab("goals")}>
+          <div className="profile-stat-label">Goals</div>
+        </div>
         {!isOwn && (
           <div className={`profile-stat ${tab === "between" ? "active" : ""}`} onClick={() => switchTab("between")}>
             <div className="profile-stat-label">Between us</div>
@@ -598,6 +608,7 @@ export default function ProfilePage({
                   onBookmark={onBookmark}
                   onOpenProfile={onOpenProfile}
                   onOpenThread={onOpenThread}
+                  onOpenGoal={onOpenGoal}
                   onOpenHashtag={onOpenHashtag}
                   onOpenArticle={onOpenArticle}
                   onOpenCalendarEvent={onOpenCalendarEvent}
@@ -723,6 +734,48 @@ export default function ProfilePage({
                   delay={0}
                 />
               ))
+      )}
+
+      {/* Goals tab */}
+      {renderedTab === "goals" && (
+        profileLoading && goals.length === 0
+          ? [0, 1, 2].map(i => <SkelCard key={i} />)
+          : goals.length === 0
+            ? <div className="empty-state"><div className="empty-state-title">No goals yet</div><div className="empty-state-sub">Zap goals will appear here</div></div>
+            : goals.slice(0, visibleNotes).map(e =>
+                <FeedItem
+                  key={e.id}
+                  event={e}
+                  profiles={profiles}
+                  myPubkey={myPubkey}
+                  myProfile={myProfile}
+                  events={mergedEvents}
+                  resolveEventById={resolveEventById}
+                  isBookmarked={isBookmarked}
+                  onBookmark={onBookmark}
+                  onOpenProfile={onOpenProfile}
+                  onOpenThread={onOpenThread}
+                  onOpenGoal={onOpenGoal}
+                  onOpenHashtag={onOpenHashtag}
+                  onOpenZaps={onOpenZaps}
+                  onOpenReactions={onOpenReactions}
+                  onOpenReposts={onOpenReposts}
+                  onPublish={onPublish}
+                  publishEvent={publishEvent}
+                  onPrepend={onPrepend}
+                  onRequestModal={onRequestModal}
+                  onDismissModal={onDismissModal}
+                  getLocalZaps={getLocalZaps}
+                  addLocalZap={addLocalZap}
+                  getLocalReactions={getLocalReactions}
+                  setLocalReaction={setLocalReaction}
+                  sendZap={sendZap}
+                  defaultZapAmount={defaultZapAmount}
+                  defaultZapMsg={defaultZapMsg}
+                  onZapFail={onZapFail}
+                  delay={0}
+                />
+            )
       )}
 
       {/* Media tab — always mounted so thumbnail images stay in DOM across tab switches */}

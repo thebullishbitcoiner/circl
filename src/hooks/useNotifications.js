@@ -4,7 +4,7 @@ import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 import useMailboxes from "./useMailboxes.js";
 
-const NOTIF_KINDS = [1, 6, 7, 9735, 30023];
+const NOTIF_KINDS = [1, 6, 7, 9735, 30023, 1018];
 const SINCE_SEC = 60 * 60 * 24 * 30;
 
 function compareDesc(a, b) {
@@ -24,11 +24,12 @@ export function getNotificationSummary(ev) {
   }
   if (kind === 9735) {
     const bolt11 = ev.tags?.find(t => t[0] === "bolt11")?.[1];
-    const msats = parseBolt11Msats(bolt11);
-    const amt = fmtSats(msats);
-    const unit = msats === 1000 ? "sat" : "sats";
+    const msats  = parseBolt11Msats(bolt11);
+    const amt    = fmtSats(msats);
+    const unit   = msats === 1000 ? "sat" : "sats";
     return { headline: `zapped you ${amt} ${unit}`, detail: "", kind: "zap" };
   }
+  if (kind === 1018) return { headline: "voted in your poll", detail: "", kind: "poll-vote" };
   if (kind === 6) return { headline: "Reposted your note", detail: "", kind: "repost" };
   if (kind === 30023) {
     const t = parseArticle(ev).title;

@@ -5,6 +5,7 @@ import PollCard from "./PollCard.jsx";
 import CalendarCard from "./CalendarCard.jsx";
 import StreamCard from "./StreamCard.jsx";
 import HighlightCard from "./HighlightCard.jsx";
+import ZapGoalCard from "./ZapGoalCard.jsx";
 import { replyCount, repostAndQuoteCount } from "../utils.js";
 
 /**
@@ -19,7 +20,7 @@ export default function FeedItem({
   profiles, events = [], resolveEventById,
   myPubkey, myProfile,
   // openers
-  onOpenProfile, onOpenThread, onOpenHashtag,
+  onOpenProfile, onOpenThread, onOpenGoal, onOpenHashtag,
   onOpenArticle, onOpenCalendarEvent, onOpenStream,
   onOpenZaps, onOpenReactions, onOpenReposts, onOpenPollVotes,
   // interactions — getLike/onLike are optional (cards using NoteActions handle their own state)
@@ -95,6 +96,26 @@ export default function FeedItem({
         defaultZapMsg={defaultZapMsg}
         onZapFail={onZapFail}
         onOpenPollVotes={onOpenPollVotes}
+        delay={delay}
+      />
+    );
+  }
+
+  if (event.kind === 9041) {
+    return (
+      <ZapGoalCard
+        key={event.id}
+        event={event}
+        events={events}
+        resolveEventById={resolveEventById}
+        profiles={profiles}
+        myPubkey={myPubkey}
+        myProfile={myProfile}
+        onOpenProfile={onOpenProfile}
+        onOpenGoal={onOpenGoal}
+        onOpenThread={onOpenThread}
+        onOpenHashtag={onOpenHashtag}
+        {...noteActionProps}
         delay={delay}
       />
     );
