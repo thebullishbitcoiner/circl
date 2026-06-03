@@ -1,6 +1,10 @@
+import { useState } from "react";
 import Avatar from "./Avatar.jsx";
+import NoteJsonModal from "./NoteJsonModal.jsx";
 import { Bk, Rpi } from "./icons.jsx";
 import { displayName, avatarUrl, avatarInitial, fmtSats, relativeTime, nip05OrNpub, normPubkey } from "../utils.js";
+import { eventStore } from "../nostr.js";
+import NoteContent from "./NoteContent.jsx";
 
 function zapsRowLabel(pk, profiles) {
   const k = normPubkey(pk);
@@ -9,7 +13,26 @@ function zapsRowLabel(pk, profiles) {
   }
   return nip05OrNpub(pk, profiles);
 }
-import NoteContent from "./NoteContent.jsx";
+
+function resolveCustomEmoji(emoji, tags) {
+  const m = emoji?.match(/^:([a-zA-Z0-9_]+):$/);
+  if (!m) return null;
+  return tags?.find(t => t[0] === "emoji" && t[1] === m[1])?.[2] ?? null;
+}
+
+function ThreeDot({ onClick }) {
+  return (
+    <button
+      type="button"
+      className="note-card-menu-btn"
+      style={{ position: "static", flexShrink: 0 }}
+      onClick={e => { e.stopPropagation(); onClick(); }}
+      aria-label="View JSON"
+    >
+      <span /><span /><span />
+    </button>
+  );
+}
 
 function ListScreen({ title, subtitle, children, onBack }) {
   return (
@@ -27,9 +50,16 @@ function ListScreen({ title, subtitle, children, onBack }) {
 }
 
 export function ZapsScreen({ eventId, zaps, profiles, onBack, onOpenProfile }) {
+  const [jsonEvent, setJsonEvent] = useState(null);
   const total = zaps.reduce((s, z) => s + z.amount, 0);
   const sorted = [...zaps].sort((a, b) => b.amount - a.amount);
   const hasUniqTop = sorted.length === 1 || sorted[0].amount > sorted[1].amount;
+
+  const openJson = z => {
+    const ev = z.id ? eventStore.getTimeline([{ ids: [z.id] }])?.[0] : null;
+    if (ev) setJsonEvent(ev);
+  };
+
   return (
     <ListScreen title="Zaps" subtitle={`${fmtSats(total)} sats total`} onBack={onBack}>
       {sorted.map((z, i) => (
@@ -47,27 +77,45 @@ export function ZapsScreen({ eventId, zaps, profiles, onBack, onOpenProfile }) {
             {z.comment && <div className="list-row-meta">{z.comment}</div>}
           </div>
           <div className="list-row-right">{fmtSats(z.amount)}</div>
+          {z.id && <ThreeDot onClick={() => openJson(z)} />}
         </div>
       ))}
+      {jsonEvent && <NoteJsonModal event={jsonEvent} onClose={() => setJsonEvent(null)} />}
     </ListScreen>
   );
 }
 
 export function ReactionsScreen({ eventId, reactions, profiles, onBack, onOpenProfile }) {
+  const [jsonEvent, setJsonEvent] = useState(null);
   const items = reactions.map(r => typeof r === "string" ? { pk: r, emoji: "🧡" } : r);
+
+  const openJson = r => {
+    const ev = r.id ? eventStore.getTimeline([{ ids: [r.id] }])?.[0] : null;
+    if (ev) setJsonEvent(ev);
+  };
+
   return (
     <ListScreen title="Reactions" subtitle={`${items.length} total`} onBack={onBack}>
-      {items.map((r, i) => (
-        <div key={i} className="list-row" onClick={() => onOpenProfile?.(r.pk)}>
-          <div className="list-row-av">
-            {avatarUrl(r.pk, profiles)
-              ? <img src={avatarUrl(r.pk, profiles)} alt="" onError={e => { e.target.style.display = "none"; }} />
-              : avatarInitial(r.pk, profiles)}
+      {items.map((r, i) => {
+        const customUrl = resolveCustomEmoji(r.emoji, r.tags);
+        return (
+          <div key={i} className="list-row" onClick={() => onOpenProfile?.(r.pk)}>
+            <div className="list-row-av">
+              {avatarUrl(r.pk, profiles)
+                ? <img src={avatarUrl(r.pk, profiles)} alt="" onError={e => { e.target.style.display = "none"; }} />
+                : avatarInitial(r.pk, profiles)}
+            </div>
+            <div className="list-row-name">{displayName(r.pk, profiles)}</div>
+            <div style={{ fontSize: 18, flexShrink: 0 }}>
+              {customUrl
+                ? <img src={customUrl} alt={r.emoji} className="note-custom-emoji" style={{ height: 22, verticalAlign: "middle" }} />
+                : (r.emoji || "🧡")}
+            </div>
+            {r.id && <ThreeDot onClick={() => openJson(r)} />}
           </div>
-          <div className="list-row-name">{displayName(r.pk, profiles)}</div>
-          <div style={{ fontSize: 18 }}>{r.emoji || "🧡"}</div>
-        </div>
-      ))}
+        );
+      })}
+      {jsonEvent && <NoteJsonModal event={jsonEvent} onClose={() => setJsonEvent(null)} />}
     </ListScreen>
   );
 }
@@ -125,7 +173,16 @@ export function PollVotesScreen({ options, voteEvents, isZapPoll, profiles, onBa
 }
 
 export function RepostsScreen({ eventId, reposts, profiles, onBack, onOpenProfile, onOpenThread, allEvents = [], resolveEventById }) {
+  const [jsonEvent, setJsonEvent] = useState(null);
   const items = reposts.map(r => typeof r === "string" ? { type: "repost", pubkey: r } : r);
+
+  const openJsonForRepost = item => {
+    if (item.event) { setJsonEvent(item.event); return; }
+    // Simple repost: find the kind:6 event in eventStore
+    const ev = eventStore.getTimeline([{ kinds: [6], authors: [item.pubkey], "#e": [eventId] }])?.[0];
+    if (ev) setJsonEvent(ev);
+  };
+
   return (
     <ListScreen title="Reposts" subtitle={`${items.length} total`} onBack={onBack}>
       {items.map((item, i) =>
@@ -141,6 +198,9 @@ export function RepostsScreen({ eventId, reposts, profiles, onBack, onOpenProfil
                     {displayName(item.pubkey, profiles)}
                   </span>
                   <span style={{ fontSize: 10, color: "var(--text-faint)" }}>{relativeTime(item.event?.created_at)}</span>
+                  <div style={{ marginLeft: "auto" }} onClick={e => e.stopPropagation()}>
+                    <ThreeDot onClick={() => openJsonForRepost(item)} />
+                  </div>
                 </div>
                 {item.event?.content && (
                   <NoteContent
@@ -189,9 +249,11 @@ export function RepostsScreen({ eventId, reposts, profiles, onBack, onOpenProfil
             </div>
             <div className="list-row-name">{displayName(item.pubkey, profiles)}</div>
             <div style={{ color: "var(--text-faint)" }}><Rpi s={15} /></div>
+            <ThreeDot onClick={() => openJsonForRepost(item)} />
           </div>
         )
       )}
+      {jsonEvent && <NoteJsonModal event={jsonEvent} onClose={() => setJsonEvent(null)} />}
     </ListScreen>
   );
 }

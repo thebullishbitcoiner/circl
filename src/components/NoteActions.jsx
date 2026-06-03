@@ -93,7 +93,7 @@ export default function NoteActions({
 
   return (
     <>
-      <div onClick={e => e.stopPropagation()}>
+      <div onClick={e => e.stopPropagation()} style={{ marginTop: 8 }}>
         <ZapBadges zaps={localZaps} eventId={event.id} profiles={profiles}
           onOpenZaps={() => onOpenZaps?.({ eventId: event.id, zaps: localZaps })} />
         <div className="note-actions">

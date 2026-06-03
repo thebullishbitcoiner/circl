@@ -279,7 +279,10 @@ export default function NoteContent({
 
   const textLength = normalizedSegments
     .filter(s => s.type === "text")
-    .reduce((n, s) => n + (s.value?.length ?? 0), 0);
+    .reduce((n, s) => {
+      const stripped = (s.value || "").replace(/nostr:(nevent1|note1)[023456789acdefghjklmnpqrstuvwxyz]+/ig, "");
+      return n + stripped.length;
+    }, 0);
   const shouldCollapse = collapsible && textLength > COLLAPSE_THRESHOLD;
   const isCollapsed = shouldCollapse && !expanded;
 
@@ -301,38 +304,40 @@ export default function NoteContent({
     return () => { cancelled = true; };
   }, [content, allEvents, resolveEventById, resolvedRefs, allowEmbeds]);
 
+  // Collect all nevent/note1 refs from text segments — rendered at the bottom,
+  // outside the collapse and after media, so they never block text or images.
+  const embeddedRefs = useMemo(() => {
+    if (!allowEmbeds) return [];
+    const seen = new Set();
+    const refs = [];
+    for (const seg of normalizedSegments) {
+      if (seg.type !== "text" || !seg.value) continue;
+      for (const part of splitNostrEventRefs(seg.value)) {
+        if (part.type === "nevent" && !seen.has(part.value)) {
+          seen.add(part.value);
+          refs.push(part.value);
+        }
+      }
+    }
+    return refs;
+  }, [normalizedSegments, allowEmbeds]);
+
   const renderTextSegment = (seg, i) => {
     if (!seg.value || seg.value.trim() === "") return null;
-    const textParts = allowEmbeds ? splitNostrEventRefs(seg.value) : [{ type: "text", value: seg.value }];
+    // Only render plain-text parts; nevent refs are lifted to bottom
+    const textParts = splitNostrEventRefs(seg.value).filter(p => p.type === "text");
     return textParts.map((part, idx) => {
-      if (part.type === "text") {
-        if (!part.value) return null;
-        return (
-          <NoteText
-            key={`${i}-t-${idx}`}
-            content={part.value}
-            profiles={profiles}
-            onOpenProfile={onOpenProfile}
-            onOpenHashtag={onOpenHashtag}
-            customEmojis={customEmojis}
-            className={className}
-            style={style}
-          />
-        );
-      }
-      if (!allowEmbeds) return null;
-      const id = resolveNeventToId(part.value);
-      const refEvent = id ? (allEvents.find(e => e.id === id) || resolvedRefs[id]) : null;
-      if (!refEvent) {
-        return <EmbeddedEventRef key={`${i}-n-${idx}`} nevent={part.value} />;
-      }
+      if (!part.value) return null;
       return (
-        <EmbeddedEvent
-          key={`${i}-n-${idx}`}
-          event={refEvent}
+        <NoteText
+          key={`${i}-t-${idx}`}
+          content={part.value}
           profiles={profiles}
           onOpenProfile={onOpenProfile}
-          onOpenThread={onOpenThread}
+          onOpenHashtag={onOpenHashtag}
+          customEmojis={customEmojis}
+          className={className}
+          style={style}
         />
       );
     });
@@ -388,6 +393,21 @@ export default function NoteContent({
         return null;
       })
     )}
+
+    {embeddedRefs.map((nevent, i) => {
+      const id = resolveNeventToId(nevent);
+      const refEvent = id ? (allEvents.find(e => e.id === id) || resolvedRefs[id]) : null;
+      if (!refEvent) return <EmbeddedEventRef key={`bot-${i}`} nevent={nevent} />;
+      return (
+        <EmbeddedEvent
+          key={`bot-${i}`}
+          event={refEvent}
+          profiles={profiles}
+          onOpenProfile={onOpenProfile}
+          onOpenThread={onOpenThread}
+        />
+      );
+    })}
 
     {lightbox && (
       <MediaLightbox

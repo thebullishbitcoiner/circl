@@ -3,6 +3,8 @@ import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteActions from "./NoteActions.jsx";
 import PollInline from "./PollInline.jsx";
+import CalendarInlineCard from "./CalendarInlineCard.jsx";
+import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
 import { displayName, nip05OrNpub, relativeTime } from "../utils.js";
 import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
@@ -31,26 +33,34 @@ function NoteCard({
   const isBookmarkedFn = useCallback(() => bookmarked, [bookmarked]);
 
   const qId = event.tags?.find(t => t[0] === "q")?.[1] ?? null;
-  const [quotedPollEvent, setQuotedPollEvent] = useState(() => {
+
+  const classifyQuoted = ev => {
+    if (!ev) return null;
+    if (ev.kind === 1068 || ev.kind === 6969) return "poll";
+    if (ev.kind === 9041) return "goal";
+    if (ev.kind === 31922 || ev.kind === 31923) return "calendar";
+    return null;
+  };
+
+  const [quotedSpecialEvent, setQuotedSpecialEvent] = useState(() => {
     const ev = qId ? events.find(e => e.id === qId) : null;
-    return (ev?.kind === 1068 || ev?.kind === 6969) ? ev : null;
+    return classifyQuoted(ev) ? ev : null;
   });
-  const pollFetchFired = useRef(false);
+  const specialFetchFired = useRef(false);
+
+  // Keep as aliases for clarity in render
+  const quotedPollEvent     = quotedSpecialEvent && (quotedSpecialEvent.kind === 1068 || quotedSpecialEvent.kind === 6969) ? quotedSpecialEvent : null;
+  const quotedGoalEvent     = quotedSpecialEvent?.kind === 9041 ? quotedSpecialEvent : null;
+  const quotedCalendarEvent = (quotedSpecialEvent?.kind === 31922 || quotedSpecialEvent?.kind === 31923) ? quotedSpecialEvent : null;
 
   useEffect(() => {
-    if (!qId || quotedPollEvent) return;
-    // Re-check pool whenever events updates (e.g. after prependEvent adds the fetched event)
+    if (!qId || quotedSpecialEvent) return;
     const fromPool = events.find(e => e.id === qId);
-    if (fromPool?.kind === 1068 || fromPool?.kind === 6969) {
-      setQuotedPollEvent(fromPool);
-      return;
-    }
-    // Fire the relay fetch only once — no cleanup cancellation so the result survives
-    // subsequent events-prop changes that would otherwise cancel it
-    if (pollFetchFired.current || !resolveEventById) return;
-    pollFetchFired.current = true;
+    if (classifyQuoted(fromPool)) { setQuotedSpecialEvent(fromPool); return; }
+    if (specialFetchFired.current || !resolveEventById) return;
+    specialFetchFired.current = true;
     resolveEventById(qId).then(ev => {
-      if (ev?.kind === 1068 || ev?.kind === 6969) setQuotedPollEvent(ev);
+      if (classifyQuoted(ev)) setQuotedSpecialEvent(ev);
     });
   }, [qId, events, resolveEventById]);
 
@@ -109,7 +119,7 @@ function NoteCard({
               />
             )}
             <NoteContent
-              content={quotedPollEvent ? event.content.replace(/nostr:\S+/g, "").trim() : event.content}
+              content={quotedSpecialEvent ? event.content.replace(/nostr:\S+/g, "").trim() : event.content}
               tags={event.tags}
               profiles={profiles}
               onOpenProfile={onOpenProfile}
@@ -117,7 +127,7 @@ function NoteCard({
               allEvents={events}
               onOpenThread={onOpenThread}
               resolveEventById={resolveEventById}
-              allowEmbeds={!quotedPollEvent}
+              allowEmbeds={!quotedSpecialEvent}
               collapsible
             />
             </div>
@@ -133,6 +143,22 @@ function NoteCard({
                 publishEvent={publishEvent}
                 onOpenVotes={onOpenPollVotes}
               />
+            )}
+            {quotedGoalEvent && (
+              <div className="note-embed" onClick={e => { e.stopPropagation(); onOpenThread?.(quotedGoalEvent); }}>
+                <div className="note-embed-head">
+                  <Avatar pk={quotedGoalEvent.pubkey} profiles={profiles} size={20} />
+                  <span className="note-embed-name" onClick={e => { e.stopPropagation(); onOpenProfile?.(quotedGoalEvent.pubkey); }}>{displayName(quotedGoalEvent.pubkey, profiles)}</span>
+                </div>
+                <div className="zap-goal-title-row" style={{ marginBottom: 4 }}>
+                  <NoteContent content={quotedGoalEvent.content} tags={quotedGoalEvent.tags} profiles={profiles} allowEmbeds={false} className="note-text" />
+                  <span className="zap-goal-badge">⚡ Goal</span>
+                </div>
+                <ZapGoalProgressBlock event={quotedGoalEvent} hideBadge />
+              </div>
+            )}
+            {quotedCalendarEvent && (
+              <CalendarInlineCard event={quotedCalendarEvent} onOpen={onOpenThread} />
             )}
             <NoteActions
               event={event}

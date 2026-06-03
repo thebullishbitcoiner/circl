@@ -13,6 +13,7 @@ import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 import PollInline from "./PollInline.jsx";
 import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
+import CalendarInlineCard from "./CalendarInlineCard.jsx";
 
 function ThreadNoteRow({
   event, variant = "normal", profiles, allEvents, onOpenProfile, onOpenThread, onOpenHashtag,
@@ -139,23 +140,42 @@ function ThreadNoteRow({
                     onOpenVotes={onOpenPollVotes}
                   />
                 )}
-                {isQuote && quotedEv && (
-                  <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px", background: "var(--surface)", marginTop: 6, cursor: "pointer" }}
-                    onClick={e => { e.stopPropagation(); onOpenThread?.(quotedEv); }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
-                      <Avatar pk={quotedEv.pubkey} profiles={profiles} size={20} />
-                      <span style={{ fontSize: 12, fontWeight: 500 }} onClick={e => { e.stopPropagation(); onOpenProfile?.(quotedEv.pubkey); }}>
-                        {displayName(quotedEv.pubkey, profiles)}
-                      </span>
-                      <span style={{ fontSize: 10, color: "var(--text-faint)", marginLeft: "auto" }}>{relativeTime(quotedEv.created_at)}</span>
+                {isQuote && quotedEv && (() => {
+                  const qKind = quotedEv.kind;
+                  if (qKind === 9041) {
+                    return (
+                      <div className="note-embed" onClick={e => { e.stopPropagation(); onOpenThread?.(quotedEv); }}>
+                        <div className="note-embed-head">
+                          <Avatar pk={quotedEv.pubkey} profiles={profiles} size={20} />
+                          <span className="note-embed-name" onClick={e => { e.stopPropagation(); onOpenProfile?.(quotedEv.pubkey); }}>{displayName(quotedEv.pubkey, profiles)}</span>
+                        </div>
+                        <div className="zap-goal-title-row" style={{ marginBottom: 4 }}>
+                          <NoteContent content={quotedEv.content} tags={quotedEv.tags} profiles={profiles} allowEmbeds={false} className="note-text" />
+                          <span className="zap-goal-badge">⚡ Goal</span>
+                        </div>
+                        <ZapGoalProgressBlock event={quotedEv} hideBadge />
+                      </div>
+                    );
+                  }
+                  if (qKind === 31922 || qKind === 31923) {
+                    return <CalendarInlineCard event={quotedEv} onOpen={onOpenThread} />;
+                  }
+                  return (
+                    <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "10px 12px", background: "var(--surface)", marginTop: 6, cursor: "pointer" }}
+                      onClick={e => { e.stopPropagation(); onOpenThread?.(quotedEv); }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
+                        <Avatar pk={quotedEv.pubkey} profiles={profiles} size={20} />
+                        <span style={{ fontSize: 12, fontWeight: 500 }} onClick={e => { e.stopPropagation(); onOpenProfile?.(quotedEv.pubkey); }}>
+                          {displayName(quotedEv.pubkey, profiles)}
+                        </span>
+                        <span style={{ fontSize: 10, color: "var(--text-faint)", marginLeft: "auto" }}>{relativeTime(quotedEv.created_at)}</span>
+                      </div>
+                      <NoteContent content={quotedEv.content} tags={quotedEv.tags} profiles={profiles} onOpenProfile={onOpenProfile}
+                        allEvents={allEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById}
+                        className="note-text" style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }} />
                     </div>
-                    <NoteContent content={quotedEv.content} tags={quotedEv.tags} profiles={profiles} onOpenProfile={onOpenProfile}
-                      allEvents={allEvents}
-                      onOpenThread={onOpenThread}
-                      resolveEventById={resolveEventById}
-                      className="note-text" style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }} />
-                  </div>
-                )}
+                  );
+                })()}
               </>
             );
           })()}

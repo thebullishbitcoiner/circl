@@ -90,12 +90,12 @@ export default function App() {
     eventId => reactionsByEvent[eventId] ?? [],
     [reactionsByEvent]
   );
-  const setLocalReaction = useCallback((eventId, pk, emoji) => {
+  const setLocalReaction = useCallback((eventId, pk, emoji, meta = {}) => {
     if (!emoji) return;
     setReactionsByEvent(prev => {
       const current = prev[eventId] ?? [];
       if (current.some(r => r.pk === pk)) return prev;
-      return { ...prev, [eventId]: [...current, { pk, emoji, created_at: Math.floor(Date.now() / 1000) }] };
+      return { ...prev, [eventId]: [...current, { pk, emoji, created_at: Math.floor(Date.now() / 1000), ...meta }] };
     });
   }, []);
 
