@@ -107,7 +107,6 @@ function NoteCard({
             style={{ marginBottom: 6, cursor: "pointer" }}
             onClick={e => { e.stopPropagation(); onOpenProfile?.(replyingToPubkey); }}
           >
-            <span className="ix-dir-arrow">↩</span>
             replying to <span className="ix-mention" style={{ marginLeft: 3 }}>@{displayName(replyingToPubkey, profiles)}</span>
           </div>
         )}
