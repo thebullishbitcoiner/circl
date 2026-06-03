@@ -18,7 +18,7 @@ export default function RepostCard({
   onRequestModal, onDismissModal, delay,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail, onOpenPollVotes,
 }) {
-  const { onOpenCalendarEvent } = useNavigation();
+  const { onOpenCalendarEvent, onOpenPoll, onOpenGoal } = useNavigation();
   const originalId  = event.tags.find(t => t[0] === "e")?.[1];
   const fromContent = (() => { try { return JSON.parse(event.content); } catch { return null; } })();
   const fromPool    = originalId ? events.find(e => e.id === originalId) : null;
@@ -33,7 +33,13 @@ export default function RepostCard({
   return (
     <>
     <div className="note-card" style={{ animationDelay: `${delay}s`, zIndex: menuOpen ? 1 : undefined }}
-      onClick={() => original && onOpenThread?.(original)}>
+      onClick={() => {
+        if (!original) return;
+        if (original.kind === 1068 || original.kind === 6969) { onOpenPoll?.(original); return; }
+        if (original.kind === 9041) { onOpenGoal?.(original); return; }
+        if (original.kind === 31922 || original.kind === 31923) { onOpenCalendarEvent?.(original); return; }
+        onOpenThread?.(original);
+      }}>
       <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--text-faint)", marginBottom: 8, paddingLeft: 2 }}>
         <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
           <polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" />
