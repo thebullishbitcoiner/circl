@@ -54,9 +54,7 @@ function fmtBalance(msats) {
 function fmtTxAmount(tx) {
   const sats = Math.round((tx.amount ?? 0) / 1000);
   const prefix = tx.type === "incoming" ? "+" : "−";
-  if (sats >= 1_000_000) return `${prefix}${(sats / 1_000_000).toFixed(1)}M`;
-  if (sats >= 1_000)     return `${prefix}${(sats / 1_000).toFixed(sats >= 10_000 ? 0 : 1)}k`;
-  return `${prefix}${sats}`;
+  return `${prefix}${sats.toLocaleString("en-US").replace(/,/g, " ")}`;
 }
 
 function fmtSatsFull(msats) {
