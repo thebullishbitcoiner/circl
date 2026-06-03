@@ -4,6 +4,7 @@ import Avatar from "./Avatar.jsx";
 import MediaLightbox from "./MediaLightbox.jsx";
 import PollPreview from "./PollPreview.jsx";
 import CalendarInlineCard from "./CalendarInlineCard.jsx";
+import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
 import { parseNoteMediaSegments, groupNoteMediaSegments, displayName, relativeTime, nip19, isHexPubkey, normPubkey } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
@@ -66,14 +67,33 @@ function decodeNevent(nevent) {
 }
 
 function EmbeddedEvent({ event, profiles, onOpenProfile }) {
-  const { onOpenThread, onOpenCalendarEvent, onOpenPoll } = useNavigation();
+  const { onOpenThread, onOpenCalendarEvent, onOpenPoll, onOpenGoal } = useNavigation();
   if (!event) return null;
   const isPoll = event.kind === 1068 || event.kind === 6969;
   const isCalendar = event.kind === 31922 || event.kind === 31923;
+  const isGoal = event.kind === 9041;
   const isZapPoll = event.kind === 6969;
 
   if (isCalendar) {
     return <CalendarInlineCard event={event} onOpen={onOpenCalendarEvent ?? onOpenThread} />;
+  }
+
+  if (isGoal) {
+    return (
+      <div className="note-embed" onClick={e => { e.stopPropagation(); (onOpenGoal ?? onOpenThread)?.(event); }} role="presentation">
+        <div className="note-embed-head">
+          <div onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }} role="presentation">
+            <Avatar pk={event.pubkey} profiles={profiles} size={20} />
+          </div>
+          <span className="note-embed-name" onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }} role="presentation">
+            {displayName(event.pubkey, profiles)}
+          </span>
+          <span className="zap-goal-badge" style={{ marginLeft: "auto" }}>⚡ Goal</span>
+        </div>
+        <NoteContent content={event.content || ""} tags={event.tags} profiles={profiles} allowEmbeds={false} className="note-embed-text" />
+        <ZapGoalProgressBlock event={event} hideBadge />
+      </div>
+    );
   }
 
   return (

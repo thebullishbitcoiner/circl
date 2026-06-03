@@ -7,7 +7,7 @@ import { displayName, nip05OrNpub, relativeTime, parseHighlight, parseArticle } 
 import { pool } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 
-function SourceChip({ sourceTag, sourceRef, sourceEvent, onOpenThread, onOpenArticle }) {
+function SourceChip({ sourceTag, sourceRef, sourceEvent }) {
   if (sourceTag === "r") {
     let hostname = sourceRef;
     try { hostname = new URL(sourceRef).hostname; } catch {}
@@ -28,42 +28,20 @@ function SourceChip({ sourceTag, sourceRef, sourceEvent, onOpenThread, onOpenArt
     );
   }
 
-  if (sourceEvent) {
-    if (sourceEvent.kind === 30023) {
-      const art = parseArticle(sourceEvent);
-      return (
-        <button
-          type="button"
-          className="highlight-source-chip"
-          onClick={e => { e.stopPropagation(); onOpenArticle?.(sourceEvent); }}
-        >
-          <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ flexShrink: 0 }}>
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-          </svg>
-          {art.title}
-        </button>
-      );
-    }
+  if (sourceEvent?.kind === 30023) {
+    const art = parseArticle(sourceEvent);
     return (
-      <button
-        type="button"
-        className="highlight-source-chip"
-        onClick={e => { e.stopPropagation(); onOpenThread?.(sourceEvent); }}
-      >
+      <span className="highlight-source-chip" style={{ cursor: "default" }}>
         <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ flexShrink: 0 }}>
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
         </svg>
-        Note
-      </button>
+        {art.title}
+      </span>
     );
   }
 
-  return (
-    <span className="highlight-source-chip highlight-source-unknown">
-      Nostr
-    </span>
-  );
+  return null;
 }
 
 function HighlightCard({
@@ -85,6 +63,8 @@ function HighlightCard({
   const [sourceEvent, setSourceEvent] = useState(null);
 
   const { text, sourceTag, sourceRef, authorPubkey, comment } = parseHighlight(event);
+  const isNoteSource = sourceEvent?.kind === 1 || (sourceTag === "e" && sourceEvent && sourceEvent.kind !== 30023);
+  const isArticleSource = sourceEvent?.kind === 30023;
 
   useEffect(() => {
     if (!sourceRef || sourceTag === "r") return;
@@ -112,8 +92,7 @@ function HighlightCard({
     <>
       <div
         className="note-card highlight-card"
-        style={{ animationDelay: `${delay}s`, zIndex: cardMenuOpen ? 1 : undefined }}
-        onClick={() => onOpenThread?.(event)}
+        style={{ animationDelay: `${delay}s`, zIndex: cardMenuOpen ? 1 : undefined, cursor: "default" }}
       >
         <div className="note-header">
           <div onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }} style={{ cursor: "pointer", flexShrink: 0 }}>
@@ -148,28 +127,32 @@ function HighlightCard({
           <div className="highlight-comment">{comment}</div>
         )}
 
-        <blockquote className="highlight-blockquote" onClick={e => e.stopPropagation()}>
+        <blockquote
+          className="highlight-blockquote"
+          style={{ cursor: (isNoteSource || isArticleSource) ? "pointer" : "default" }}
+          onClick={e => {
+            e.stopPropagation();
+            if (isNoteSource && sourceEvent) onOpenThread?.(sourceEvent);
+            else if (isArticleSource && sourceEvent) onOpenArticle?.(sourceEvent);
+          }}
+        >
           {text}
           {(authorPubkey || sourceEvent?.pubkey) && (
-            <span
-              className="highlight-attribution"
-              onClick={e => { e.stopPropagation(); onOpenProfile?.(authorPubkey || sourceEvent.pubkey); }}
-            >
+            <span className="highlight-attribution">
               — {displayName(authorPubkey || sourceEvent.pubkey, profiles)}
             </span>
           )}
         </blockquote>
 
-        <div className="highlight-meta" onClick={e => e.stopPropagation()}>
-          <span className="highlight-from-label">from</span>
-          <SourceChip
-            sourceTag={sourceTag}
-            sourceRef={sourceRef}
-            sourceEvent={sourceEvent}
-            onOpenThread={onOpenThread}
-            onOpenArticle={onOpenArticle}
-          />
-        </div>
+        {!isNoteSource && (
+          <div className="highlight-meta" onClick={e => e.stopPropagation()}>
+            <span className="highlight-from-label">from</span>
+            {isArticleSource
+              ? <em style={{ fontSize: 12, color: "var(--text-muted)", fontStyle: "italic" }}>{parseArticle(sourceEvent).title || "Article"}</em>
+              : <SourceChip sourceTag={sourceTag} sourceRef={sourceRef} sourceEvent={sourceEvent} />
+            }
+          </div>
+        )}
 
         <NoteActions
           event={event}
