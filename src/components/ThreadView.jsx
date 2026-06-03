@@ -97,7 +97,7 @@ function ThreadNoteRow({
             return (
               <>
                 {displayContent && (
-                  <NoteContent content={displayContent} profiles={profiles} onOpenProfile={onOpenProfile}
+                  <NoteContent content={displayContent} tags={event.tags} profiles={profiles} onOpenProfile={onOpenProfile}
                     onOpenHashtag={onOpenHashtag}
                     allEvents={allEvents}
                     onOpenThread={onOpenThread}
@@ -130,7 +130,7 @@ function ThreadNoteRow({
                       </span>
                       <span style={{ fontSize: 10, color: "var(--text-faint)", marginLeft: "auto" }}>{relativeTime(quotedEv.created_at)}</span>
                     </div>
-                    <NoteContent content={quotedEv.content} profiles={profiles} onOpenProfile={onOpenProfile}
+                    <NoteContent content={quotedEv.content} tags={quotedEv.tags} profiles={profiles} onOpenProfile={onOpenProfile}
                       allEvents={allEvents}
                       onOpenThread={onOpenThread}
                       resolveEventById={resolveEventById}

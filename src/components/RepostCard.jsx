@@ -99,6 +99,7 @@ export default function RepostCard({
               ? <CalendarInline event={original} onOpen={onOpenCalendarEvent ?? onOpenThread} />
               : <NoteContent
                   content={original.content}
+                  tags={original.tags}
                   profiles={profiles}
                   onOpenProfile={onOpenProfile}
                   onOpenHashtag={onOpenHashtag}

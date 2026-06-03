@@ -53,7 +53,7 @@ function NoteResult({ ev, profiles, onOpenProfile, onOpenThread }) {
           <span className="search-result-name" style={{ fontSize: 13 }}>{displayName(ev.pubkey, profiles)}</span>
           <span style={{ fontSize: 11, color: "var(--text-faint)", flexShrink: 0 }}>{relativeTime(ev.created_at)}</span>
         </div>
-        <NoteContent content={ev.content} profiles={profiles} allEvents={[]} allowEmbeds={false} className="search-note-text" />
+        <NoteContent content={ev.content} tags={ev.tags} profiles={profiles} allEvents={[]} allowEmbeds={false} className="search-note-text" />
       </div>
     </div>
   );

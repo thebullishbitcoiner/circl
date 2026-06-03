@@ -145,6 +145,7 @@ export function RepostsScreen({ eventId, reposts, profiles, onBack, onOpenProfil
                 {item.event?.content && (
                   <NoteContent
                     content={item.event.content.replace(/\nnostr:\S+/g, "").replace(/nostr:\S+/g, "").trim()}
+                    tags={item.event.tags}
                     profiles={profiles}
                     onOpenProfile={onOpenProfile}
                     allEvents={allEvents}
@@ -164,6 +165,7 @@ export function RepostsScreen({ eventId, reposts, profiles, onBack, onOpenProfil
                     <div style={{ maxHeight: 140, overflow: "hidden" }}>
                       <NoteContent
                         content={item.quotedEvent.content}
+                        tags={item.quotedEvent.tags}
                         profiles={profiles}
                         onOpenProfile={onOpenProfile}
                         allEvents={allEvents}

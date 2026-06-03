@@ -89,6 +89,7 @@ function EmbeddedEvent({ event, profiles, onOpenProfile, onOpenThread }) {
       </div>
       <NoteContent
         content={event.content || ""}
+        tags={event.tags}
         profiles={profiles}
         onOpenProfile={onOpenProfile}
         allEvents={[]}
@@ -208,6 +209,7 @@ const COLLAPSE_THRESHOLD = 500;
  */
 export default function NoteContent({
   content,
+  tags,
   profiles,
   onOpenProfile,
   onOpenHashtag,
@@ -243,6 +245,14 @@ export default function NoteContent({
       return { ...seg, value: val };
     }).filter(seg => seg.type !== "text" || (seg.value || "").trim() !== "");
   }, [segments]);
+
+  const customEmojis = useMemo(() => {
+    const map = {};
+    for (const t of tags || []) {
+      if (t[0] === "emoji" && t[1] && t[2]) map[t[1]] = t[2];
+    }
+    return map;
+  }, [tags]);
 
   // Collect all media items in document order for bottom-mosaic layout
   const allMediaItems = useMemo(() => {
@@ -304,6 +314,7 @@ export default function NoteContent({
             profiles={profiles}
             onOpenProfile={onOpenProfile}
             onOpenHashtag={onOpenHashtag}
+            customEmojis={customEmojis}
             className={className}
             style={style}
           />

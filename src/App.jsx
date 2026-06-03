@@ -892,6 +892,7 @@ export default function App() {
                                 {isQ && ev.content && (
                                   <NoteContent
                                     content={ev.content.replace(/\nnostr:\S+/g, "").trim()}
+                                    tags={ev.tags}
                                     profiles={profiles}
                                     onOpenProfile={handleOpenProfile}
                                     allEvents={mergedFeedPool}
@@ -902,6 +903,7 @@ export default function App() {
                                 {!isQ && (
                                   <NoteContent
                                     content={ev.content}
+                                    tags={ev.tags}
                                     profiles={profiles}
                                     onOpenProfile={handleOpenProfile}
                                     allEvents={mergedFeedPool}
@@ -926,6 +928,7 @@ export default function App() {
                                       </div>
                                       <NoteContent
                                         content={repostedEv.content}
+                                        tags={repostedEv.tags}
                                         profiles={profiles}
                                         onOpenProfile={handleOpenProfile}
                                         allEvents={mergedFeedPool}

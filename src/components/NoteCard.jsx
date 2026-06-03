@@ -110,6 +110,7 @@ function NoteCard({
             )}
             <NoteContent
               content={quotedPollEvent ? event.content.replace(/nostr:\S+/g, "").trim() : event.content}
+              tags={event.tags}
               profiles={profiles}
               onOpenProfile={onOpenProfile}
               onOpenHashtag={onOpenHashtag}

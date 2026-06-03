@@ -29,8 +29,38 @@ function decodeNostrRef(raw) {
 // then "1" (bech32 separator), then 30+ bech32 data chars.
 const BECH32_GARBAGE_RE = /^[^\s1]{0,12}1[023456789acdefghjklmnpqrstuvwxyz]{30,}/;
 
-export default function NoteText({ content, profiles, onOpenProfile, onOpenHashtag, className = "note-text", style = {} }) {
-  const parts = content.split(/(https?:\/\/[^\s<>'"]+|nostr:(?:npub1|nprofile1)[023456789acdefghjklmnpqrstuvwxyz]+|#[a-zA-Z][a-zA-Z0-9_]+|@\S+)/gi);
+// Order matters: ***bold-italic*** before **bold** before *italic*, all before single *.
+// Excludes newlines and delimiter chars inside spans to prevent runaway matches.
+const INLINE_MD_RE = /(\*\*\*[^*\n]+\*\*\*|\*\*[^*\n]+\*\*|~~[^~\n]+~~|`[^`\n]+`|\*[^*\n]+\*)/g;
+
+function applyInlineMarkdown(text, keyPrefix) {
+  const parts = [];
+  let last = 0;
+  const re = new RegExp(INLINE_MD_RE.source, "g");
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    const token = m[0];
+    const key = `${keyPrefix}-md-${m.index}`;
+    if (token.startsWith("***")) {
+      parts.push(<strong key={key}><em>{token.slice(3, -3)}</em></strong>);
+    } else if (token.startsWith("**")) {
+      parts.push(<strong key={key}>{token.slice(2, -2)}</strong>);
+    } else if (token.startsWith("~~")) {
+      parts.push(<del key={key}>{token.slice(2, -2)}</del>);
+    } else if (token.startsWith("`")) {
+      parts.push(<code key={key} className="note-code">{token.slice(1, -1)}</code>);
+    } else {
+      parts.push(<em key={key}>{token.slice(1, -1)}</em>);
+    }
+    last = m.index + token.length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+
+export default function NoteText({ content, profiles, onOpenProfile, onOpenHashtag, customEmojis, className = "note-text", style = {} }) {
+  const parts = content.split(/(https?:\/\/[^\s<>'"]+|nostr:(?:npub1|nprofile1)[023456789acdefghjklmnpqrstuvwxyz]+|#[a-zA-Z][a-zA-Z0-9_]+|@\S+|:[a-zA-Z0-9_]+:)/gi);
 
   const handleMention = mention => {
     if (!onOpenProfile) return;
@@ -65,6 +95,18 @@ export default function NoteText({ content, profiles, onOpenProfile, onOpenHasht
           {part}
         </span>
       );
+      prevWasDecodedNostr = false;
+
+    } else if (/^:[a-zA-Z0-9_]+:$/.test(part)) {
+      const name = part.slice(1, -1);
+      const url = customEmojis?.[name];
+      if (url) {
+        elements.push(
+          <img key={i} src={url} alt={part} className="note-custom-emoji" />
+        );
+      } else {
+        elements.push(part);
+      }
       prevWasDecodedNostr = false;
 
     } else if (/^https?:\/\//i.test(part)) {
@@ -104,7 +146,7 @@ export default function NoteText({ content, profiles, onOpenProfile, onOpenHasht
       if (prevWasDecodedNostr) {
         part = part.replace(BECH32_GARBAGE_RE, "");
       }
-      if (part) elements.push(part);
+      if (part) elements.push(...applyInlineMarkdown(part, i));
       prevWasDecodedNostr = false;
     }
   }

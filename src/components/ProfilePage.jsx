@@ -125,7 +125,7 @@ function IxNote({ event, myPubkey, profiles, onOpenProfile, onOpenThread, resolv
               replying to <span className="ix-mention" style={{ marginLeft: 3 }}>@{mentionedName}</span>
             </div>
           )}
-          <NoteContent content={event.content} profiles={profiles} onOpenProfile={onOpenProfile} allEvents={allEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} className="ix-text" />
+          <NoteContent content={event.content} tags={event.tags} profiles={profiles} onOpenProfile={onOpenProfile} allEvents={allEvents} onOpenThread={onOpenThread} resolveEventById={resolveEventById} className="ix-text" />
         </div>
       </div>
     </div>
