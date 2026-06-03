@@ -345,6 +345,19 @@ export default function NoteContent({
       {isCollapsed && <div className="note-content-fade" />}
     </div>
 
+    {shouldCollapse && (
+      <button
+        type="button"
+        className="note-content-more-btn"
+        onClick={e => { e.stopPropagation(); setExpanded(v => !v); }}
+      >
+        {expanded ? "Show less" : "Show more"}
+        <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{ transform: expanded ? "rotate(180deg)" : undefined, transition: "transform .2s" }}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+    )}
+
     {hoistMedia ? (
       <MediaMosaic
         items={allMediaItems}
@@ -374,19 +387,6 @@ export default function NoteContent({
         }
         return null;
       })
-    )}
-
-    {shouldCollapse && (
-      <button
-        type="button"
-        className="note-content-more-btn"
-        onClick={e => { e.stopPropagation(); setExpanded(v => !v); }}
-      >
-        {expanded ? "Show less" : "Show more"}
-        <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{ transform: expanded ? "rotate(180deg)" : undefined, transition: "transform .2s" }}>
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
     )}
 
     {lightbox && (
