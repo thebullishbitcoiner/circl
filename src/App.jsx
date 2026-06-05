@@ -181,9 +181,17 @@ export default function App() {
     };
     // Priority 1: logged-in user — bottom nav avatar fetched first
     if (pubkey) add(pubkey);
-    // Priority 2: authors of the first visible feed events (above the fold)
+    // Priority 2: notification actors — must resolve quickly for the notifications screen
+    for (const n of notificationEvents) {
+      add(n.pubkey);
+      if (n.kind === 9735) {
+        const zapper = zapperPubkeyFromKind9735(n);
+        if (zapper) add(zapper);
+      }
+    }
+    // Priority 3: authors of the first visible feed events (above the fold)
     for (const e of events.slice(0, 15)) add(e.pubkey);
-    // Priority 3: everything else
+    // Priority 4: everything else
     for (const e of mergedFeedPool) {
       add(e.pubkey);
       for (const t of e.tags || []) {
@@ -200,13 +208,6 @@ export default function App() {
       for (const r of reacts) add(typeof r === "string" ? r : r?.pk);
     }
     for (const f of follows) add(f);
-    for (const n of notificationEvents) {
-      add(n.pubkey);
-      if (n.kind === 9735) {
-        const zapper = zapperPubkeyFromKind9735(n);
-        if (zapper) add(zapper);
-      }
-    }
     return result;
   }, [mergedFeedPool, events, follows, pubkey, zapsByEvent, reactionsByEvent, notificationEvents]);
   const { profiles } = useProfiles({ pubkeys: allPks });

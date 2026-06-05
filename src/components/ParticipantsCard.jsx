@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import Avatar from "./Avatar.jsx";
 import { displayName, isHexPubkey, normPubkey } from "../utils.js";
 import { eventStore } from "../nostr.js";
+import useProfiles from "../hooks/useProfiles.js";
 
-export default function ParticipantsCard({ event, profiles, onOpenProfile }) {
+export default function ParticipantsCard({ event, profiles: propProfiles, onOpenProfile }) {
   const [pubkeys, setPubkeys] = useState([]);
   const seenRef = useRef(new Set());
 
@@ -44,6 +45,9 @@ export default function ParticipantsCard({ event, profiles, onOpenProfile }) {
 
     return () => sub.unsubscribe();
   }, [event?.id]);
+
+  const { profiles: localProfiles } = useProfiles({ pubkeys });
+  const profiles = useMemo(() => ({ ...propProfiles, ...localProfiles }), [propProfiles, localProfiles]);
 
   if (pubkeys.length === 0) return null;
 

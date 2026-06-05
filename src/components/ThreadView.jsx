@@ -8,6 +8,7 @@ import HighlightPopover from "./HighlightPopover.jsx";
 import HighlightSheet from "./HighlightSheet.jsx";
 import { Bk } from "./icons.jsx";
 import { displayName, nip05OrNpub, relativeTime, isQuoteRepost, replyCount, buildParentChain, buildSelfReplyChain, directReplyParentId } from "../utils.js";
+import useProfiles from "../hooks/useProfiles.js";
 import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
 import { pool, eventStore } from "../nostr.js";
@@ -271,6 +272,22 @@ export default function ThreadView({
     return [...map.values()];
   }, [events, fetchedEvents]);
 
+  // Fetch profiles for thread participants (includes freshly-fetched parent chain authors
+  // not present in the global allPks from App)
+  const threadPubkeys = useMemo(() => {
+    const seen = new Set();
+    const result = [];
+    for (const ev of allEvents) {
+      if (!seen.has(ev.pubkey)) { seen.add(ev.pubkey); result.push(ev.pubkey); }
+      for (const t of ev.tags || []) {
+        if (t[0] === "p" && t[1] && !seen.has(t[1])) { seen.add(t[1]); result.push(t[1]); }
+      }
+    }
+    return result;
+  }, [allEvents]);
+  const { profiles: localProfiles } = useProfiles({ pubkeys: threadPubkeys });
+  const mergedProfiles = useMemo(() => ({ ...profiles, ...localProfiles }), [profiles, localProfiles]);
+
   // Fetch ancestor chain and subscribe to replies whenever the focused event changes
   useEffect(() => {
     setFetchedEvents([]);
@@ -332,7 +349,7 @@ export default function ThreadView({
   }).sort((a, b) => a.created_at - b.created_at);
 
   const rowProps = {
-    profiles, allEvents,
+    profiles: mergedProfiles, allEvents,
     onOpenProfile, onOpenThread, onOpenHashtag,
     onOpenZaps, onOpenReactions, onOpenReposts,
     myPubkey, myProfile, onPublish, publishEvent, onPrepend,

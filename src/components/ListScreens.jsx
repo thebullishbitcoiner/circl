@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Avatar from "./Avatar.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
 import { Bk, Rpi } from "./icons.jsx";
 import { displayName, avatarUrl, avatarInitial, fmtSats, relativeTime, nip05OrNpub, normPubkey } from "../utils.js";
 import { eventStore } from "../nostr.js";
 import NoteContent from "./NoteContent.jsx";
+import useProfiles from "../hooks/useProfiles.js";
 
 function zapsRowLabel(pk, profiles) {
   const k = normPubkey(pk);
@@ -49,8 +50,11 @@ function ListScreen({ title, subtitle, children, onBack }) {
   );
 }
 
-export function ZapsScreen({ eventId, zaps, profiles, onBack, onOpenProfile }) {
+export function ZapsScreen({ eventId, zaps, profiles: propProfiles, onBack, onOpenProfile }) {
   const [jsonEvent, setJsonEvent] = useState(null);
+  const zapperPks = useMemo(() => [...new Set(zaps.map(z => z.zapper).filter(Boolean))], [zaps]);
+  const { profiles: localProfiles } = useProfiles({ pubkeys: zapperPks });
+  const profiles = useMemo(() => ({ ...propProfiles, ...localProfiles }), [propProfiles, localProfiles]);
   const total = zaps.reduce((s, z) => s + z.amount, 0);
   const sorted = [...zaps].sort((a, b) => b.amount - a.amount);
   const hasUniqTop = sorted.length === 1 || sorted[0].amount > sorted[1].amount;
@@ -85,9 +89,12 @@ export function ZapsScreen({ eventId, zaps, profiles, onBack, onOpenProfile }) {
   );
 }
 
-export function ReactionsScreen({ eventId, reactions, profiles, onBack, onOpenProfile }) {
+export function ReactionsScreen({ eventId, reactions, profiles: propProfiles, onBack, onOpenProfile }) {
   const [jsonEvent, setJsonEvent] = useState(null);
-  const items = reactions.map(r => typeof r === "string" ? { pk: r, emoji: "🧡" } : r);
+  const items = useMemo(() => reactions.map(r => typeof r === "string" ? { pk: r, emoji: "🧡" } : r), [reactions]);
+  const reactorPks = useMemo(() => [...new Set(items.map(r => r.pk).filter(Boolean))], [items]);
+  const { profiles: localProfiles } = useProfiles({ pubkeys: reactorPks });
+  const profiles = useMemo(() => ({ ...propProfiles, ...localProfiles }), [propProfiles, localProfiles]);
 
   const openJson = r => {
     const ev = r.id ? eventStore.getTimeline([{ ids: [r.id] }])?.[0] : null;
@@ -120,7 +127,22 @@ export function ReactionsScreen({ eventId, reactions, profiles, onBack, onOpenPr
   );
 }
 
-export function PollVotesScreen({ options, voteEvents, isZapPoll, profiles, onBack, onOpenProfile }) {
+export function PollVotesScreen({ options, voteEvents, isZapPoll, profiles: propProfiles, onBack, onOpenProfile }) {
+  const voterPks = useMemo(() => {
+    const pks = new Set();
+    for (const ev of voteEvents) {
+      if (isZapPoll) {
+        const descTag = ev.tags.find(t => t[0] === "description");
+        if (!descTag) continue;
+        try { const zapReq = JSON.parse(descTag[1]); if (zapReq.pubkey) pks.add(zapReq.pubkey); } catch {}
+      } else {
+        pks.add(ev.pubkey);
+      }
+    }
+    return [...pks];
+  }, [voteEvents, isZapPoll]);
+  const { profiles: localProfiles } = useProfiles({ pubkeys: voterPks });
+  const profiles = useMemo(() => ({ ...propProfiles, ...localProfiles }), [propProfiles, localProfiles]);
   const votesByOption = Object.fromEntries(options.map(o => [o.id, []]));
 
   for (const ev of voteEvents) {
@@ -172,9 +194,19 @@ export function PollVotesScreen({ options, voteEvents, isZapPoll, profiles, onBa
   );
 }
 
-export function RepostsScreen({ eventId, reposts, profiles, onBack, onOpenProfile, onOpenThread, allEvents = [], resolveEventById }) {
+export function RepostsScreen({ eventId, reposts, profiles: propProfiles, onBack, onOpenProfile, onOpenThread, allEvents = [], resolveEventById }) {
   const [jsonEvent, setJsonEvent] = useState(null);
-  const items = reposts.map(r => typeof r === "string" ? { type: "repost", pubkey: r } : r);
+  const items = useMemo(() => reposts.map(r => typeof r === "string" ? { type: "repost", pubkey: r } : r), [reposts]);
+  const reposterPks = useMemo(() => {
+    const pks = new Set();
+    for (const item of items) {
+      if (item.pubkey) pks.add(item.pubkey);
+      if (item.quotedEvent?.pubkey) pks.add(item.quotedEvent.pubkey);
+    }
+    return [...pks];
+  }, [items]);
+  const { profiles: localProfiles } = useProfiles({ pubkeys: reposterPks });
+  const profiles = useMemo(() => ({ ...propProfiles, ...localProfiles }), [propProfiles, localProfiles]);
 
   const openJsonForRepost = item => {
     if (item.event) { setJsonEvent(item.event); return; }

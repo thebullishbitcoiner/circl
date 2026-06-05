@@ -1,8 +1,10 @@
+import { useMemo } from "react";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import { displayName, relativeTime, zapCommentFromKind9735, zapperPubkeyFromKind9735, parseArticle, fmtSats, parseBolt11Msats } from "../utils.js";
 import { getNotificationSummary } from "../hooks/useNotifications.js";
 import { eventStore } from "../nostr.js";
+import useProfiles from "../hooks/useProfiles.js";
 
 function resolveEmoji(content, tags) {
   const m = content?.match(/^:([a-zA-Z0-9_]+):$/);
@@ -98,7 +100,21 @@ function NotePreview({ ev, profiles }) {
 
 const timeStyle = { fontSize: 11, color: "var(--text-faint)", whiteSpace: "nowrap", flexShrink: 0, marginLeft: "auto", paddingLeft: 8 };
 
-export default function NotificationsFeed({ items, profiles, onOpenProfile, onOpenNotification, allEvents }) {
+export default function NotificationsFeed({ items, profiles: propProfiles, onOpenProfile, onOpenNotification, allEvents }) {
+  const actorPks = useMemo(() => {
+    const pks = new Set();
+    for (const ev of items) {
+      pks.add(ev.pubkey);
+      if (ev.kind === 9735) {
+        const zapper = zapperPubkeyFromKind9735(ev);
+        if (zapper) pks.add(zapper);
+      }
+    }
+    return [...pks].filter(Boolean);
+  }, [items]);
+  const { profiles: localProfiles } = useProfiles({ pubkeys: actorPks });
+  const profiles = useMemo(() => ({ ...propProfiles, ...localProfiles }), [propProfiles, localProfiles]);
+
   if (!items.length) {
     return (
       <div className="empty-state">

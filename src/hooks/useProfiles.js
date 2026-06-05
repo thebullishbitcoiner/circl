@@ -3,7 +3,7 @@ import { isHexPubkey, normPubkey, nip19 } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 
-const PRIORITY_COUNT = 16; // self + first 15 feed authors
+const PRIORITY_COUNT = 32; // self + notification actors + first feed authors
 const REST_DELAY_MS = 600;
 
 // Module-scope: pubkeys marked here are never re-fetched on remount
@@ -134,9 +134,10 @@ export default function useProfiles({ pubkeys }) {
         priorityNew.push(k);
       } else {
         _pendingRest.add(k);
-        // Schedule (or reschedule) the rest batch
-        if (_restTimer) clearTimeout(_restTimer);
-        _restTimer = setTimeout(flushRest, REST_DELAY_MS);
+        // Start the timer only if not already running — don't reset on each new key.
+        // This ensures the batch fires 600ms after the *first* rest-batch pubkey appears,
+        // not 600ms after the last, which would delay fetching indefinitely while the feed loads.
+        if (!_restTimer) _restTimer = setTimeout(flushRest, REST_DELAY_MS);
       }
     }
 

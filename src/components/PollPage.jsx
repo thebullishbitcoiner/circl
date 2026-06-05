@@ -1,17 +1,16 @@
-import { useEffect } from "react";
+import { useMemo } from "react";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteActions from "./NoteActions.jsx";
 import { Bk } from "./icons.jsx";
 import { displayName, nip05OrNpub, relativeTime, fmtSatsVal, parseBolt11Msats } from "../utils.js";
 import usePollData from "../hooks/usePollData.js";
-import { pool, eventStore } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import useProfiles from "../hooks/useProfiles.js";
 
 function pct(count, total) { return total ? Math.round((count / total) * 100) : 0; }
 
 export default function PollPage({
-  event, profiles,
+  event, profiles: propProfiles,
   myPubkey, myProfile,
   events = [],
   onBack, onOpenProfile, onOpenThread, onOpenHashtag,
@@ -63,22 +62,20 @@ export default function PollPage({
     return map;
   })();
 
-  // Fetch profiles for all voters
-  useEffect(() => {
-    if (!voteEvents.length) return;
-    const pubkeys = isZapPoll
-      ? voteEvents.flatMap(r => {
-          const d = r.tags.find(t => t[0] === "description");
-          try { return [JSON.parse(d[1]).pubkey].filter(Boolean); } catch { return []; }
-        })
-      : voteEvents.map(e => e.pubkey);
-    const toFetch = [...new Set(pubkeys)].filter(pk => !profiles?.[pk]);
-    if (!toFetch.length) return;
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
-    pool.request(relayUrls, [{ kinds: [0], authors: toFetch }]).subscribe({
-      next: ev => eventStore.add(ev),
-    });
-  }, [voteEvents.length]);
+  const voterPks = useMemo(() => {
+    const pks = new Set([event.pubkey]);
+    for (const ev of voteEvents) {
+      if (isZapPoll) {
+        const d = ev.tags.find(t => t[0] === "description");
+        try { const pk = JSON.parse(d[1]).pubkey; if (pk) pks.add(pk); } catch {}
+      } else {
+        pks.add(ev.pubkey);
+      }
+    }
+    return [...pks];
+  }, [event.pubkey, voteEvents, isZapPoll]);
+  const { profiles: localProfiles } = useProfiles({ pubkeys: voterPks });
+  const profiles = useMemo(() => ({ ...propProfiles, ...localProfiles }), [propProfiles, localProfiles]);
 
   const expiryLabel = (() => {
     if (!expiry) return null;
