@@ -7,7 +7,7 @@ import FocusedStatsRow from "./FocusedStatsRow.jsx";
 import HighlightPopover from "./HighlightPopover.jsx";
 import HighlightSheet from "./HighlightSheet.jsx";
 import { Bk } from "./icons.jsx";
-import { displayName, nip05OrNpub, relativeTime, isQuoteRepost, replyCount, buildParentChain, buildSelfReplyChain, directReplyParentId } from "../utils.js";
+import { displayName, nip05OrNpub, relativeTime, isQuoteRepost, replyCount, buildParentChain, buildSelfReplyChain, directReplyParentId, parseBolt11Msats, zapperPubkeyFromKind9735, zapCommentFromKind9735 } from "../utils.js";
 import useProfiles from "../hooks/useProfiles.js";
 import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
@@ -330,6 +330,24 @@ export default function ThreadView({
       },
     });
     subs.push(replySub);
+
+    // Backfill all zaps for the focused event — the feed's broad metaSub can miss
+    // these (no #e filter, 48h window, 500-event limit)
+    const zapFetch = pool.request(relayUrls, [{
+      kinds: [9735],
+      "#e": [focusedEvent.id],
+    }]).subscribe({
+      next: raw => {
+        const bolt11 = raw.tags.find(t => t[0] === "bolt11")?.[1];
+        if (!bolt11) return;
+        const msats = parseBolt11Msats(bolt11);
+        if (!msats) return;
+        const zapper  = zapperPubkeyFromKind9735(raw) ?? raw.pubkey;
+        const comment = zapCommentFromKind9735(raw) ?? "";
+        addLocalZap?.(focusedEvent.id, { id: raw.id, zapper, amount: msats, comment });
+      },
+    });
+    subs.push(zapFetch);
 
     return () => subs.forEach(s => s.unsubscribe());
   }, [focusedEvent.id]); // eslint-disable-line
