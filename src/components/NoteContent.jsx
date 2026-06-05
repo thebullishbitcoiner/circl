@@ -125,6 +125,7 @@ function EmbeddedEvent({ event, profiles, onOpenProfile }) {
         onOpenThread={onOpenThread}
         allowEmbeds={false}
         className="note-embed-text"
+        collapsible
       />
       {isPoll && <PollPreview event={event} />}
     </div>
@@ -231,7 +232,7 @@ function MediaMosaic({ items, onItemClick }) {
   );
 }
 
-const COLLAPSE_THRESHOLD = 500;
+const COLLAPSE_THRESHOLD = 1000;
 
 /**
  * Renders note body with inline images (mosaic when multiple), videos, and @mentions.

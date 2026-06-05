@@ -91,7 +91,7 @@ function NotePreview({ ev, profiles }) {
   if (typeof ev.content !== "string" || !ev.content.trim()) return null;
   return (
     <div className="notif-preview">
-      <NoteContent content={ev.content} tags={ev.tags} profiles={profiles} allEvents={[]} allowEmbeds={false} className="notif-note-text" />
+      <NoteContent content={ev.content} tags={ev.tags} profiles={profiles} allEvents={[]} allowEmbeds={false} className="notif-note-text" collapsible />
     </div>
   );
 }

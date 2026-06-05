@@ -13,6 +13,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   const [media,          setMedia]          = useState([]);
   const [uploading,      setUploading]      = useState(false);
   const [uploadErr,      setUploadErr]      = useState("");
+  const [publishing,     setPublishing]     = useState(false);
   const [showGif,        setShowGif]        = useState(false);
   const [gifQuery,       setGifQuery]       = useState("");
   const [gifs,           setGifs]           = useState([]);
@@ -67,7 +68,8 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   };
 
   const handlePost = async () => {
-    if (!canPost) return;
+    if (!canPost || publishing) return;
+    setPublishing(true);
 
     if (pollMode && publishEvent) {
       const question = getContent().trim();
@@ -102,7 +104,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
       if (goalClosedAt) tags.push(["closed_at", String(Math.floor(new Date(goalClosedAt).getTime() / 1000))]);
       if (goalImage.trim()) tags.push(["image", goalImage.trim()]);
       const published = await publishEvent({ kind: 9041, content: goalTitle.trim(), tags });
-      if (!published) { setUploadErr("Failed to publish — please try again."); return; }
+      if (!published) { setUploadErr("Failed to publish — please try again."); setPublishing(false); return; }
       onPrepend?.(published);
       onDismiss?.();
       return;
@@ -133,42 +135,54 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     onDismiss?.();
   };
 
+  const uploadFile = async file => {
+    const uploadUrl = "https://nostr.build/api/v2/upload/files";
+    let authHeader = "";
+    if (myPubkey && window.nostr?.signEvent) {
+      const buf         = await file.arrayBuffer();
+      const digest      = await crypto.subtle.digest("SHA-256", buf);
+      const payloadHash = Array.from(new Uint8Array(digest))
+        .map(b => b.toString(16).padStart(2, "0")).join("");
+      const authEvent = await window.nostr.signEvent({
+        kind: 27235,
+        pubkey: myPubkey,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [["u", uploadUrl], ["method", "POST"], ["payload", payloadHash]],
+        content: "",
+      });
+      authHeader = `Nostr ${btoa(JSON.stringify(authEvent))}`;
+    }
+    const form = new FormData();
+    form.append("file", file);
+    const headers = authHeader ? { Authorization: authHeader } : {};
+    const res  = await fetch(uploadUrl, { method: "POST", headers, body: form });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`HTTP ${res.status}: ${errText}`);
+    }
+    const json = await res.json();
+    const url  = json?.nip94_event?.tags?.find(t => t[0] === "url")?.[1]
+              ?? json?.data?.[0]?.url;
+    if (!url) throw new Error("No URL returned");
+    return url;
+  };
+
   const handleFileChange = async e => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
     setUploading(true); setUploadErr("");
-    try {
-      const uploadUrl = "https://nostr.build/api/v2/upload/files";
-      let authHeader = "";
-      if (myPubkey && window.nostr?.signEvent) {
-        const buf         = await file.arrayBuffer();
-        const digest      = await crypto.subtle.digest("SHA-256", buf);
-        const payloadHash = Array.from(new Uint8Array(digest))
-          .map(b => b.toString(16).padStart(2, "0")).join("");
-        const authEvent = await window.nostr.signEvent({
-          kind: 27235,
-          pubkey: myPubkey,
-          created_at: Math.floor(Date.now() / 1000),
-          tags: [["u", uploadUrl], ["method", "POST"], ["payload", payloadHash]],
-          content: "",
-        });
-        authHeader = `Nostr ${btoa(JSON.stringify(authEvent))}`;
+    const errors = [];
+    for (const file of files) {
+      try {
+        const url = await uploadFile(file);
+        setMedia(m => [...m, { url, type: "image" }]);
+      } catch (err) {
+        errors.push(err.message);
       }
-      const form = new FormData();
-      form.append("file", file);
-      const headers = authHeader ? { Authorization: authHeader } : {};
-      const res  = await fetch(uploadUrl, { method: "POST", headers, body: form });
-      if (!res.ok) {
-        const errText = await res.text().catch(() => "");
-        throw new Error(`HTTP ${res.status}: ${errText}`);
-      }
-      const json = await res.json();
-      const url  = json?.nip94_event?.tags?.find(t => t[0] === "url")?.[1]
-                ?? json?.data?.[0]?.url;
-      if (!url) throw new Error("No URL returned");
-      setMedia(m => [...m, { url, type: "image" }]);
-    } catch (err) { setUploadErr(`Upload failed — ${err.message}`); }
-    finally  { setUploading(false); e.target.value = ""; }
+    }
+    if (errors.length) setUploadErr(`Upload failed — ${errors[0]}`);
+    setUploading(false);
+    e.target.value = "";
   };
 
   const fetchGifs = async url => {
@@ -327,7 +341,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
         <div className="compose-sheet-bar">
           <button className="compose-sheet-cancel" onClick={onDismiss}>Cancel</button>
           <span className="compose-sheet-title">{title}</span>
-          <button className="compose-sheet-post" disabled={!canPost} onClick={handlePost}>Publish</button>
+          <button className="compose-sheet-post" disabled={!canPost || publishing} onClick={handlePost}>{publishing ? "Publishing…" : "Publish"}</button>
         </div>
 
         {replyTo && (
@@ -345,23 +359,51 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
           </div>
         )}
 
-        {!goalMode && <div className="compose-sheet-body">
-          <div className="compose-sheet-av">
-            {myProfile?.picture
-              ? <img src={myProfile.picture} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
-              : avatarInitial(myPubkey, { [myPubkey]: myProfile })}
-          </div>
-          <div
-            ref={editorRef}
-            className="compose-sheet-input compose-richtext"
-            contentEditable
-            suppressContentEditableWarning
-            onInput={handleInput}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            data-placeholder={replyTo ? "Write your reply…" : "What's on your mind?"}
-          />
-        </div>}
+        {/* Scrollable area: text editor + image previews + quoted event scroll together */}
+        <div className="compose-sheet-scroll">
+          {!goalMode && <div className="compose-sheet-body">
+            <div className="compose-sheet-av">
+              {myProfile?.picture
+                ? <img src={myProfile.picture} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
+                : avatarInitial(myPubkey, { [myPubkey]: myProfile })}
+            </div>
+            <div
+              ref={editorRef}
+              className="compose-sheet-input compose-richtext"
+              contentEditable
+              suppressContentEditableWarning
+              onInput={handleInput}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              data-placeholder={replyTo ? "Write your reply…" : "What's on your mind?"}
+            />
+          </div>}
+
+          {media.length > 0 && (
+            <div className="compose-previews">
+              {media.map((m, i) => (
+                <div key={i} className="compose-preview">
+                  <img src={m.url} alt="" />
+                  <button className="compose-preview-remove" onClick={() => setMedia(ms => ms.filter((_, j) => j !== i))}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {quotedEvent && (
+            <div style={{ padding: "0 16px 12px" }}>
+              <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px", background: "var(--surface)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
+                  <Avatar pk={quotedEvent.pubkey} profiles={profiles} size={20} />
+                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text)" }}>{displayName(quotedEvent.pubkey, profiles)}</span>
+                </div>
+                <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: "var(--text-muted)", margin: 0, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                  {quotedEvent.content}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
 
         {pollMode && (
           <PollCompose
@@ -395,17 +437,6 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
           />
         )}
 
-        {media.length > 0 && (
-          <div className="compose-previews">
-            {media.map((m, i) => (
-              <div key={i} className="compose-preview">
-                <img src={m.url} alt="" />
-                <button className="compose-preview-remove" onClick={() => setMedia(ms => ms.filter((_, j) => j !== i))}>✕</button>
-              </div>
-            ))}
-          </div>
-        )}
-
         {uploadErr  && <div className="compose-upload-status" style={{ color: "#E05C8A" }}>{uploadErr}</div>}
         {uploading   && <div className="compose-upload-status">Uploading…</div>}
 
@@ -437,20 +468,6 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
           </div>
         )}
 
-        {quotedEvent && (
-          <div style={{ padding: "0 16px 12px", flexShrink: 0 }}>
-            <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px", background: "var(--surface)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
-                <Avatar pk={quotedEvent.pubkey} profiles={profiles} size={20} />
-                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text)" }}>{displayName(quotedEvent.pubkey, profiles)}</span>
-              </div>
-              <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: "var(--text-muted)", margin: 0, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                {quotedEvent.content}
-              </p>
-            </div>
-          </div>
-        )}
-
         {mentionResults.length > 0 && (
           <div className="mention-list">
             {mentionResults.map((pk, i) => (
@@ -472,7 +489,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
         )}
 
         <div className="compose-sheet-footer">
-          <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFileChange} />
+          <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleFileChange} />
           <button className="compose-media-btn" title="Add image" onClick={() => fileRef.current?.click()}>
             <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />

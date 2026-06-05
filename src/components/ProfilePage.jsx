@@ -323,11 +323,31 @@ export default function ProfilePage({
       if (!cancelled) setProfileEvents(Array.from(byId.values()).sort((a, b) => b.created_at - a.created_at));
     };
 
-    // Phase 1 — notes first (default tab); clears loading state when done
+    // Phase 1 — notes first (default tab); clears loading state when done.
+    // Circle count fetch is deferred until after notes complete so the relay
+    // prioritises the notes query and the tab populates without waiting for follows.
     const notesSub = pool.request(relayUrls, [{ kinds: [1], authors: [pubkey], limit: 200 }]).subscribe({
       next: raw => { eventStore.add(raw); byId.set(raw.id, raw); },
-      complete: () => { flush(); if (!cancelled) setProfileLoading(false); },
-      error:    () => { if (!cancelled) setProfileLoading(false); },
+      complete: () => {
+        flush();
+        if (!cancelled) {
+          setProfileLoading(false);
+          // Start circle count only after notes are shown
+          if (!isOwn) {
+            const followsSub = pool.request(relayUrls, [{ kinds: [3], authors: [pubkey], limit: 1 }]).subscribe({
+              next: raw => {
+                if (cancelled) return;
+                const pks = raw.tags.filter(t => t[0] === "p" && isHexPubkey(t[1])).map(t => t[1]);
+                setSubjectFollows(pks);
+              },
+              complete: () => { if (!cancelled) setCircleLoading(false); },
+              error:    () => { if (!cancelled) setCircleLoading(false); },
+            });
+            activeSubs.push(followsSub);
+          }
+        }
+      },
+      error: () => { if (!cancelled) setProfileLoading(false); },
     });
     activeSubs.push(notesSub);
 
@@ -351,20 +371,6 @@ export default function ProfilePage({
       complete: flush,
     });
     activeSubs.push(highlightsSub);
-
-    // Fetch subject's contact list for circle count (skip for own profile)
-    if (!isOwn) {
-      const followsSub = pool.request(relayUrls, [{ kinds: [3], authors: [pubkey], limit: 1 }]).subscribe({
-        next: raw => {
-          if (cancelled) return;
-          const pks = raw.tags.filter(t => t[0] === "p" && isHexPubkey(t[1])).map(t => t[1]);
-          setSubjectFollows(pks);
-        },
-        complete: () => { if (!cancelled) setCircleLoading(false); },
-        error:    () => { if (!cancelled) setCircleLoading(false); },
-      });
-      activeSubs.push(followsSub);
-    }
 
     return () => {
       cancelled = true;
