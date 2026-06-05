@@ -232,7 +232,7 @@ function MediaMosaic({ items, onItemClick }) {
   );
 }
 
-const COLLAPSE_THRESHOLD = 1000;
+const COLLAPSE_THRESHOLD = 500;
 
 /**
  * Renders note body with inline images (mosaic when multiple), videos, and @mentions.
