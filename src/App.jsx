@@ -58,6 +58,7 @@ import NotificationsFeed from "./components/NotificationsFeed.jsx";
 import WalletPage from "./components/WalletPage.jsx";
 import TxDetailPage from "./components/TxDetailPage.jsx";
 import SearchPage from "./components/SearchPage.jsx";
+import MutedPage from "./components/MutedPage.jsx";
 import HashtagFeed from "./components/HashtagFeed.jsx";
 import { ZapsScreen, ReactionsScreen, RepostsScreen, PollVotesScreen } from "./components/ListScreens.jsx";
 import SwipePanel from "./components/SwipePanel.jsx";
@@ -110,7 +111,7 @@ export default function App() {
   const { items: notificationEvents, loading: notifLoading } = useNotifications({ pubkey });
   const [bookmarkRefreshKey, setBookmarkRefreshKey] = useState(0);
   const { toggle: toggleBm, isBookmarked, bookmarkItems } = useBookmarks({ pubkey, signAndPublish, refreshKey: bookmarkRefreshKey });
-  const { mute: muteUser, unmute: unmuteUser, isMuted } = useMutes({ pubkey, signAndPublish });
+  const { mutes, mute: muteUser, unmute: unmuteUser, isMuted } = useMutes({ pubkey, signAndPublish });
   const bookmarkLocalPool = useMemo(() => [...events, ...notificationEvents], [events, notificationEvents]);
   const { events: bookmarkFeedEvents, loading: bookmarkFeedLoading } = useBookmarkedEvents({
     bookmarkTags: bookmarkItems,
@@ -210,8 +211,9 @@ export default function App() {
       for (const r of reacts) add(typeof r === "string" ? r : r?.pk);
     }
     for (const f of follows) add(f);
+    for (const m of mutes) add(m);
     return result;
-  }, [mergedFeedPool, events, follows, pubkey, zapsByEvent, reactionsByEvent, notificationEvents]);
+  }, [mergedFeedPool, events, follows, pubkey, zapsByEvent, reactionsByEvent, notificationEvents, mutes]);
   const { profiles } = useProfiles({ pubkeys: allPks });
   const { publish, publishEvent, publishHighlight } = usePublish({ signAndPublish, pubkey });
   const isMobile = useIsMobile();
@@ -446,6 +448,7 @@ export default function App() {
       onMuteUser: handleMuteUser,
       onUnmuteUser: handleUnmuteUser,
       myPubkey: pubkey,
+      mutes,
     }}>
     <>
       <div className="app-shell">
@@ -461,7 +464,15 @@ export default function App() {
               {item.label}
             </button>
           ))}
-          <button className={`nav-item ${settingsOpen ? "active" : ""}`} onClick={() => { setOpenArticle(null); clearNav(); setSettingsOpen(true); }}>
+          <button className={`nav-item ${topEntry?.type === "muted" ? "active" : ""}`} onClick={() => { setOpenArticle(null); clearNav(); setSettingsOpen(false); pushNav({ type: "muted" }); }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="nav-icon">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <line x1="23" y1="9" x2="17" y2="15"/>
+              <line x1="17" y1="9" x2="23" y2="15"/>
+            </svg>
+            Muted
+          </button>
+          <button className={`nav-item ${settingsOpen ? "active" : ""}`} onClick={() => { setOpenArticle(null); clearNav(); setMutedOpen(false); setSettingsOpen(true); }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="nav-icon">
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
@@ -694,10 +705,22 @@ export default function App() {
               </div>
 
               <SwipePanel open={navStack.length > 0 && !openArticle && !openStreamEvent && !settingsOpen} onSwipeRight={handleBack}>
-                {/* Keep CirclePage mounted when a profile is opened on top of it */}
+                {/* Keep MutedPage mounted when a profile is opened on top of it */}
                 {navStack.length >= 2 && !openArticle && !openStreamEvent && !settingsOpen && (() => {
                   const prev = navStack[navStack.length - 2];
                   const top  = navStack[navStack.length - 1];
+                  if (prev.type === "muted" && top.type === "profile") {
+                    return (
+                      <div key="hidden-muted" style={{ display: "none", height: "100%" }}>
+                        <MutedPage
+                          mutes={mutes}
+                          profiles={profiles}
+                          onUnmute={handleUnmuteUser}
+                          onOpenProfile={handleOpenProfile}
+                        />
+                      </div>
+                    );
+                  }
                   if (prev.type !== "circle" || top.type !== "profile") return null;
                   const isOwnCircle = prev.payload.pubkey === pubkey;
                   return (
@@ -785,6 +808,18 @@ export default function App() {
                   const top = navStack[navStack.length - 1];
 
                   if (top.type === "profile") return null; // rendered persistently above
+
+                  if (top.type === "muted") {
+                    return (
+                      <MutedPage
+                        key="muted"
+                        mutes={mutes}
+                        profiles={profiles}
+                        onUnmute={handleUnmuteUser}
+                        onOpenProfile={handleOpenProfile}
+                      />
+                    );
+                  }
 
                   if (top.type === "circle") {
                     const isOwnCircle = top.payload.pubkey === pubkey;
@@ -1218,6 +1253,8 @@ export default function App() {
                   signAndPublish={signAndPublish}
                 />
               </SwipePanel>
+
+
             </div>
 
             <div className="right-panel">
