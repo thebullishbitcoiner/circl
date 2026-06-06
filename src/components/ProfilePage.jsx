@@ -554,7 +554,7 @@ export default function ProfilePage({
             </div>
           );
         })()}
-        {p.about && <ProfileText className="profile-about" text={p.about} />}
+        {p.about && <ProfileText className="profile-about" text={p.about} profiles={profiles} onOpenProfile={onOpenProfile} />}
         {websiteHref && (
           <a
             className="profile-website"

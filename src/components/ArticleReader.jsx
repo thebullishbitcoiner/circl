@@ -112,7 +112,7 @@ export default function ArticleReader({
             <div>
               <div className="author-card-label">Written by</div>
               <div className="author-card-name">{name}</div>
-              {about && <ProfileText className="author-card-bio" text={about} />}
+              {about && <ProfileText className="author-card-bio" text={about} profiles={profiles} onOpenProfile={onOpenProfile} />}
               <button className="follow-author-btn">Follow on Nostr</button>
             </div>
           </div>
