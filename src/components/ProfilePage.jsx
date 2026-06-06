@@ -106,16 +106,16 @@ function IxNote({ event, myPubkey, profiles, onOpenProfile, onOpenThread, resolv
   const mentionedName = mentionedPk ? displayName(mentionedPk, profiles) : null;
 
   return (
-    <div className="ix-note" style={{ animationDelay: `${delay}s` }}>
+    <div className="ix-note" style={{ animationDelay: `${delay}s`, cursor: "pointer" }} onClick={() => onOpenThread?.(event)}>
       <div className="ix-inner">
         <div className="ix-line-wrap">
-          <div className={`ix-av ${isMe ? "is-me" : ""}`} style={{ cursor: "pointer" }} onClick={() => onOpenProfile?.(event.pubkey)}>
+          <div className={`ix-av ${isMe ? "is-me" : ""}`} style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }}>
             {url ? <img src={url} alt={init} onError={e => { e.target.style.display = "none"; }} /> : init}
           </div>
         </div>
         <div className="ix-body">
           <div className="ix-meta">
-            <span className={`ix-name ${isMe ? "is-me" : ""}`} style={{ cursor: "pointer" }} onClick={() => onOpenProfile?.(event.pubkey)}>{name}</span>
+            <span className={`ix-name ${isMe ? "is-me" : ""}`} style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }}>{name}</span>
             {isMe && <span className="ix-you-badge">you</span>}
             <span className="ix-time">{relativeTime(event.created_at)}</span>
           </div>
@@ -181,7 +181,7 @@ export default function ProfilePage({
   const websiteHref = normalizeWebsite(p.website);
   const websiteLabel = websiteHref ? websiteHref.replace(/^https?:\/\//, "").replace(/\/$/, "") : "";
 
-  const { extras, loading: ixLoading } = useInteractions({ myPubkey, otherPubkey: pubkey, feedEvents: events });
+  const { extras, loading: ixLoading } = useInteractions({ myPubkey, otherPubkey: pubkey, feedEvents: events, active: !isOwn && tab === "between" });
 
   const [repostExtras, setRepostExtras] = useState({});
   const repostFetchRef = useRef(new Set());
@@ -480,7 +480,7 @@ export default function ProfilePage({
                (e.pubkey === myPubkey && pTags.includes(pubkey));
       })
       .filter((e, i, arr) => arr.findIndex(x => x.id === e.id) === i)
-      .sort((a, b) => a.created_at - b.created_at),
+      .sort((a, b) => b.created_at - a.created_at),
     [allEvents, pubkey, myPubkey]
   );
 
@@ -578,6 +578,11 @@ export default function ProfilePage({
         <div className={`profile-stat ${tab === "media" ? "active" : ""}`} onClick={() => switchTab("media")}>
           <div className="profile-stat-label">Media</div>
         </div>
+        {!isOwn && (
+          <div className={`profile-stat ${tab === "between" ? "active" : ""}`} onClick={() => switchTab("between")}>
+            <div className="profile-stat-label">Between us</div>
+          </div>
+        )}
         <div className={`profile-stat ${tab === "articles" ? "active" : ""}`} onClick={() => switchTab("articles")}>
           <div className="profile-stat-label">Articles</div>
         </div>
@@ -587,11 +592,6 @@ export default function ProfilePage({
         <div className={`profile-stat ${tab === "goals" ? "active" : ""}`} onClick={() => switchTab("goals")}>
           <div className="profile-stat-label">Goals</div>
         </div>
-        {!isOwn && (
-          <div className={`profile-stat ${tab === "between" ? "active" : ""}`} onClick={() => switchTab("between")}>
-            <div className="profile-stat-label">Between us</div>
-          </div>
-        )}
       </div>
 
       {/* Notes tab */}

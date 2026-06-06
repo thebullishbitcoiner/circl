@@ -6,12 +6,13 @@ import { RELAYS } from "../constants.js";
 // Persists across mounts — revisiting the same profile pair skips the relay fetch
 const _cache = new Map(); // `${myPubkey}:${otherPubkey}` → extras[]
 
-export default function useInteractions({ myPubkey, otherPubkey, feedEvents }) {
+export default function useInteractions({ myPubkey, otherPubkey, feedEvents, active = false }) {
   const [extras, setExtras] = useState([]);
   const [loading, setLoading] = useState(false);
   const seen = useRef(new Set());
 
   useEffect(() => {
+    if (!active) return;
     const me = normPubkey(myPubkey);
     const them = normPubkey(otherPubkey);
     if (!isHexPubkey(me) || !isHexPubkey(them)) return;
@@ -36,8 +37,8 @@ export default function useInteractions({ myPubkey, otherPubkey, feedEvents }) {
     const sub = pool.request(
       relayUrls,
       [
-        { kinds: [1], authors: [them], "#p": [me], limit: 100 },
-        { kinds: [1], authors: [me], "#p": [them], limit: 100 },
+        { kinds: [1], authors: [them], "#p": [me], limit: 500 },
+        { kinds: [1], authors: [me], "#p": [them], limit: 500 },
       ]
     ).subscribe({
       next: raw => {
@@ -45,17 +46,17 @@ export default function useInteractions({ myPubkey, otherPubkey, feedEvents }) {
         if (seen.current.has(raw.id)) return;
         seen.current.add(raw.id);
         collected.push(raw);
-        setExtras([...collected].sort((a, b) => a.created_at - b.created_at));
+        setExtras([...collected].sort((a, b) => b.created_at - a.created_at));
       },
       complete: () => {
-        _cache.set(cacheKey, [...collected].sort((a, b) => a.created_at - b.created_at));
+        _cache.set(cacheKey, [...collected].sort((a, b) => b.created_at - a.created_at));
         setLoading(false);
       },
       error: () => setLoading(false),
     });
 
     return () => sub.unsubscribe();
-  }, [myPubkey, otherPubkey]);
+  }, [myPubkey, otherPubkey, active]);
 
   return { extras, loading };
 }
