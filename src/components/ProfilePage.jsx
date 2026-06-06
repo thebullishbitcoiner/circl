@@ -6,10 +6,12 @@ import PollCard from "./PollCard.jsx";
 import NoteActions from "./NoteActions.jsx";
 import ProfileText from "./ProfileText.jsx";
 import { Bk, Ck } from "./icons.jsx";
+import ProfileContextMenu from "./ProfileContextMenu.jsx";
 import { displayName, nip05OrNpub, relativeTime, shortNpub, truncNpub, avatarUrl, isQuoteRepost, isHexPubkey, replyCount, repostAndQuoteCount, normPubkey, directReplyParentId, parseKind6EmbeddedEvent, nip19, parseNoteMediaSegments } from "../utils.js";
 import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
 import useInteractions from "../hooks/useInteractions.js";
+import { useNavigation } from "../context/NavigationContext.jsx";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 import SkelCard from "./SkelCard.jsx";
@@ -141,6 +143,8 @@ export default function ProfilePage({
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
   scrollToTopTrigger,
 }) {
+  const { isMuted } = useNavigation();
+
   const [tab, setTab] = useState("notes");             // drives indicator immediately
   const [renderedTab, setRenderedTab] = useState("notes"); // drives content (deferred)
   const [, startTransition] = useTransition();
@@ -158,6 +162,7 @@ export default function ProfilePage({
   const [profileLoading, setProfileLoading] = useState(true);
   const [subjectFollows, setSubjectFollows] = useState([]);
   const [circleLoading, setCircleLoading] = useState(true);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [profileNotesMenuId, setProfileNotesMenuId] = useState(null);
   const [profileNotesJsonEvent, setProfileNotesJsonEvent] = useState(null);
   const [lightboxUrl, setLightboxUrl] = useState(null);
@@ -387,8 +392,8 @@ export default function ProfilePage({
   }, [events, profileEvents, repostExtras]);
 
   const theirEvents = useMemo(
-    () => mergedEvents.filter(e => e.pubkey === pubkey && (e.kind === 1 || e.kind === 6 || e.kind === 9802 || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311 || e.kind === 9041)),
-    [mergedEvents, pubkey]
+    () => isMuted?.(pubkey) ? [] : mergedEvents.filter(e => e.pubkey === pubkey && (e.kind === 1 || e.kind === 6 || e.kind === 9802 || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311 || e.kind === 9041)),
+    [mergedEvents, pubkey, isMuted]
   );
 
   const topLevel = useMemo(
@@ -506,6 +511,24 @@ export default function ProfilePage({
         >
           <Bk s={16} />
         </button>
+        {!isOwn && (
+          <div style={{ position: "absolute", top: 12, right: 12 }}>
+            <button
+              type="button"
+              className="back-btn"
+              style={{ background: "rgba(0,0,0,.25)", backdropFilter: "blur(8px)", color: "white", flexDirection: "column", gap: "2.5px" }}
+              onClick={e => { e.stopPropagation(); setProfileMenuOpen(v => !v); }}
+              aria-label="More options"
+            >
+              <span style={{ width: 2.5, height: 2.5, borderRadius: "50%", background: "currentColor", display: "block" }} />
+              <span style={{ width: 2.5, height: 2.5, borderRadius: "50%", background: "currentColor", display: "block" }} />
+              <span style={{ width: 2.5, height: 2.5, borderRadius: "50%", background: "currentColor", display: "block" }} />
+            </button>
+            {profileMenuOpen && (
+              <ProfileContextMenu pubkey={pubkey} onClose={() => setProfileMenuOpen(false)} />
+            )}
+          </div>
+        )}
       </div>
 
       <div className="profile-identity" style={{ paddingBottom: 16 }}>

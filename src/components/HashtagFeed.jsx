@@ -3,6 +3,7 @@ import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 import { replyCount, repostAndQuoteCount } from "../utils.js";
 import NoteCard from "./NoteCard.jsx";
+import { useNavigation } from "../context/NavigationContext.jsx";
 import { Bk } from "./icons.jsx";
 
 const hashtagCache = new Map(); // hashtag → { notes, ts }
@@ -15,6 +16,7 @@ export default function HashtagFeed({
   publishEvent, onPrepend, onOpenZaps, onOpenReactions, onOpenReposts,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail, resolveEventById,
 }) {
+  const { isMuted } = useNavigation();
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const subRef = useRef(null);
@@ -74,7 +76,7 @@ export default function HashtagFeed({
         </div>
       )}
 
-      {notes.map((ev, i) => (
+      {notes.filter(ev => !isMuted?.(ev.pubkey)).map((ev, i) => (
         <NoteCard
           key={ev.id}
           event={ev}

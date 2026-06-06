@@ -259,6 +259,7 @@ export default function ThreadView({
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
   resolveEventById, onOpenPollVotes,
 }) {
+  const { isMuted } = useNavigation();
   const containerRef = useRef(null);
   const focusRef     = useRef(null);
   const authorPk     = focusedEvent.pubkey;
@@ -363,6 +364,7 @@ export default function ThreadView({
 
   const otherReplies = allEvents.filter(e => {
     if (e.kind !== 1 || chainIds.has(e.id) || isQuoteRepost(e)) return false;
+    if (isMuted?.(e.pubkey)) return false;
     return directReplyParentId(e) === focusedEvent.id;
   }).sort((a, b) => a.created_at - b.created_at);
 

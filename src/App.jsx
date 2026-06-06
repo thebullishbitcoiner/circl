@@ -19,6 +19,7 @@ import useFeed from "./hooks/useFeed.js";
 import useNotifications from "./hooks/useNotifications.js";
 import useProfiles from "./hooks/useProfiles.js";
 import useBookmarks from "./hooks/useBookmarks.js";
+import useMutes from "./hooks/useMutes.js";
 import useBookmarkedEvents from "./hooks/useBookmarkedEvents.js";
 import usePublish from "./hooks/usePublish.js";
 import useIsMobile from "./hooks/useIsMobile.js";
@@ -109,6 +110,7 @@ export default function App() {
   const { items: notificationEvents, loading: notifLoading } = useNotifications({ pubkey });
   const [bookmarkRefreshKey, setBookmarkRefreshKey] = useState(0);
   const { toggle: toggleBm, isBookmarked, bookmarkItems } = useBookmarks({ pubkey, signAndPublish, refreshKey: bookmarkRefreshKey });
+  const { mute: muteUser, unmute: unmuteUser, isMuted } = useMutes({ pubkey, signAndPublish });
   const bookmarkLocalPool = useMemo(() => [...events, ...notificationEvents], [events, notificationEvents]);
   const { events: bookmarkFeedEvents, loading: bookmarkFeedLoading } = useBookmarkedEvents({
     bookmarkTags: bookmarkItems,
@@ -355,6 +357,24 @@ export default function App() {
     }
   };
 
+  const handleMuteUser = async pk => {
+    try {
+      await muteUser(pk);
+      showToast("User muted");
+    } catch (e) {
+      showToast(e?.message || "Could not update mute list");
+    }
+  };
+
+  const handleUnmuteUser = async pk => {
+    try {
+      await unmuteUser(pk);
+      showToast("User unmuted");
+    } catch (e) {
+      showToast(e?.message || "Could not update mute list");
+    }
+  };
+
   const hasUnread = (notificationEvents[0]?.created_at ?? 0) > lastNotifSeenAt;
 
   const navigate = nav => {
@@ -376,7 +396,7 @@ export default function App() {
     if (nav === "zaps" && activeNav !== "zaps") refreshWallet();
   };
 
-  const displayEvs = activeNav === "bookmarks" ? bookmarkFeedEvents : events;
+  const displayEvs = (activeNav === "bookmarks" ? bookmarkFeedEvents : events).filter(e => !isMuted(e.pubkey));
   const isLoading = fl || el;
   const anyPanelOpen = settingsOpen || !!openArticle || !!openStreamEvent || navStack.length > 0;
   const myProfile = profiles[pubkey];
@@ -421,7 +441,11 @@ export default function App() {
       onOpenZaps: handleOpenZaps,
       onOpenReactions: handleOpenReactions,
       onOpenReposts: handleOpenReposts,
-      onOpenPollVotes: handleOpenPollVotes,
+        onOpenPollVotes: handleOpenPollVotes,
+      isMuted,
+      onMuteUser: handleMuteUser,
+      onUnmuteUser: handleUnmuteUser,
+      myPubkey: pubkey,
     }}>
     <>
       <div className="app-shell">
@@ -560,13 +584,13 @@ export default function App() {
                     : (
                       <>
                         <NotificationsFeed
-                          items={notificationEvents.slice(0, visibleCount)}
+                          items={notificationEvents.filter(e => !isMuted(e.pubkey)).slice(0, visibleCount)}
                           profiles={profiles}
                           onOpenProfile={handleOpenProfile}
                           onOpenNotification={handleOpenNotification}
                           allEvents={mergedFeedPool}
                         />
-                        {visibleCount < notificationEvents.length && (
+                        {visibleCount < notificationEvents.filter(e => !isMuted(e.pubkey)).length && (
                           <div style={{ padding: "20px", textAlign: "center" }}>
                             <div style={{ width: 20, height: 20, border: "2px solid var(--border)", borderTopColor: "var(--primary)", borderRadius: "50%", animation: "spin .7s linear infinite", margin: "0 auto" }} />
                           </div>
