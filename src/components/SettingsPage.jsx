@@ -349,14 +349,14 @@ export default function SettingsPage({
     onSaveZapSettings?.({ amount: parsed, msg: e.target.value });
   };
 
-  const tabBtn = (id, label) => ({
+  const tabBtn = (id) => ({
     flex: 1, padding: "6px 0", borderRadius: 6, border: "none",
-    background: walletTab === id ? "var(--surface)" : "transparent",
-    color: walletTab === id ? "var(--text)" : "var(--text-muted)",
+    background: walletTab === id ? "var(--bg)" : "transparent",
+    color: walletTab === id ? "var(--primary)" : "var(--text-muted)",
     fontFamily: "'DM Sans',sans-serif", fontSize: 12,
-    fontWeight: walletTab === id ? 600 : 400,
+    fontWeight: walletTab === id ? 600 : 500,
     cursor: "pointer",
-    boxShadow: walletTab === id ? "0 1px 3px rgba(0,0,0,.1)" : "none",
+    boxShadow: walletTab === id ? "0 1px 4px rgba(0,0,0,.12)" : "none",
     transition: "all .15s",
   });
 
@@ -400,9 +400,11 @@ export default function SettingsPage({
         </>
       ) : (
         <div style={{ margin: "0 16px 4px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
-          <div style={{ display: "flex", padding: "10px 12px 0", gap: 4 }}>
-            <button style={tabBtn("rizful")} onClick={() => setWalletTab("rizful")}>Rizful</button>
-            <button style={tabBtn("nwc")}    onClick={() => setWalletTab("nwc")}>NWC Connection String</button>
+          <div style={{ display: "flex", padding: "10px 12px 10px", gap: 4 }}>
+            <div style={{ display: "flex", flex: 1, background: "var(--border)", borderRadius: 8, padding: 3, gap: 2 }}>
+              <button style={tabBtn("rizful")} onClick={() => setWalletTab("rizful")}>Rizful</button>
+              <button style={tabBtn("nwc")}    onClick={() => setWalletTab("nwc")}>NWC Connection String</button>
+            </div>
           </div>
           {walletTab === "rizful"
             ? <RizfulConnect pubkey={pubkey} onConnected={data => onWalletConnected({ ...data, source: "rizful" })} />
