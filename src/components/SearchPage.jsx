@@ -59,6 +59,23 @@ function NoteResult({ ev, profiles, onOpenProfile, onOpenThread }) {
   );
 }
 
+function HashtagSuggestion({ tag, onOpenHashtag }) {
+  return (
+    <div className="search-result" role="button" tabIndex={0}
+      onClick={() => onOpenHashtag?.(tag)}
+      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") onOpenHashtag?.(tag); }}
+    >
+      <div style={{ flexShrink: 0, width: 40, height: 40, borderRadius: "50%", background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, color: "var(--primary)" }}>
+        #
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="search-result-name">#{tag}</div>
+        <div className="search-result-sub">Browse hashtag</div>
+      </div>
+    </div>
+  );
+}
+
 function Spinner() {
   return (
     <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
@@ -67,7 +84,7 @@ function Spinner() {
   );
 }
 
-export default function SearchPage({ profiles, onOpenProfile, onOpenThread }) {
+export default function SearchPage({ profiles, onOpenProfile, onOpenThread, onOpenHashtag }) {
   const [query,          setQuery]          = useState("");
   const [suggestions,    setSuggestions]    = useState([]);
   const [noteResults,    setNoteResults]    = useState([]);
@@ -145,6 +162,7 @@ export default function SearchPage({ profiles, onOpenProfile, onOpenThread }) {
       setLoadingSuggest(false);
       return;
     }
+    if (q.trim().startsWith("#")) return;
     debounceRef.current = setTimeout(() => runPeopleSearch(q.trim()), SUGGEST_DEBOUNCE_MS);
   };
 
@@ -153,6 +171,10 @@ export default function SearchPage({ profiles, onOpenProfile, onOpenThread }) {
       clearTimeout(debounceRef.current);
       suggestSubRef.current?.unsubscribe();
       setSuggestions([]);
+      if (query.trim().startsWith("#")) {
+        onOpenHashtag?.(query.trim().slice(1));
+        return;
+      }
       setMode("notes");
       runNoteSearch(query.trim());
     }
@@ -194,7 +216,7 @@ export default function SearchPage({ profiles, onOpenProfile, onOpenThread }) {
         </div>
         {query.trim() && mode === "suggest" && (
           <div style={{ fontSize: 11, color: "var(--text-faint)", textAlign: "center", marginTop: 8, fontFamily: "'DM Sans',sans-serif" }}>
-            Press Enter to search notes
+            {query.trim().startsWith("#") ? `Press Enter to browse ${query.trim()}` : "Press Enter to search notes"}
           </div>
         )}
       </div>
@@ -216,7 +238,10 @@ export default function SearchPage({ profiles, onOpenProfile, onOpenThread }) {
           </div>
         )}
 
-        {results.map(ev =>
+        {mode === "suggest" && query.trim().startsWith("#") && (
+          <HashtagSuggestion tag={query.trim().slice(1)} onOpenHashtag={onOpenHashtag} />
+        )}
+        {!(mode === "suggest" && query.trim().startsWith("#")) && results.map(ev =>
           mode === "suggest"
             ? <ProfileSuggestion key={ev.pubkey} ev={ev} onOpenProfile={onOpenProfile} />
             : <NoteResult key={ev.id} ev={ev} profiles={profiles} onOpenProfile={onOpenProfile} onOpenThread={onOpenThread} />

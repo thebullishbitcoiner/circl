@@ -133,6 +133,10 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
           tags.push(["p", pk]);
         }
       }
+      const hashtags = [...new Set(
+        [...finalContent.matchAll(/#([a-zA-Z][a-zA-Z0-9_]+)/g)].map(m => m[1].toLowerCase())
+      )];
+      for (const ht of hashtags) tags.push(["t", ht]);
       if (replyTo && replyTo.pubkey !== myPubkey) broadcastEvent(replyTo);
       const published = await publishEvent({ kind: 1, content: finalContent, tags });
       if (published) onPrepend?.(published);

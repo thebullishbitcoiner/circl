@@ -36,8 +36,8 @@ export default function HashtagFeed({
     setNotes([]);
     setLoading(true);
 
-    const since = Math.floor(Date.now() / 1000) - 60 * 60 * 48;
-    const sub = pool.subscription(relayUrls, [{ kinds: [1], "#t": [key], since, limit: 50 }]).subscribe({
+    // Use group(relays, false) so offline/not-yet-connected outbox relays are included
+    const sub = pool.group(relayUrls, false).request([{ kinds: [1], "#t": [key], limit: 100 }]).subscribe({
       next: ev => {
         eventStore.add(ev);
         setNotes(prev => {
@@ -52,7 +52,7 @@ export default function HashtagFeed({
     });
 
     subRef.current = sub;
-    const t = setTimeout(() => setLoading(false), 4000);
+    const t = setTimeout(() => setLoading(false), 8000);
     return () => { sub.unsubscribe(); clearTimeout(t); };
   }, [hashtag]);
 

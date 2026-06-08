@@ -640,6 +640,7 @@ export default function App() {
                     profiles={profiles}
                     onOpenProfile={handleOpenProfile}
                     onOpenThread={handleOpenThread}
+                    onOpenHashtag={handleOpenHashtag}
                   />
                 </div>
               )}
