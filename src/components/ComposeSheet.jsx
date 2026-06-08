@@ -8,7 +8,7 @@ import EmojiPicker from "./EmojiPicker.jsx";
 import PollCompose from "./PollCompose.jsx";
 import GoalCompose from "./GoalCompose.jsx";
 
-export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey, myProfile, onPost, onDismiss, publishEvent, onPrepend, events = [] }) {
+export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey, myProfile, onPost, onDismiss, publishEvent, onPrepend, events = [], circles = [], initialCircle = null }) {
   const [hasText,        setHasText]        = useState(false);
   const [media,          setMedia]          = useState([]);
   const [uploading,      setUploading]      = useState(false);
@@ -35,6 +35,8 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   const [goalAmount,      setGoalAmount]      = useState("");
   const [goalClosedAt,    setGoalClosedAt]    = useState("");
   const [goalImage,       setGoalImage]       = useState("");
+  const [selectedCircle,  setSelectedCircle]  = useState(initialCircle);
+  const [showCirclePicker, setShowCirclePicker] = useState(false);
   const fileRef   = useRef(null);
   const editorRef = useRef(null);
 
@@ -125,6 +127,11 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
         tags.push(["p", quotedEvent.pubkey, "", "mention"]);
         const noteUri = `nostr:${nip19.noteEncode(quotedEvent.id)}`;
         finalContent = finalContent ? `${finalContent}\n${noteUri}` : noteUri;
+      }
+      if (selectedCircle) {
+        for (const pk of selectedCircle.members) {
+          tags.push(["p", pk]);
+        }
       }
       if (replyTo && replyTo.pubkey !== myPubkey) broadcastEvent(replyTo);
       const published = await publishEvent({ kind: 1, content: finalContent, tags });
@@ -379,6 +386,25 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
             />
           </div>}
 
+          {selectedCircle && (
+            <div style={{ padding: "0 16px 8px", display: "flex", alignItems: "center", gap: 6 }}>
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+                <circle cx="19" cy="8" r="2.5" />
+                <path d="M21.5 14c1.5.7 2.5 2 2.5 3.5" />
+              </svg>
+              <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12, color: "var(--primary)", fontWeight: 500 }}>
+                Notifying {selectedCircle.title} ({selectedCircle.members.length})
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedCircle(null)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: 14, lineHeight: 1, padding: 0 }}
+              >✕</button>
+            </div>
+          )}
+
           {media.length > 0 && (
             <div className="compose-previews">
               {media.map((m, i) => (
@@ -468,6 +494,46 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
           </div>
         )}
 
+        {showCirclePicker && circles.length > 0 && (
+          <div style={{ borderTop: "1px solid var(--border)", background: "var(--bg)", padding: "8px 0" }}>
+            {circles.map(circle => (
+              <button
+                key={circle.id}
+                type="button"
+                onClick={() => {
+                  setSelectedCircle(selectedCircle?.id === circle.id ? null : circle);
+                  setShowCirclePicker(false);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  width: "100%",
+                  padding: "10px 16px",
+                  background: selectedCircle?.id === circle.id ? "var(--surface)" : "none",
+                  border: "none",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  color: "var(--text)",
+                }}
+              >
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={selectedCircle?.id === circle.id ? "var(--primary)" : "currentColor"} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="9" cy="7" r="3" />
+                  <path d="M3 18c0-3 2.7-5 6-5s6 2 6 5" />
+                  <circle cx="18" cy="7" r="2" />
+                  <path d="M20 14c1.2.6 2 1.7 2 3" />
+                </svg>
+                <span style={{ flex: 1, fontFamily: "'DM Sans',sans-serif", fontSize: 14, fontWeight: selectedCircle?.id === circle.id ? 600 : 400 }}>
+                  {circle.title}
+                </span>
+                <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12, color: "var(--text-muted)" }}>
+                  {circle.members.length}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {mentionResults.length > 0 && (
           <div className="mention-list">
             {mentionResults.map((pk, i) => (
@@ -544,6 +610,23 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
                 <circle cx="12" cy="12" r="10" />
                 <circle cx="12" cy="12" r="6" />
                 <circle cx="12" cy="12" r="2" />
+              </svg>
+            </button>
+          )}
+          {!replyTo && !quotedEvent && circles.length > 0 && (
+            <button
+              type="button"
+              className="compose-media-btn"
+              title="Post to a circle"
+              onClick={() => { setShowEmoji(false); setShowGif(false); setShowCirclePicker(v => !v); }}
+              style={selectedCircle || showCirclePicker ? { color: "var(--primary)", background: "var(--surface)" } : {}}
+              aria-pressed={showCirclePicker}
+            >
+              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="9" cy="7" r="3" />
+                <path d="M3 18c0-3 2.7-5 6-5s6 2 6 5" />
+                <circle cx="18" cy="7" r="2" />
+                <path d="M20 14c1.2.6 2 1.7 2 3" />
               </svg>
             </button>
           )}
