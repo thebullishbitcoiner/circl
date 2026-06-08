@@ -13,7 +13,8 @@ import {
   zapperPubkeyFromKind9735,
 } from "./utils.js";
 import useAuth from "./hooks/useAuth.js";
-import { nostrSubscribe } from "./nostr.js";
+import { nostrSubscribe, eventLoader, eventStore, pool } from "./nostr.js";
+import { RELAYS } from "./constants.js";
 import useFollows from "./hooks/useFollows.js";
 import useFeed from "./hooks/useFeed.js";
 import useNotifications from "./hooks/useNotifications.js";
@@ -126,54 +127,34 @@ export default function App() {
 
   const mergedFeedPool = useMemo(() => [...mergedFeedMap.values()], [mergedFeedMap]);
 
-  const pendingEventFetches = useRef(new Set());
-  const batchQueueRef = useRef([]);
-  const batchTimerRef = useRef(null);
-
-  const flushBatch = useCallback(() => {
-    batchTimerRef.current = null;
-    const pending = batchQueueRef.current.splice(0);
-    if (!pending.length) return;
-    const resolvers = new Map(pending.map(p => [p.id, p.resolve]));
-    const ids = [...resolvers.keys()];
-    const sub = nostrSubscribe(
-      [{ ids, limit: ids.length }],
-      {
-        closeOnEose: true,
-        onEvent: e => {
-          const ev = e.rawEvent();
-          const res = resolvers.get(ev.id);
-          if (res) {
-            resolvers.delete(ev.id);
-            pendingEventFetches.current.delete(ev.id);
-            prependEvent(ev);
-            res(ev);
-          }
-        },
-        onEose: () => {
-          for (const [id, res] of resolvers) {
-            pendingEventFetches.current.delete(id);
-            res(null);
-          }
-          resolvers.clear();
-        },
-      }
-    );
-    setTimeout(() => sub.stop(), 5500);
-  }, [prependEvent]);
-
-  const resolveEventById = useCallback(async eventId => {
+  const resolveEventById = useCallback(async (eventId, relayHints = []) => {
     if (!eventId) return null;
     const existing = mergedFeedMap.get(eventId);
     if (existing) return existing;
-    if (pendingEventFetches.current.has(eventId)) return null;
-    pendingEventFetches.current.add(eventId);
+    // Fast path: event already known to the store from any prior fetch
+    const stored = eventStore.getTimeline([{ ids: [eventId], limit: 1 }])?.[0];
+    if (stored) return stored;
+    // Always include connected relays so note1 refs (no hints) still get fetched
+    const connected = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const allRelays = relayHints.length
+      ? [...new Set([...relayHints, ...connected])]
+      : connected;
     return new Promise(resolve => {
-      batchQueueRef.current.push({ id: eventId, resolve });
-      clearTimeout(batchTimerRef.current);
-      batchTimerRef.current = setTimeout(flushBatch, 100);
+      let done = false;
+      const sub = eventLoader({ id: eventId, relays: allRelays }).subscribe({
+        next: ev => {
+          if (done || !ev?.id) return;
+          done = true;
+          sub.unsubscribe();
+          prependEvent(ev);
+          resolve(ev);
+        },
+        error: () => { if (!done) { done = true; resolve(null); } },
+        complete: () => { if (!done) { done = true; resolve(null); } },
+      });
+      setTimeout(() => { if (!done) { done = true; sub.unsubscribe(); resolve(null); } }, 8000);
     });
-  }, [mergedFeedMap, flushBatch]);
+  }, [mergedFeedMap, prependEvent]);
 
   const allPks = useMemo(() => {
     const seen = new Set();

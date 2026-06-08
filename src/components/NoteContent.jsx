@@ -324,9 +324,11 @@ export default function NoteContent({
     let cancelled = false;
     const known = new Set((allEvents || []).map(e => e.id));
     for (const nevent of refs) {
-      const id = resolveNeventToId(nevent);
+      const decoded = decodeNevent(nevent);
+      const id = decoded?.id;
+      const hints = decoded?.relays || [];
       if (!id || known.has(id) || resolvedRefs[id]) continue;
-      Promise.resolve(resolveEventById(id)).then(ev => {
+      Promise.resolve(resolveEventById(id, hints)).then(ev => {
         if (cancelled || !ev?.id) return;
         setResolvedRefs(prev => (prev[ev.id] ? prev : { ...prev, [ev.id]: ev }));
       }).catch(() => {});

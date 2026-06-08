@@ -1,5 +1,6 @@
 import { EventStore } from "applesauce-core";
 import { RelayPool } from "applesauce-relay";
+import { createEventLoader } from "applesauce-loaders/loaders";
 import { RELAYS } from "./constants.js";
 
 export const eventStore = new EventStore();
@@ -53,6 +54,14 @@ export function broadcastEvent(event) {
     new Promise(resolve => setTimeout(resolve, 8000)),
   ]).catch(() => null);
 }
+
+// ── Event loader ────────────────────────────────────────────────────────────
+// Uses pool.group(relays, false) to bypass the ignoreOffline=true default so
+// relay hints in nevent references work even for relays not yet connected.
+export const eventLoader = createEventLoader(
+  (relays, filters) => pool.group(relays, false).request(filters),
+  { eventStore, bufferTime: 300 },
+);
 
 // ── NDK-compat subscribe wrapper ────────────────────────────────────────────
 
