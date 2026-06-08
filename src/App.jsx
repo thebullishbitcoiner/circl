@@ -644,44 +644,42 @@ export default function App() {
                 </div>
               )}
               {(activeNav === "home" || activeNav === "profile") && !anyPanelOpen && !openArticle && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setFloatingCompose(true)}
-                    style={{
-                      position: "absolute",
-                      bottom: isMobile ? "calc(var(--bottom-nav-h) + 16px)" : "20px",
-                      right: "18px",
-                      width: 52, height: 52,
-                      borderRadius: "50%",
-                      background: "var(--primary)",
-                      color: "white",
-                      border: "none",
-                      boxShadow: "0 4px 16px rgba(109,40,217,.45)",
-                      cursor: "pointer",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 26, fontWeight: 300,
-                      zIndex: 150,
-                      transition: "transform .15s, box-shadow .15s",
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.boxShadow = "0 6px 24px rgba(109,40,217,.55)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 4px 16px rgba(109,40,217,.45)"; }}
-                  >+
-                  </button>
-                  {floatingCompose && (
-                    <ComposeSheet
-                      profiles={profiles}
-                      myPubkey={pubkey}
-                      myProfile={myProfile}
-                      onPost={text => { publish(text).then(s => s && prependEvent(s)); }}
-                      publishEvent={publishEvent}
-                      onPrepend={prependEvent}
-                      onDismiss={() => { setFloatingCompose(false); setComposeCircle(null); }}
-                      circles={circles}
-                      initialCircle={composeCircle}
-                    />
-                  )}
-                </>
+                <button
+                  type="button"
+                  onClick={() => setFloatingCompose(true)}
+                  style={{
+                    position: "absolute",
+                    bottom: isMobile ? "calc(var(--bottom-nav-h) + 16px)" : "20px",
+                    right: "18px",
+                    width: 52, height: 52,
+                    borderRadius: "50%",
+                    background: "var(--primary)",
+                    color: "white",
+                    border: "none",
+                    boxShadow: "0 4px 16px rgba(109,40,217,.45)",
+                    cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 26, fontWeight: 300,
+                    zIndex: 150,
+                    transition: "transform .15s, box-shadow .15s",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.boxShadow = "0 6px 24px rgba(109,40,217,.55)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 4px 16px rgba(109,40,217,.45)"; }}
+                >+
+                </button>
+              )}
+              {floatingCompose && (
+                <ComposeSheet
+                  profiles={profiles}
+                  myPubkey={pubkey}
+                  myProfile={myProfile}
+                  onPost={text => { publish(text).then(s => s && prependEvent(s)); }}
+                  publishEvent={publishEvent}
+                  onPrepend={prependEvent}
+                  onDismiss={() => { setFloatingCompose(false); setComposeCircle(null); }}
+                  circles={circles}
+                  initialCircle={composeCircle}
+                />
               )}
 
               <div className={`slide-panel ${openArticle ? "open" : ""}`}>
