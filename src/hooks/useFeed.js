@@ -51,8 +51,8 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap }) {
     const metaSub = pool.subscription(
       relayUrls,
       [
-        { kinds: [7], authors, since, limit: 500 },
-        { kinds: [9735], since, limit: 500 },
+        { kinds: [7], "#p": authors, since, limit: 500 },
+        { kinds: [9735], "#p": authors, since, limit: 500 },
       ]
     ).subscribe({
       next: raw => {

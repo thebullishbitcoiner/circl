@@ -350,6 +350,19 @@ export default function ThreadView({
     });
     subs.push(zapFetch);
 
+    // Backfill all reactions for the focused event — feed metaSub uses #p filter
+    // which misses reactions from users who aren't in the follows list
+    const reactionFetch = pool.request(relayUrls, [{
+      kinds: [7],
+      "#e": [focusedEvent.id],
+    }]).subscribe({
+      next: raw => {
+        if (!raw.content) return;
+        setLocalReaction?.(focusedEvent.id, raw.pubkey, raw.content === "+" ? "🧡" : raw.content, { id: raw.id, tags: raw.tags });
+      },
+    });
+    subs.push(reactionFetch);
+
     return () => subs.forEach(s => s.unsubscribe());
   }, [focusedEvent.id]); // eslint-disable-line
 

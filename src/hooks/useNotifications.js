@@ -5,7 +5,7 @@ import { RELAYS } from "../constants.js";
 import useMailboxes from "./useMailboxes.js";
 
 const NOTIF_KINDS = [1, 6, 7, 9735, 30023, 1018];
-const SINCE_SEC = 60 * 60 * 24 * 30;
+const SINCE_SEC = 60 * 60 * 24 * 7;
 
 function compareDesc(a, b) {
   const ta = Number(a?.created_at) || 0;
