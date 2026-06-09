@@ -142,6 +142,7 @@ export default function ProfilePage({
   onOpenCircle, onFollow, onUnfollow, onOpenPollVotes, onOpenArticle, onOpenStream,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
   scrollToTopTrigger,
+  customEmojis,
 }) {
   const { isMuted } = useNavigation();
 
@@ -656,6 +657,7 @@ export default function ProfilePage({
                   defaultZapAmount={defaultZapAmount}
                   defaultZapMsg={defaultZapMsg}
                   onZapFail={onZapFail}
+                  customEmojis={customEmojis}
                   delay={0}
                 />
             )
@@ -689,6 +691,7 @@ export default function ProfilePage({
                   getLocalReactions={getLocalReactions} setLocalReaction={setLocalReaction}
                   sendZap={sendZap} defaultZapAmount={defaultZapAmount}
                   defaultZapMsg={defaultZapMsg} onZapFail={onZapFail}
+                  customEmojis={customEmojis}
                   delay={0}
                 />
               );
@@ -757,6 +760,7 @@ export default function ProfilePage({
                   defaultZapMsg={defaultZapMsg}
                   onZapFail={onZapFail}
                   resolveEventById={resolveEventById}
+                  customEmojis={customEmojis}
                   delay={0}
                 />
               ))
@@ -799,6 +803,7 @@ export default function ProfilePage({
                   defaultZapAmount={defaultZapAmount}
                   defaultZapMsg={defaultZapMsg}
                   onZapFail={onZapFail}
+                  customEmojis={customEmojis}
                   delay={0}
                 />
             )

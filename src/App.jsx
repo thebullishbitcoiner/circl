@@ -22,6 +22,7 @@ import useProfiles from "./hooks/useProfiles.js";
 import useBookmarks from "./hooks/useBookmarks.js";
 import useMutes from "./hooks/useMutes.js";
 import useCircles from "./hooks/useCircles.js";
+import useCustomEmojiList from "./hooks/useCustomEmojiList.js";
 import useBookmarkedEvents from "./hooks/useBookmarkedEvents.js";
 import usePublish from "./hooks/usePublish.js";
 import useIsMobile from "./hooks/useIsMobile.js";
@@ -117,6 +118,7 @@ export default function App() {
   const { toggle: toggleBm, isBookmarked, bookmarkItems } = useBookmarks({ pubkey, signAndPublish, refreshKey: bookmarkRefreshKey });
   const { mutes, mute: muteUser, unmute: unmuteUser, isMuted } = useMutes({ pubkey, signAndPublish });
   const { circles, createCircle, renameCircle, deleteCircle, addMember: addCircleMember, removeMember: removeCircleMember } = useCircles({ pubkey, signAndPublish });
+  const { emojis: customEmojis, sets: customEmojiSets, allCustomEmojis, addEmoji, removeEmoji, addSet: addEmojiSet, removeSet: removeEmojiSet, loading: customEmojiLoading } = useCustomEmojiList({ pubkey, signAndPublish });
   const bookmarkLocalPool = useMemo(() => [...events, ...notificationEvents], [events, notificationEvents]);
   const { events: bookmarkFeedEvents, loading: bookmarkFeedLoading } = useBookmarkedEvents({
     bookmarkTags: bookmarkItems,
@@ -588,6 +590,7 @@ export default function App() {
                                   reason === "no_wallet" ? "⚡ No wallet connected" :
                                   `⚡ Zap failed: ${reason}`
                                 )}
+                                customEmojis={allCustomEmojis}
                                 delay={0}
                               />
                             )}
@@ -680,6 +683,7 @@ export default function App() {
                   onDismiss={() => { setFloatingCompose(false); setComposeCircle(null); }}
                   circles={circles}
                   initialCircle={composeCircle}
+                  customEmojis={allCustomEmojis}
                 />
               )}
 
@@ -812,6 +816,7 @@ export default function App() {
                         onOpenArticle={setOpenArticle}
                         onOpenStream={setOpenStreamEvent}
                         scrollToTopTrigger={isTop && profileEntry.payload === pubkey ? profileScrollTrigger : 0}
+                        customEmojis={allCustomEmojis}
                       />
                     </div>
                   );
@@ -916,6 +921,7 @@ export default function App() {
                           `⚡ Zap failed: ${reason}`
                         )}                        resolveEventById={resolveEventById}
                         onOpenPollVotes={handleOpenPollVotes}
+                        customEmojis={allCustomEmojis}
                       />
                     );
                   }
@@ -954,6 +960,7 @@ export default function App() {
                           reason === "no_wallet" ? "⚡ No wallet connected" :
                           `⚡ Zap failed: ${reason}`
                         )}
+                        customEmojis={allCustomEmojis}
                       />
                     );
                   }
@@ -992,6 +999,7 @@ export default function App() {
                           reason === "no_wallet" ? "⚡ No wallet connected" :
                           `⚡ Zap failed: ${reason}`
                         )}
+                        customEmojis={allCustomEmojis}
                       />
                     );
                   }
@@ -1030,6 +1038,7 @@ export default function App() {
                           reason === "no_wallet" ? "⚡ No wallet connected" :
                           `⚡ Zap failed: ${reason}`
                         )}
+                        customEmojis={allCustomEmojis}
                       />
                     );
                   }
@@ -1210,6 +1219,7 @@ export default function App() {
                                     reason === "no_wallet" ? "⚡ No wallet connected" :
                                     `⚡ Zap failed: ${reason}`
                                   )}
+                                  customEmojis={allCustomEmojis}
                                 />
                               </div>
                             </div>
@@ -1251,6 +1261,7 @@ export default function App() {
                           reason === "no_wallet" ? "⚡ No wallet connected" :
                           `⚡ Zap failed: ${reason}`
                         )}
+                        customEmojis={allCustomEmojis}
                       />
                     );
                   }
@@ -1292,6 +1303,13 @@ export default function App() {
                   textSize={textSize}
                   onTextSizeChange={setTextSize}
                   signAndPublish={signAndPublish}
+                  customEmojis={customEmojis}
+                  sets={customEmojiSets}
+                  addEmoji={addEmoji}
+                  removeEmoji={removeEmoji}
+                  addSet={addEmojiSet}
+                  removeSet={removeEmojiSet}
+                  customEmojiLoading={customEmojiLoading}
                 />
               </SwipePanel>
 

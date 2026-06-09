@@ -15,6 +15,7 @@ export default function HashtagFeed({
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   publishEvent, onPrepend, onOpenZaps, onOpenReactions, onOpenReposts,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail, resolveEventById,
+  customEmojis,
 }) {
   const { isMuted } = useNavigation();
   const [notes, setNotes] = useState([]);
@@ -109,6 +110,7 @@ export default function HashtagFeed({
           defaultZapAmount={defaultZapAmount}
           defaultZapMsg={defaultZapMsg}
           onZapFail={onZapFail}
+          customEmojis={customEmojis}
           delay={i * 0.03}
         />
       ))}

@@ -27,6 +27,7 @@ function ThreadNoteRow({
   resolveEventById, onOpenPollVotes,
   focusRef, hasConnector = false,
   threadMenuId, setThreadMenuId, onShowThreadJson,
+  customEmojis,
 }) {
   const { onOpenGoal, onOpenPoll, onOpenCalendarEvent } = useNavigation();
   const rCount    = replyCount(event.id, allEvents);
@@ -227,6 +228,7 @@ function ThreadNoteRow({
               onRequestModal={onRequestModal} onDismissModal={onDismissModal}
               sendZap={sendZap} defaultZapAmount={defaultZapAmount}
               defaultZapMsg={defaultZapMsg} onZapFail={onZapFail}
+              customEmojis={customEmojis}
             />
           )}
     </div>
@@ -258,6 +260,7 @@ export default function ThreadView({
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, onRequestModal, onDismissModal,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
   resolveEventById, onOpenPollVotes,
+  customEmojis,
 }) {
   const { isMuted } = useNavigation();
   const containerRef = useRef(null);
@@ -392,6 +395,7 @@ export default function ThreadView({
     sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
     resolveEventById, onOpenPollVotes,
     threadMenuId, setThreadMenuId, onShowThreadJson: setThreadJsonEvent,
+    customEmojis,
   };
 
   useEffect(() => {

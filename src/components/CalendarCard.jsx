@@ -21,6 +21,7 @@ export default function CalendarCard({
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
+  customEmojis,
 }) {
   const { onOpenCalendarEvent } = useNavigation();
   const cal = parseCalendarEvent(event);
@@ -111,6 +112,7 @@ export default function CalendarCard({
             defaultZapAmount={defaultZapAmount}
             defaultZapMsg={defaultZapMsg}
             onZapFail={onZapFail}
+            customEmojis={customEmojis}
           />
     </div>
     {jsonOpen && <NoteJsonModal event={event} onClose={() => setJsonOpen(false)} />}

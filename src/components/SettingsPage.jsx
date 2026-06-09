@@ -1,6 +1,9 @@
 import { useState } from "react";
 import useMailboxes from "../hooks/useMailboxes.js";
 import { MailboxesFactory } from "applesauce-core";
+import CustomEmojiSettingsPage from "./CustomEmojiSettingsPage.jsx";
+
+// ── Wallet helpers ────────────────────────────────────────────────────────────
 
 function RizfulConnect({ pubkey, onConnected }) {
   const [step,     setStep]   = useState("idle");
@@ -144,6 +147,8 @@ function NWCConnect({ onConnected }) {
   );
 }
 
+// ── Relay editor ──────────────────────────────────────────────────────────────
+
 function normalizeRelayUrl(input) {
   const s = (input || "").trim();
   if (!s) return null;
@@ -208,7 +213,6 @@ function RelayEditor({ pubkey, signAndPublish }) {
   function RelaySection({ title, relays, input, onInputChange, onAdd, onRemove, onKeyDown }) {
     return (
       <div style={{ marginBottom: 18 }}>
-        {/* Section header */}
         <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
           <span style={{
             fontSize: "calc(var(--font-base) - 3px)", fontWeight: 700,
@@ -221,133 +225,55 @@ function RelayEditor({ pubkey, signAndPublish }) {
             border: "1px solid var(--border)", borderRadius: 20, padding: "1px 7px",
           }}>{relays.length}</span>
         </div>
-
-        {/* Relay rows */}
         {relays.length === 0 ? (
-          <div style={{
-            fontSize: "calc(var(--font-base) - 2px)", color: "var(--text-faint)",
-            fontFamily: "monospace", padding: "6px 0",
-          }}>None configured</div>
+          <div style={{ fontSize: "calc(var(--font-base) - 2px)", color: "var(--text-faint)", fontFamily: "monospace", padding: "6px 0" }}>None configured</div>
         ) : relays.map((r, i) => (
-          <div key={r} style={{
-            display: "flex", alignItems: "center", gap: 8,
-            padding: "6px 0",
-            borderBottom: i < relays.length - 1 ? "1px solid var(--border)" : "none",
-          }}>
-            <span style={{
-              fontFamily: "monospace",
-              fontSize: "calc(var(--font-base) - 2px)",
-              color: "var(--text)",
-              flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            }}>{fmtUrl(r)}</span>
-            <button
-              onClick={() => onRemove(r)}
-              disabled={saving}
-              style={{
-                padding: "3px 10px", borderRadius: 6,
-                border: "1px solid var(--border)", background: "transparent",
-                color: "var(--text-faint)", fontSize: "calc(var(--font-base) + 2px)",
-                fontFamily: "'DM Sans',sans-serif", cursor: saving ? "default" : "pointer",
-                lineHeight: 1, flexShrink: 0, opacity: saving ? 0.5 : 1,
-              }}
-            >×</button>
+          <div key={r} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: i < relays.length - 1 ? "1px solid var(--border)" : "none" }}>
+            <span style={{ fontFamily: "monospace", fontSize: "calc(var(--font-base) - 2px)", color: "var(--text)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fmtUrl(r)}</span>
+            <button onClick={() => onRemove(r)} disabled={saving}
+              style={{ padding: "3px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "transparent", color: "var(--text-faint)", fontSize: "calc(var(--font-base) + 2px)", fontFamily: "'DM Sans',sans-serif", cursor: saving ? "default" : "pointer", lineHeight: 1, flexShrink: 0, opacity: saving ? 0.5 : 1 }}>×</button>
           </div>
         ))}
-
-        {/* Add row */}
         <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-          <input
-            value={input}
-            onChange={e => onInputChange(e.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder="relay.example.com"
-            disabled={saving}
-            style={{
-              flex: 1, padding: "0 10px", borderRadius: 8,
-              border: "1.5px solid var(--border)", background: "var(--bg)",
-              color: "var(--text)", fontFamily: "monospace",
-              fontSize: "calc(var(--font-base) - 2px)",
-              outline: "none", minWidth: 0, opacity: saving ? 0.5 : 1,
-              height: "calc(var(--font-base) + 20px)", boxSizing: "border-box",
-            }}
-          />
-          <button
-            onClick={onAdd}
-            disabled={saving}
-            style={{
-              padding: "0 14px", borderRadius: 8, border: "none",
-              background: "var(--primary)", color: "white",
-              fontFamily: "'DM Sans',sans-serif",
-              fontSize: "calc(var(--font-base) - 2px)",
-              fontWeight: 600,
-              cursor: saving ? "default" : "pointer",
-              opacity: saving ? 0.6 : 1, flexShrink: 0,
-              height: "calc(var(--font-base) + 20px)",
-            }}
-          >Add</button>
+          <input value={input} onChange={e => onInputChange(e.target.value)} onKeyDown={onKeyDown}
+            placeholder="relay.example.com" disabled={saving}
+            style={{ flex: 1, padding: "0 10px", borderRadius: 8, border: "1.5px solid var(--border)", background: "var(--bg)", color: "var(--text)", fontFamily: "monospace", fontSize: "calc(var(--font-base) - 2px)", outline: "none", minWidth: 0, opacity: saving ? 0.5 : 1, height: "calc(var(--font-base) + 20px)", boxSizing: "border-box" }} />
+          <button onClick={onAdd} disabled={saving}
+            style={{ padding: "0 14px", borderRadius: 8, border: "none", background: "var(--primary)", color: "white", fontFamily: "'DM Sans',sans-serif", fontSize: "calc(var(--font-base) - 2px)", fontWeight: 600, cursor: saving ? "default" : "pointer", opacity: saving ? 0.6 : 1, flexShrink: 0, height: "calc(var(--font-base) + 20px)" }}>Add</button>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ margin: "0 16px 4px", padding: "14px 16px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
-      <RelaySection
-        title="Read"
-        relays={effectiveInboxes}
-        input={inboxInput}
-        onInputChange={setInboxInput}
-        onAdd={addInbox}
-        onKeyDown={e => e.key === "Enter" && addInbox()}
-        onRemove={removeInbox}
-      />
-      <RelaySection
-        title="Write"
-        relays={effectiveOutboxes}
-        input={outboxInput}
-        onInputChange={setOutboxInput}
-        onAdd={addOutbox}
-        onKeyDown={e => e.key === "Enter" && addOutbox()}
-        onRemove={removeOutbox}
-      />
-      {saving && (
-        <div style={{
-          fontSize: "calc(var(--font-base) - 3px)", color: "var(--text-faint)",
-          fontFamily: "'DM Sans',sans-serif", textAlign: "center", paddingTop: 2,
-        }}>Publishing…</div>
-      )}
+    <div style={{ padding: "0 16px" }}>
+      <RelaySection title="Read" relays={effectiveInboxes} input={inboxInput} onInputChange={setInboxInput} onAdd={addInbox} onKeyDown={e => e.key === "Enter" && addInbox()} onRemove={removeInbox} />
+      <RelaySection title="Write" relays={effectiveOutboxes} input={outboxInput} onInputChange={setOutboxInput} onAdd={addOutbox} onKeyDown={e => e.key === "Enter" && addOutbox()} onRemove={removeOutbox} />
+      {saving && <div style={{ fontSize: "calc(var(--font-base) - 3px)", color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textAlign: "center", paddingTop: 2 }}>Publishing…</div>}
     </div>
   );
 }
 
-export default function SettingsPage({
-  onBack, dark, toggleDark, onLogout, pubkey, wallet, onWalletConnected, onWalletDisconnect,
-  zapSettings = { amount: 21, msg: "" }, onSaveZapSettings,
-  textSize = "medium", onTextSizeChange,
-  signAndPublish,
-}) {
-  const [walletTab,  setWalletTab]  = useState("rizful");
-  const [zapAmount,  setZapAmount]  = useState(String(zapSettings.amount));
-  const [zapMsg,     setZapMsg]     = useState(zapSettings.msg);
+// ── Sub-page shell ────────────────────────────────────────────────────────────
 
-  const handleAmountChange = e => {
-    const raw = e.target.value;
-    setZapAmount(raw);
-    const parsed = parseInt(raw);
-    if (parsed >= 1) onSaveZapSettings?.({ amount: parsed, msg: zapMsg });
-  };
+function SubPage({ title, onBack, children }) {
+  return (
+    <div className="slide-panel-scroll">
+      <div className="panel-bar">
+        <button type="button" onClick={onBack}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: 20, lineHeight: 1, padding: "0 8px 0 0" }}
+          aria-label="Back">‹</button>
+        <span className="feed-title">{title}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
 
-  const handleAmountBlur = () => {
-    const amount = Math.max(1, parseInt(zapAmount) || 21);
-    setZapAmount(String(amount));
-    onSaveZapSettings?.({ amount, msg: zapMsg });
-  };
+// ── Sub-pages ─────────────────────────────────────────────────────────────────
 
-  const handleMsgChange = e => {
-    setZapMsg(e.target.value);
-    const parsed = Math.max(1, parseInt(zapAmount) || 21);
-    onSaveZapSettings?.({ amount: parsed, msg: e.target.value });
-  };
+function WalletSubPage({ onBack, pubkey, wallet, onWalletConnected, onWalletDisconnect }) {
+  const [walletTab, setWalletTab] = useState("rizful");
 
   const tabBtn = (id) => ({
     flex: 1, padding: "6px 0", borderRadius: 6, border: "none",
@@ -360,24 +286,11 @@ export default function SettingsPage({
     transition: "all .15s",
   });
 
-  const inputStyle = {
-    padding: "6px 10px", borderRadius: 8,
-    border: "1.5px solid var(--border)", background: "var(--bg)",
-    color: "var(--text)", fontFamily: "'DM Sans',sans-serif",
-    fontSize: 13, outline: "none",
-  };
-
   return (
-    <div className="slide-panel-scroll">
-      <div className="feed-header" style={{ borderBottom: "1px solid var(--border)" }}>
-        <div className="feed-title">Settings</div>
-      </div>
-
-      <div className="settings-section-title">Wallet</div>
-
+    <SubPage title="Wallet" onBack={onBack}>
       {wallet?.nwc_uri ? (
         <>
-          <div style={{ margin: "0 16px 4px", padding: "14px 16px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
+          <div style={{ margin: "12px 16px 4px", padding: "14px 16px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
               <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4CAF50", flexShrink: 0 }} />
               <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif" }}>Wallet connected</span>
@@ -399,7 +312,7 @@ export default function SettingsPage({
           </div>
         </>
       ) : (
-        <div style={{ margin: "0 16px 4px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
+        <div style={{ margin: "12px 16px 4px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
           <div style={{ display: "flex", padding: "10px 12px 10px", gap: 4 }}>
             <div style={{ display: "flex", flex: 1, background: "var(--border)", borderRadius: 8, padding: 3, gap: 2 }}>
               <button style={tabBtn("rizful")} onClick={() => setWalletTab("rizful")}>Rizful</button>
@@ -412,34 +325,66 @@ export default function SettingsPage({
           }
         </div>
       )}
+    </SubPage>
+  );
+}
 
-      <div style={{ margin: "8px 16px 4px", padding: "14px 16px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
+function ZapsSubPage({ onBack, zapSettings, onSaveZapSettings }) {
+  const [zapAmount, setZapAmount] = useState(String(zapSettings.amount));
+  const [zapMsg,    setZapMsg]    = useState(zapSettings.msg);
+
+  const inputStyle = {
+    padding: "6px 10px", borderRadius: 8,
+    border: "1.5px solid var(--border)", background: "var(--bg)",
+    color: "var(--text)", fontFamily: "'DM Sans',sans-serif",
+    fontSize: 13, outline: "none",
+  };
+
+  const handleAmountChange = e => {
+    const raw = e.target.value;
+    setZapAmount(raw);
+    const parsed = parseInt(raw);
+    if (parsed >= 1) onSaveZapSettings?.({ amount: parsed, msg: zapMsg });
+  };
+
+  const handleAmountBlur = () => {
+    const amount = Math.max(1, parseInt(zapAmount) || 21);
+    setZapAmount(String(amount));
+    onSaveZapSettings?.({ amount, msg: zapMsg });
+  };
+
+  const handleMsgChange = e => {
+    setZapMsg(e.target.value);
+    const parsed = Math.max(1, parseInt(zapAmount) || 21);
+    onSaveZapSettings?.({ amount: parsed, msg: e.target.value });
+  };
+
+  return (
+    <SubPage title="Zaps" onBack={onBack}>
+      <div style={{ margin: "12px 16px 4px", padding: "14px 16px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
         <div style={{ marginBottom: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif" }}>Zap Defaults</div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <label style={{ fontSize: 13, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", flexShrink: 0 }}>Amount (sats)</label>
-            <input
-              type="number" min="1" value={zapAmount}
-              onChange={handleAmountChange}
-              onBlur={handleAmountBlur}
-              style={{ ...inputStyle, width: 90, textAlign: "right", fontFamily: "monospace" }}
-            />
+            <input type="number" min="1" value={zapAmount} onChange={handleAmountChange} onBlur={handleAmountBlur}
+              style={{ ...inputStyle, width: 90, textAlign: "right", fontFamily: "monospace" }} />
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <label style={{ fontSize: 13, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", flexShrink: 0 }}>Message</label>
-            <input
-              type="text" value={zapMsg}
-              onChange={handleMsgChange}
-              placeholder="optional"
-              style={{ ...inputStyle, flex: 1, minWidth: 0 }}
-            />
+            <input type="text" value={zapMsg} onChange={handleMsgChange} placeholder="optional"
+              style={{ ...inputStyle, flex: 1, minWidth: 0 }} />
           </div>
         </div>
       </div>
+    </SubPage>
+  );
+}
 
-      <div className="settings-section-title" style={{ marginTop: 16 }}>Appearance</div>
+function AppearanceSubPage({ onBack, dark, toggleDark, textSize, onTextSizeChange }) {
+  return (
+    <SubPage title="Appearance" onBack={onBack}>
       <div className="settings-row" onClick={toggleDark}>
         <div>
           <div className="settings-row-label">Dark mode</div>
@@ -458,9 +403,7 @@ export default function SettingsPage({
         </div>
         <div style={{ display: "flex", gap: 4, background: "var(--surface)", borderRadius: 8, padding: 3 }}>
           {[["small", "S"], ["medium", "M"], ["large", "L"]].map(([size, label]) => (
-            <button
-              key={size}
-              onClick={e => { e.stopPropagation(); onTextSizeChange?.(size); }}
+            <button key={size} onClick={e => { e.stopPropagation(); onTextSizeChange?.(size); }}
               style={{
                 padding: "4px 10px", borderRadius: 6, border: "none", cursor: "pointer",
                 background: textSize === size ? "var(--bg)" : "transparent",
@@ -469,18 +412,116 @@ export default function SettingsPage({
                 fontWeight: textSize === size ? 600 : 400,
                 boxShadow: textSize === size ? "0 1px 3px rgba(0,0,0,.1)" : "none",
                 transition: "all .15s",
-              }}
-            >
+              }}>
               {label}
             </button>
           ))}
         </div>
       </div>
+    </SubPage>
+  );
+}
 
-      <div className="settings-section-title" style={{ marginTop: 16 }}>Relays</div>
-      <RelayEditor pubkey={pubkey} signAndPublish={signAndPublish} />
+function RelaysSubPage({ onBack, pubkey, signAndPublish }) {
+  return (
+    <SubPage title="Relays" onBack={onBack}>
+      <div style={{ marginTop: 12 }}>
+        <RelayEditor pubkey={pubkey} signAndPublish={signAndPublish} />
+      </div>
+    </SubPage>
+  );
+}
 
-      <div className="settings-section-title">Account</div>
+// ── Main settings page ────────────────────────────────────────────────────────
+
+export default function SettingsPage({
+  onBack, dark, toggleDark, onLogout, pubkey, wallet, onWalletConnected, onWalletDisconnect,
+  zapSettings = { amount: 21, msg: "" }, onSaveZapSettings,
+  textSize = "medium", onTextSizeChange,
+  signAndPublish,
+  customEmojis, sets = [], addEmoji, removeEmoji, addSet, removeSet, customEmojiLoading,
+}) {
+  const [subPage, setSubPage] = useState(null);
+
+  if (subPage === "wallet") {
+    return <WalletSubPage onBack={() => setSubPage(null)} pubkey={pubkey} wallet={wallet} onWalletConnected={onWalletConnected} onWalletDisconnect={onWalletDisconnect} />;
+  }
+  if (subPage === "zaps") {
+    return <ZapsSubPage onBack={() => setSubPage(null)} zapSettings={zapSettings} onSaveZapSettings={onSaveZapSettings} />;
+  }
+  if (subPage === "appearance") {
+    return <AppearanceSubPage onBack={() => setSubPage(null)} dark={dark} toggleDark={toggleDark} textSize={textSize} onTextSizeChange={onTextSizeChange} />;
+  }
+  if (subPage === "relays") {
+    return <RelaysSubPage onBack={() => setSubPage(null)} pubkey={pubkey} signAndPublish={signAndPublish} />;
+  }
+  if (subPage === "customEmoji") {
+    return (
+      <CustomEmojiSettingsPage
+        emojis={customEmojis} sets={sets}
+        addEmoji={addEmoji} removeEmoji={removeEmoji}
+        addSet={addSet} removeSet={removeSet}
+        loading={customEmojiLoading}
+        onBack={() => setSubPage(null)}
+      />
+    );
+  }
+
+  const walletSub = wallet?.nwc_uri
+    ? (wallet.lightning_address ? wallet.lightning_address : "Connected")
+    : "Not connected";
+
+  const totalEmojiCount = (customEmojis?.length ?? 0) + sets.reduce((n, s) => n + s.emojis.length, 0);
+
+  return (
+    <div className="slide-panel-scroll">
+      <div className="feed-header" style={{ borderBottom: "1px solid var(--border)" }}>
+        <div className="feed-title">Settings</div>
+      </div>
+
+      <div className="settings-row" onClick={() => setSubPage("wallet")}>
+        <div>
+          <div className="settings-row-label">Wallet</div>
+          <div className="settings-row-sub">{walletSub}</div>
+        </div>
+        <div style={{ color: "var(--text-muted)", fontSize: 18 }}>›</div>
+      </div>
+
+      <div className="settings-row" onClick={() => setSubPage("zaps")}>
+        <div>
+          <div className="settings-row-label">Zaps</div>
+          <div className="settings-row-sub">Default {zapSettings.amount} sats</div>
+        </div>
+        <div style={{ color: "var(--text-muted)", fontSize: 18 }}>›</div>
+      </div>
+
+      <div className="settings-row" onClick={() => setSubPage("appearance")}>
+        <div>
+          <div className="settings-row-label">Appearance</div>
+          <div className="settings-row-sub">{dark ? "Dark" : "Light"} theme, {textSize} text</div>
+        </div>
+        <div style={{ color: "var(--text-muted)", fontSize: 18 }}>›</div>
+      </div>
+
+      <div className="settings-row" onClick={() => setSubPage("relays")}>
+        <div>
+          <div className="settings-row-label">Relays</div>
+          <div className="settings-row-sub">Manage read and write relays</div>
+        </div>
+        <div style={{ color: "var(--text-muted)", fontSize: 18 }}>›</div>
+      </div>
+
+      <div className="settings-row" onClick={() => setSubPage("customEmoji")}>
+        <div>
+          <div className="settings-row-label">Custom Emoji</div>
+          <div className="settings-row-sub">
+            {totalEmojiCount > 0 ? `${totalEmojiCount} emoji` : "Manage your personal emoji library"}
+          </div>
+        </div>
+        <div style={{ color: "var(--text-muted)", fontSize: 18 }}>›</div>
+      </div>
+
+      <div className="settings-section-title" style={{ marginTop: 16 }}>Account</div>
       <div className="settings-row" onClick={onLogout}>
         <div className="settings-row-label" style={{ color: "#E05C8A" }}>Sign out</div>
       </div>

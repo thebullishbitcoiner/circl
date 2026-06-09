@@ -30,6 +30,7 @@ export default function FeedItem({
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
+  customEmojis,
   delay = 0,
 }) {
   const like = getLike?.(event.id) ?? { liked: false, count: 0 };
@@ -43,6 +44,7 @@ export default function FeedItem({
     getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
     onRequestModal, onDismissModal,
     sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
+    customEmojis,
   };
 
   if (event.kind === 30023) {
@@ -95,6 +97,7 @@ export default function FeedItem({
         defaultZapMsg={defaultZapMsg}
         onZapFail={onZapFail}
         onOpenPollVotes={onOpenPollVotes}
+        customEmojis={customEmojis}
         delay={delay}
       />
     );
@@ -209,6 +212,7 @@ export default function FeedItem({
         defaultZapMsg={defaultZapMsg}
         onZapFail={onZapFail}
         resolveEventById={resolveEventById}
+        customEmojis={customEmojis}
         delay={delay}
       />
     );
@@ -249,6 +253,7 @@ export default function FeedItem({
       defaultZapAmount={defaultZapAmount}
       defaultZapMsg={defaultZapMsg}
       onZapFail={onZapFail}
+      customEmojis={customEmojis}
       delay={delay}
     />
   );

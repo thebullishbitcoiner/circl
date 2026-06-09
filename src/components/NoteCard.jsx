@@ -25,6 +25,7 @@ function NoteCard({
   replyingToPubkey = null,
   sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail,
   onOpenPollVotes,
+  customEmojis,
 }) {
   const { onOpenGoal, onOpenPoll, onOpenCalendarEvent } = useNavigation();
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
@@ -195,6 +196,7 @@ function NoteCard({
               defaultZapAmount={defaultZapAmount}
               defaultZapMsg={defaultZapMsg}
               onZapFail={onZapFail}
+              customEmojis={customEmojis}
             />
       </div>
 

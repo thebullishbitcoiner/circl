@@ -52,6 +52,7 @@ export default function EventDetailView({
   defaultZapAmount,
   defaultZapMsg,
   onZapFail,
+  customEmojis,
 }) {
   const ref = useRef(null);
   const [rsvping, setRsvping] = useState(false);
@@ -170,6 +171,7 @@ export default function EventDetailView({
             defaultZapAmount={defaultZapAmount}
             defaultZapMsg={defaultZapMsg}
             onZapFail={onZapFail}
+            customEmojis={customEmojis}
           />
         </div>
 

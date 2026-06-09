@@ -89,18 +89,38 @@ const CATEGORIES = [
   },
 ];
 
-export default function EmojiPicker({ onSelect }) {
-  const [activeTab, setActiveTab] = useState(0);
-  const cat = CATEGORIES[activeTab];
+const CUSTOM_TAB_ID = "__custom__";
+
+export default function EmojiPicker({ onSelect, customEmojis = [] }) {
+  const hasCustom = customEmojis.length > 0;
+  const [activeTab, setActiveTab] = useState(hasCustom ? CUSTOM_TAB_ID : 0);
+
+  // If custom emojis disappear, fall back to first standard tab
+  const resolvedTab = activeTab === CUSTOM_TAB_ID
+    ? (hasCustom ? CUSTOM_TAB_ID : 0)
+    : activeTab;
+
+  const isCustomTab = resolvedTab === CUSTOM_TAB_ID;
+  const cat = isCustomTab ? null : CATEGORIES[resolvedTab];
 
   return (
     <div className="ep-shell">
       <div className="ep-tabs">
+        {hasCustom && (
+          <button
+            type="button"
+            className={`ep-tab${resolvedTab === CUSTOM_TAB_ID ? " active" : ""}`}
+            onClick={() => setActiveTab(CUSTOM_TAB_ID)}
+            title="Custom"
+          >
+            ✨
+          </button>
+        )}
         {CATEGORIES.map((c, i) => (
           <button
             key={c.id}
             type="button"
-            className={`ep-tab${activeTab === i ? " active" : ""}`}
+            className={`ep-tab${resolvedTab === i ? " active" : ""}`}
             onClick={() => setActiveTab(i)}
             title={c.label}
           >
@@ -109,14 +129,35 @@ export default function EmojiPicker({ onSelect }) {
         ))}
       </div>
       <div className="ep-grid-wrap">
-        <div className="ep-cat-label">{cat.label}</div>
-        <div className="ep-grid">
-          {cat.emojis.map((e, i) => (
-            <button key={i} type="button" className="ep-btn" onClick={() => onSelect(e)}>
-              {e}
-            </button>
-          ))}
-        </div>
+        {isCustomTab ? (
+          <>
+            <div className="ep-cat-label">Custom</div>
+            <div className="ep-grid">
+              {customEmojis.map(({ name, url }) => (
+                <button
+                  key={name}
+                  type="button"
+                  className="ep-btn"
+                  title={`:${name}:`}
+                  onClick={() => onSelect({ content: `:${name}:`, emojiTag: ["emoji", name, url] })}
+                >
+                  <img src={url} alt={name} style={{ width: 22, height: 22, objectFit: "contain" }} />
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="ep-cat-label">{cat.label}</div>
+            <div className="ep-grid">
+              {cat.emojis.map((e, i) => (
+                <button key={i} type="button" className="ep-btn" onClick={() => onSelect(e)}>
+                  {e}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

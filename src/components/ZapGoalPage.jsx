@@ -21,6 +21,7 @@ export default function ZapGoalPage({
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal,
   sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail,
+  customEmojis,
 }) {
   const { zaps, isClosed } = useGoalProgress(event);
   const sortedZaps = [...zaps].sort((a, b) => b.amount - a.amount);
@@ -112,6 +113,7 @@ export default function ZapGoalPage({
           defaultZapAmount={defaultZapAmount}
           defaultZapMsg={defaultZapMsg}
           onZapFail={onZapFail}
+          customEmojis={customEmojis}
           onRequestModal={onRequestModal}
           onDismissModal={onDismissModal}
         />

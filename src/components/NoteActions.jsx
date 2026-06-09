@@ -17,6 +17,7 @@ export default function NoteActions({
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal,
   sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail,
+  customEmojis,
 }) {
   const reactions    = getLocalReactions?.(event.id) ?? [];
   const rCount       = replyCount(event.id, allEvents);
@@ -24,6 +25,19 @@ export default function NoteActions({
   const myReaction   = reactions.find(r => (r.pk ?? r) === myPubkey);
 
   const [reaction,     setReaction]     = useState(myReaction?.emoji || null);
+
+  // Resolve a custom emoji string like ":name:" to an image URL.
+  // Checks the stored reaction's own tags first (relay-loaded events already carry the URL),
+  // then falls back to the user's emoji list (picker-chosen reactions).
+  const reactionEmojiUrl = (() => {
+    if (!reaction) return null;
+    const m = reaction.match(/^:([a-zA-Z0-9_-]+):$/);
+    if (!m) return null;
+    const name = m[1];
+    const fromTags = myReaction?.tags?.find(t => t[0] === "emoji" && t[1] === name)?.[2];
+    if (fromTags) return fromTags;
+    return customEmojis?.find(e => e.name === name)?.url ?? null;
+  })();
   const [showZapModal, setShowZapModal] = useState(false);
   const [localModal,   setLocalModal]   = useState(null);
   const zapBtnRef     = useRef(null);
@@ -70,8 +84,10 @@ export default function NoteActions({
     if (event.pubkey !== myPubkey) broadcastEvent(event);
   }, [localZaps, defaultZapAmount, defaultZapMsg, doSendZap, event, myPubkey]);
 
-  const publishReaction = useCallback(emoji => {
-    publishEvent?.({ kind: 7, content: emoji, tags: [["e", event.id], ["p", event.pubkey]] });
+  const publishReaction = useCallback((content, emojiTag) => {
+    const tags = [["e", event.id], ["p", event.pubkey]];
+    if (emojiTag) tags.push(emojiTag);
+    publishEvent?.({ kind: 7, content, tags });
   }, [publishEvent, event.id, event.pubkey]);
 
   const handleReact = useCallback((emoji = "💜") => {
@@ -83,11 +99,14 @@ export default function NoteActions({
     if (event.pubkey !== myPubkey) broadcastEvent(event);
   }, [reaction, publishReaction, event, myPubkey]);
 
-  const handleReactPick = useCallback(emoji => {
+  const handleReactPick = useCallback(picked => {
     haptic.tap();
-    setReaction(emoji);
-    if (setLocalReaction) setLocalReaction(event.id, myPubkey, emoji);
-    publishReaction(emoji);
+    const isCustom = picked && typeof picked === "object";
+    const displayEmoji = isCustom ? picked.content : picked;
+    const emojiTag    = isCustom ? picked.emojiTag  : null;
+    setReaction(displayEmoji);
+    if (setLocalReaction) setLocalReaction(event.id, myPubkey, displayEmoji, emojiTag ? { tags: [emojiTag] } : {});
+    publishReaction(displayEmoji, emojiTag);
     if (event.pubkey !== myPubkey) broadcastEvent(event);
   }, [publishReaction, event, myPubkey]);
 
@@ -108,21 +127,23 @@ export default function NoteActions({
           <button className={`action-btn${reaction ? " reacted" : ""}`}
             style={reaction ? { color: "var(--primary)" } : {}}
             onClick={e => { e.stopPropagation(); handleReact(); }}
-            onMouseDown={e => { e.stopPropagation(); const t = setTimeout(() => openModal(<EmojiPickerSheet onPick={emoji => { handleReactPick(emoji); dismiss(); }} onDismiss={dismiss} />), 600); window.addEventListener("mouseup", () => clearTimeout(t), { once: true }); }}
-            onTouchStart={e => { e.stopPropagation(); const t = setTimeout(() => openModal(<EmojiPickerSheet onPick={emoji => { handleReactPick(emoji); dismiss(); }} onDismiss={dismiss} />), 600); window.addEventListener("touchend", () => clearTimeout(t), { once: true }); }}
+            onMouseDown={e => { e.stopPropagation(); const t = setTimeout(() => openModal(<EmojiPickerSheet customEmojis={customEmojis} onPick={emoji => { handleReactPick(emoji); dismiss(); }} onDismiss={dismiss} />), 600); window.addEventListener("mouseup", () => clearTimeout(t), { once: true }); }}
+            onTouchStart={e => { e.stopPropagation(); const t = setTimeout(() => openModal(<EmojiPickerSheet customEmojis={customEmojis} onPick={emoji => { handleReactPick(emoji); dismiss(); }} onDismiss={dismiss} />), 600); window.addEventListener("touchend", () => clearTimeout(t), { once: true }); }}
           >
             {reaction && reaction !== "💜"
-              ? <span style={{ fontSize: 14, lineHeight: 1 }}>{reaction}</span>
+              ? reactionEmojiUrl
+                ? <img src={reactionEmojiUrl} alt={reaction} style={{ width: 16, height: 16, objectFit: "contain", verticalAlign: "middle", display: "inline-block" }} />
+                : <span style={{ fontSize: 14, lineHeight: 1 }}>{reaction}</span>
               : <svg width={14} height={14} viewBox="0 0 24 24" fill={reaction ? "var(--primary)" : "none"} stroke={reaction ? "var(--primary)" : "currentColor"} strokeWidth={2}><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
             }
             {reactions.length || ""}
           </button>
           <button className="action-btn"
-            onClick={e => { e.stopPropagation(); openModal(<ComposeSheet replyTo={event} profiles={profiles} myPubkey={myPubkey} myProfile={myProfile} events={allEvents} publishEvent={publishEvent} onPrepend={onPrepend} onDismiss={dismiss} />); }}>
+            onClick={e => { e.stopPropagation(); openModal(<ComposeSheet replyTo={event} profiles={profiles} myPubkey={myPubkey} myProfile={myProfile} events={allEvents} publishEvent={publishEvent} onPrepend={onPrepend} onDismiss={dismiss} customEmojis={customEmojis} />); }}>
             <Ri />{rCount || ""}
           </button>
           <button className="action-btn"
-            onClick={e => { e.stopPropagation(); openModal(<RepostSheet event={event} profiles={profiles} publishEvent={publishEvent} onPrepend={onPrepend} onQuoteRepost={() => openModal(<ComposeSheet quotedEvent={event} profiles={profiles} myPubkey={myPubkey} myProfile={myProfile} events={allEvents} publishEvent={publishEvent} onPrepend={onPrepend} onDismiss={dismiss} />)} onDismiss={dismiss} />); }}>
+            onClick={e => { e.stopPropagation(); openModal(<RepostSheet event={event} profiles={profiles} publishEvent={publishEvent} onPrepend={onPrepend} onQuoteRepost={() => openModal(<ComposeSheet quotedEvent={event} profiles={profiles} myPubkey={myPubkey} myProfile={myProfile} events={allEvents} publishEvent={publishEvent} onPrepend={onPrepend} onDismiss={dismiss} customEmojis={customEmojis} />)} onDismiss={dismiss} />); }}>
             <Rpi />{repostAndQuoteCount(event.id, allEvents) || ""}
           </button>
           <button className={`action-btn${isBookmarked?.(event) ? " saved" : ""}`}

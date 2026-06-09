@@ -20,6 +20,7 @@ export default function PollPage({
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal,
   sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail,
+  customEmojis,
 }) {
   const isZapPoll = event.kind === 6969;
   const {
@@ -168,6 +169,7 @@ export default function PollPage({
           defaultZapAmount={defaultZapAmount}
           defaultZapMsg={defaultZapMsg}
           onZapFail={onZapFail}
+          customEmojis={customEmojis}
           onRequestModal={onRequestModal}
           onDismissModal={onDismissModal}
         />

@@ -8,7 +8,7 @@ import EmojiPicker from "./EmojiPicker.jsx";
 import PollCompose from "./PollCompose.jsx";
 import GoalCompose from "./GoalCompose.jsx";
 
-export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey, myProfile, onPost, onDismiss, publishEvent, onPrepend, events = [], circles = [], initialCircle = null }) {
+export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey, myProfile, onPost, onDismiss, publishEvent, onPrepend, events = [], circles = [], initialCircle = null, customEmojis = [] }) {
   const [hasText,        setHasText]        = useState(false);
   const [media,          setMedia]          = useState([]);
   const [uploading,      setUploading]      = useState(false);
@@ -37,6 +37,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   const [goalImage,       setGoalImage]       = useState("");
   const [selectedCircle,  setSelectedCircle]  = useState(initialCircle);
   const [showCirclePicker, setShowCirclePicker] = useState(false);
+  const [emojiTags,       setEmojiTags]       = useState([]);
   const fileRef   = useRef(null);
   const editorRef = useRef(null);
 
@@ -137,6 +138,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
         [...finalContent.matchAll(/#([a-zA-Z][a-zA-Z0-9_]+)/g)].map(m => m[1].toLowerCase())
       )];
       for (const ht of hashtags) tags.push(["t", ht]);
+      for (const et of emojiTags) tags.push(et);
       if (replyTo && replyTo.pubkey !== myPubkey) broadcastEvent(replyTo);
       const published = await publishEvent({ kind: 1, content: finalContent, tags });
       if (published) onPrepend?.(published);
@@ -327,7 +329,10 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     setHasText(getContent().trim().length > 0);
   };
 
-  const insertEmoji = emoji => {
+  const insertEmoji = picked => {
+    const isCustom = picked && typeof picked === "object";
+    const text     = isCustom ? picked.content : picked;
+    const emojiTag = isCustom ? picked.emojiTag : null;
     const div = editorRef.current;
     if (!div) return;
     div.focus();
@@ -335,13 +340,16 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     if (sel?.rangeCount) {
       const range = sel.getRangeAt(0);
       range.deleteContents();
-      const node = document.createTextNode(emoji);
+      const node = document.createTextNode(text);
       range.insertNode(node);
       const newRange = document.createRange();
       newRange.setStartAfter(node);
       newRange.collapse(true);
       sel.removeAllRanges();
       sel.addRange(newRange);
+    }
+    if (emojiTag) {
+      setEmojiTags(prev => prev.some(t => t[1] === emojiTag[1]) ? prev : [...prev, emojiTag]);
     }
     setHasText(true);
   };
@@ -471,7 +479,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
         {uploading   && <div className="compose-upload-status">Uploading…</div>}
 
         {showEmoji && (
-          <EmojiPicker onSelect={emoji => { insertEmoji(emoji); }} />
+          <EmojiPicker customEmojis={customEmojis} onSelect={emoji => { insertEmoji(emoji); }} />
         )}
 
         {showGif && (
@@ -570,7 +578,10 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
             className="compose-media-btn compose-emoji-toggle"
             title="Emoji"
             onClick={() => { setShowGif(false); setShowEmoji(v => !v); }}
-            style={showEmoji ? { color: "var(--primary)", background: "var(--surface)" } : {}}
+            style={{
+              ...(showEmoji ? { color: "var(--primary)", background: "var(--surface)" } : {}),
+              ...(customEmojis.length > 0 ? { display: "inline-flex" } : {}),
+            }}
             aria-label="Insert emoji"
             aria-pressed={showEmoji}
           >

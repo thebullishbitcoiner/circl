@@ -17,6 +17,7 @@ export default function RepostCard({
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
   onRequestModal, onDismissModal, delay,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail, onOpenPollVotes,
+  customEmojis,
 }) {
   const { onOpenCalendarEvent, onOpenPoll, onOpenGoal } = useNavigation();
   const originalId  = event.tags.find(t => t[0] === "e")?.[1];
@@ -122,6 +123,7 @@ export default function RepostCard({
               onRequestModal={onRequestModal} onDismissModal={onDismissModal}
               sendZap={sendZap} defaultZapAmount={defaultZapAmount}
               defaultZapMsg={defaultZapMsg} onZapFail={onZapFail}
+              customEmojis={customEmojis}
             />
         </>
       ) : (

@@ -57,6 +57,7 @@ function HighlightCard({
   sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail,
   resolveEventById,
   delay = 0,
+  customEmojis,
 }) {
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
@@ -179,6 +180,7 @@ function HighlightCard({
           defaultZapAmount={defaultZapAmount}
           defaultZapMsg={defaultZapMsg}
           onZapFail={onZapFail}
+          customEmojis={customEmojis}
         />
       </div>
 

@@ -37,6 +37,7 @@ function PollCard({
   sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail,
   onRequestModal, onDismissModal,
   onOpenVotes,
+  customEmojis,
   delay = 0,
 }) {
   const { onOpenPoll } = useNavigation();
@@ -236,6 +237,7 @@ function PollCard({
               defaultZapAmount={defaultZapAmount}
               defaultZapMsg={defaultZapMsg}
               onZapFail={onZapFail}
+              customEmojis={customEmojis}
               onRequestModal={onRequestModal}
               onDismissModal={onDismissModal}
             />

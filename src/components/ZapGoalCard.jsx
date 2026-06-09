@@ -20,6 +20,7 @@ function ZapGoalCard({
   sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail,
   onRequestModal, onDismissModal,
   isBookmarked, onBookmark,
+  customEmojis,
   delay = 0,
 }) {
   const { onOpenGoal } = useNavigation();
@@ -110,6 +111,7 @@ function ZapGoalCard({
           defaultZapAmount={defaultZapAmount}
           defaultZapMsg={defaultZapMsg}
           onZapFail={onZapFail}
+          customEmojis={customEmojis}
           onRequestModal={onRequestModal}
           onDismissModal={onDismissModal}
         />
