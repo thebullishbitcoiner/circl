@@ -143,6 +143,7 @@ export default function ProfilePage({
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
   scrollToTopTrigger,
   customEmojis,
+  onEditProfile,
 }) {
   const { isMuted } = useNavigation();
 
@@ -544,7 +545,7 @@ export default function ProfilePage({
               : name[0]?.toUpperCase()}
             {activeStream && <div className="profile-av-live-badge">LIVE</div>}
           </div>
-          {isOwn && <button className="profile-edit-btn">Edit profile</button>}
+          {isOwn && <button className="profile-edit-btn" onClick={onEditProfile}>Edit profile</button>}
           {!isOwn && (
             follows?.includes(pubkey)
               ? <button className="profile-unfollow-btn" onClick={() => onUnfollow?.(pubkey)}>Unfollow</button>

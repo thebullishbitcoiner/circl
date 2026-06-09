@@ -63,6 +63,7 @@ import SearchPage from "./components/SearchPage.jsx";
 import MutedPage from "./components/MutedPage.jsx";
 import MyCirclesPage from "./components/MyCirclesPage.jsx";
 import CircleDetailPage from "./components/CircleDetailPage.jsx";
+import EditProfilePage from "./components/EditProfilePage.jsx";
 import HashtagFeed from "./components/HashtagFeed.jsx";
 import { ZapsScreen, ReactionsScreen, RepostsScreen, PollVotesScreen } from "./components/ListScreens.jsx";
 import SwipePanel from "./components/SwipePanel.jsx";
@@ -239,6 +240,7 @@ export default function App() {
   })();
 
   const handleOpenProfile     = pk => { if (pk === pubkey) refreshFollows(); pushNav({ type: "profile", payload: pk }); };
+  const handleEditProfile     = () => pushNav({ type: "edit-profile" });
   const handleOpenTransaction = tx => pushNav({ type: "transaction", payload: tx });
   const handleOpenCircle = ({ pubkey: cpk, follows: cFollows }) =>
     pushNav({ type: "circle", payload: { pubkey: cpk, follows: cFollows } });
@@ -796,6 +798,7 @@ export default function App() {
                         onOpenStream={setOpenStreamEvent}
                         scrollToTopTrigger={isTop && profileEntry.payload === pubkey ? profileScrollTrigger : 0}
                         customEmojis={allCustomEmojis}
+                        onEditProfile={profileEntry.payload === pubkey ? handleEditProfile : undefined}
                       />
                     </div>
                   );
@@ -804,6 +807,19 @@ export default function App() {
                   const top = navStack[navStack.length - 1];
 
                   if (top.type === "profile") return null; // rendered persistently above
+
+                  if (top.type === "edit-profile") {
+                    return (
+                      <EditProfilePage
+                        key="edit-profile"
+                        myProfile={myProfile}
+                        myPubkey={pubkey}
+                        publishEvent={publishEvent}
+                        onBack={handleBack}
+                        onSaved={() => showToast("Profile saved")}
+                      />
+                    );
+                  }
 
                   if (top.type === "muted") {
                     return (
