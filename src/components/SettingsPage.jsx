@@ -432,6 +432,125 @@ function RelaysSubPage({ onBack, pubkey, signAndPublish }) {
   );
 }
 
+// ── Blossom sub-page ──────────────────────────────────────────────────────────
+
+const DEFAULT_BLOSSOM_SERVERS = [
+  "https://blossom.band",
+  "https://cdn.satellite.earth",
+  "https://nostr.download",
+];
+
+function normalizeBlossomUrl(input) {
+  const s = (input || "").trim();
+  if (!s) return null;
+  const withScheme = s.startsWith("https://") || s.startsWith("http://") ? s : `https://${s}`;
+  try { new URL(withScheme); return withScheme.replace(/\/+$/, ""); } catch { return null; }
+}
+
+function BlossomSubPage({ onBack, servers, saveServers }) {
+  const [localServers, setLocalServers] = useState(null);
+  const [inputVal,     setInputVal]     = useState("");
+  const [saving,       setSaving]       = useState(false);
+
+  const effective = localServers ?? servers;
+
+  async function persist(next) {
+    setSaving(true);
+    setLocalServers(next);
+    try { await saveServers(next); } finally { setSaving(false); }
+  }
+
+  function add() {
+    const url = normalizeBlossomUrl(inputVal);
+    if (!url || effective.includes(url)) return;
+    setInputVal("");
+    persist([...effective, url]);
+  }
+
+  function remove(url) { persist(effective.filter(u => u !== url)); }
+
+  function moveUp(i) {
+    if (i === 0) return;
+    const next = [...effective];
+    [next[i - 1], next[i]] = [next[i], next[i - 1]];
+    persist(next);
+  }
+
+  function moveDown(i) {
+    if (i === effective.length - 1) return;
+    const next = [...effective];
+    [next[i], next[i + 1]] = [next[i + 1], next[i]];
+    persist(next);
+  }
+
+  const fmtUrl = url => url.replace(/^https?:\/\//, "");
+
+  const btnStyle = {
+    padding: "0 14px", borderRadius: 8, border: "none",
+    background: "var(--primary)", color: "white",
+    fontFamily: "'DM Sans',sans-serif", fontSize: "calc(var(--font-base) - 2px)",
+    fontWeight: 600, cursor: saving ? "default" : "pointer",
+    opacity: saving ? 0.6 : 1, flexShrink: 0,
+    height: "calc(var(--font-base) + 20px)",
+  };
+
+  const arrowBtn = (disabled) => ({
+    padding: "2px 6px", borderRadius: 5,
+    border: "1px solid var(--border)", background: "transparent",
+    color: disabled ? "var(--text-faint)" : "var(--text-muted)",
+    fontSize: 12, lineHeight: 1, cursor: disabled || saving ? "default" : "pointer",
+    opacity: disabled || saving ? 0.35 : 1, flexShrink: 0,
+  });
+
+  return (
+    <SubPage title="Blossom" onBack={onBack}>
+      <div style={{ padding: "12px 16px 0" }}>
+        <p style={{ margin: "0 0 14px", fontFamily: "'DM Sans',sans-serif", fontSize: 12.5, color: "var(--text-muted)", lineHeight: 1.5 }}>
+          Blossom servers store your media files. The first server is the primary upload target; others are tried if it fails. Falls back to nostr.build if all servers fail.
+        </p>
+
+        {/* Server list */}
+        {effective.length === 0 ? (
+          <div style={{ fontSize: "calc(var(--font-base) - 2px)", color: "var(--text-faint)", fontFamily: "monospace", padding: "6px 0 10px" }}>No servers configured</div>
+        ) : effective.map((url, i) => (
+          <div key={url} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 0", borderBottom: i < effective.length - 1 ? "1px solid var(--border)" : "none" }}>
+            {i === 0 && (
+              <span style={{ fontSize: 9, fontWeight: 700, color: "var(--primary)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", background: "var(--surface)", border: "1px solid var(--primary)", borderRadius: 4, padding: "1px 5px", flexShrink: 0 }}>Primary</span>
+            )}
+            <span style={{ fontFamily: "monospace", fontSize: "calc(var(--font-base) - 2px)", color: "var(--text)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fmtUrl(url)}</span>
+            <button onClick={() => moveUp(i)}   disabled={i === 0}                  style={arrowBtn(i === 0)}>↑</button>
+            <button onClick={() => moveDown(i)} disabled={i === effective.length - 1} style={arrowBtn(i === effective.length - 1)}>↓</button>
+            <button onClick={() => remove(url)} disabled={saving}
+              style={{ padding: "3px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "transparent", color: "var(--text-faint)", fontSize: "calc(var(--font-base) + 2px)", fontFamily: "'DM Sans',sans-serif", cursor: saving ? "default" : "pointer", lineHeight: 1, flexShrink: 0, opacity: saving ? 0.5 : 1 }}>×</button>
+          </div>
+        ))}
+
+        {/* Add input */}
+        <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+          <input
+            value={inputVal} onChange={e => setInputVal(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && add()}
+            placeholder="blossom.example.com" disabled={saving}
+            style={{ flex: 1, padding: "0 10px", borderRadius: 8, border: "1.5px solid var(--border)", background: "var(--bg)", color: "var(--text)", fontFamily: "monospace", fontSize: "calc(var(--font-base) - 2px)", outline: "none", minWidth: 0, opacity: saving ? 0.5 : 1, height: "calc(var(--font-base) + 20px)", boxSizing: "border-box" }}
+          />
+          <button onClick={add} disabled={saving} style={btnStyle}>Add</button>
+        </div>
+
+        {/* Reset to defaults */}
+        <button
+          onClick={() => persist([...DEFAULT_BLOSSOM_SERVERS])}
+          disabled={saving}
+          style={{ marginTop: 12, padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", fontSize: "calc(var(--font-base) - 2px)", cursor: saving ? "default" : "pointer", opacity: saving ? 0.5 : 1 }}
+        >
+          Reset to defaults
+        </button>
+
+        {saving && <div style={{ fontSize: "calc(var(--font-base) - 3px)", color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", paddingTop: 8 }}>Publishing…</div>}
+      </div>
+    </SubPage>
+  );
+}
+
 // ── Main settings page ────────────────────────────────────────────────────────
 
 export default function SettingsPage({
@@ -440,6 +559,7 @@ export default function SettingsPage({
   textSize = "medium", onTextSizeChange,
   signAndPublish,
   customEmojis, sets = [], addEmoji, removeEmoji, addSet, removeSet, customEmojiLoading,
+  blossomServers = [], saveBlossomServers,
 }) {
   const [subPage, setSubPage] = useState(null);
 
@@ -465,6 +585,9 @@ export default function SettingsPage({
         onBack={() => setSubPage(null)}
       />
     );
+  }
+  if (subPage === "blossom") {
+    return <BlossomSubPage onBack={() => setSubPage(null)} servers={blossomServers} saveServers={saveBlossomServers} />;
   }
 
   const walletSub = wallet?.nwc_uri
@@ -516,6 +639,18 @@ export default function SettingsPage({
           <div className="settings-row-label">Custom Emoji</div>
           <div className="settings-row-sub">
             {totalEmojiCount > 0 ? `${totalEmojiCount} emoji` : "Manage your personal emoji library"}
+          </div>
+        </div>
+        <div style={{ color: "var(--text-muted)", fontSize: 18 }}>›</div>
+      </div>
+
+      <div className="settings-row" onClick={() => setSubPage("blossom")}>
+        <div>
+          <div className="settings-row-label">Blossom</div>
+          <div className="settings-row-sub">
+            {blossomServers.length > 0
+              ? `${blossomServers.length} server${blossomServers.length > 1 ? "s" : ""} configured`
+              : "Media server storage"}
           </div>
         </div>
         <div style={{ color: "var(--text-muted)", fontSize: 18 }}>›</div>

@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { uploadToBlossom } from "../utils/blossom.js";
 
 const UPLOAD_URL = "https://nostr.build/api/v2/upload/files";
 
@@ -117,7 +118,7 @@ function EditOverlay({ onClick, uploading, style }) {
   );
 }
 
-export default function EditProfilePage({ myProfile, myPubkey, publishEvent, onBack, onSaved }) {
+export default function EditProfilePage({ myProfile, myPubkey, publishEvent, onBack, onSaved, blossomServers = [] }) {
   const p = myProfile ?? {};
 
   const [displayName, setDisplayName] = useState(p.display_name ?? p.name ?? "");
@@ -137,12 +138,20 @@ export default function EditProfilePage({ myProfile, myPubkey, publishEvent, onB
   const avatarInputRef = useRef(null);
   const bannerInputRef = useRef(null);
 
+  const uploadFile = async file => {
+    if (blossomServers.length > 0) {
+      const url = await uploadToBlossom(file, blossomServers, myPubkey);
+      if (url) return url;
+    }
+    return uploadToNostrBuild(file, myPubkey);
+  };
+
   const handleAvatarFile = async e => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingAvatar(true); setUploadError("");
     try {
-      const url = await uploadToNostrBuild(file, myPubkey);
+      const url = await uploadFile(file);
       setPicture(url);
     } catch (err) {
       setUploadError(err.message);
@@ -157,7 +166,7 @@ export default function EditProfilePage({ myProfile, myPubkey, publishEvent, onB
     if (!file) return;
     setUploadingBanner(true); setUploadError("");
     try {
-      const url = await uploadToNostrBuild(file, myPubkey);
+      const url = await uploadFile(file);
       setBanner(url);
     } catch (err) {
       setUploadError(err.message);

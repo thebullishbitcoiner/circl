@@ -7,8 +7,9 @@ import { broadcastEvent, pool } from "../nostr.js";
 import EmojiPicker from "./EmojiPicker.jsx";
 import PollCompose from "./PollCompose.jsx";
 import GoalCompose from "./GoalCompose.jsx";
+import { uploadToBlossom } from "../utils/blossom.js";
 
-export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey, myProfile, onPost, onDismiss, publishEvent, onPrepend, events = [], circles = [], initialCircle = null, customEmojis = [] }) {
+export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey, myProfile, onPost, onDismiss, publishEvent, onPrepend, events = [], circles = [], initialCircle = null, customEmojis = [], blossomServers = [] }) {
   const [hasText,        setHasText]        = useState(false);
   const [media,          setMedia]          = useState([]);
   const [uploading,      setUploading]      = useState(false);
@@ -154,6 +155,13 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   };
 
   const uploadFile = async file => {
+    // Try Blossom servers first
+    if (blossomServers.length > 0) {
+      const blossomUrl = await uploadToBlossom(file, blossomServers, myPubkey);
+      if (blossomUrl) return blossomUrl;
+    }
+
+    // Fall back to nostr.build
     const uploadUrl = "https://nostr.build/api/v2/upload/files";
     let authHeader = "";
     if (myPubkey && window.nostr?.signEvent) {
