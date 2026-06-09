@@ -156,7 +156,7 @@ export const directReplyParentId = event => {
 
 export const replyCount = (eventId, pool) =>
   pool.filter(e =>
-    e.kind === 1 &&
+    (e.kind === 1 || e.kind === 1111) &&
     e.id !== eventId &&
     !isQuoteRepost(e) &&
     directReplyParentId(e) === eventId
@@ -188,6 +188,55 @@ export const threadRootId = (replyTo, pool = []) => {
     cur = parent;
   }
   return replyTo.id;
+};
+
+const isAddressableKind = k => k >= 30000 && k <= 39999;
+
+/** NIP-22 tags for publishing a kind 1111 comment on a poll, article, or another kind 1111. */
+export const kind1111TagsForPublish = (replyTo, pool = []) => {
+  if (!replyTo?.id) return [];
+  const tags = [];
+
+  if (replyTo.kind === 1111) {
+    // Inherit root from the upstream comment's uppercase tags.
+    const rootKind     = replyTo.tags?.find(t => t[0] === "K")?.[1] ?? "";
+    const rootAuthorPk = replyTo.tags?.find(t => t[0] === "P")?.[1] ?? "";
+    const ATag         = replyTo.tags?.find(t => t[0] === "A");
+    const ETag         = replyTo.tags?.find(t => t[0] === "E");
+
+    tags.push(["K", rootKind]);
+    if (ATag) tags.push(["A", ATag[1], ATag[2] ?? ""]);
+    else if (ETag) tags.push(["E", ETag[1], ETag[2] ?? "", rootAuthorPk]);
+    if (rootAuthorPk) tags.push(["P", rootAuthorPk]);
+
+    // Parent is the kind 1111 comment itself (a regular event → lowercase e).
+    tags.push(["k", "1111"]);
+    tags.push(["e", replyTo.id, "", replyTo.pubkey ?? ""]);
+    if (replyTo.pubkey) tags.push(["p", replyTo.pubkey]);
+  } else if (isAddressableKind(replyTo.kind)) {
+    // Addressable root (e.g. kind 30023 article) → use A/a tags.
+    const dTag = replyTo.tags?.find(t => t[0] === "d")?.[1] ?? "";
+    const addr = `${replyTo.kind}:${replyTo.pubkey}:${dTag}`;
+    const pk   = replyTo.pubkey ?? "";
+
+    tags.push(["K", String(replyTo.kind)]);
+    tags.push(["A", addr, ""]);
+    tags.push(["P", pk]);
+    tags.push(["k", String(replyTo.kind)]);
+    tags.push(["a", addr, ""]);
+    tags.push(["p", pk]);
+  } else {
+    // Regular event root (e.g. kind 1068/6969 poll) → use E/e tags.
+    const pk = replyTo.pubkey ?? "";
+    tags.push(["K", String(replyTo.kind)]);
+    tags.push(["E", replyTo.id, "", pk]);
+    tags.push(["P", pk]);
+    tags.push(["k", String(replyTo.kind)]);
+    tags.push(["e", replyTo.id, "", pk]);
+    tags.push(["p", pk]);
+  }
+
+  return tags;
 };
 
 /** NIP-10 marked `e` + `p` tags for publishing a reply (root / reply markers + mentions). */

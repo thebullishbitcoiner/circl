@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import Overlay from "./Overlay.jsx";
 import Avatar from "./Avatar.jsx";
-import { displayName, avatarInitial, replyTagsForPublish, nip19 } from "../utils.js";
+import { displayName, avatarInitial, replyTagsForPublish, kind1111TagsForPublish, nip19 } from "../utils.js";
 import { GIPHY_KEY, RELAYS } from "../constants.js";
 import { broadcastEvent, pool } from "../nostr.js";
 import EmojiPicker from "./EmojiPicker.jsx";
@@ -117,9 +117,14 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     const urls = media.map(m => m.url).join("\n");
     const full = [content, urls].filter(Boolean).join("\n");
     if (publishEvent) {
+      const isNip22Reply = replyTo?.kind === 1068 || replyTo?.kind === 6969 || replyTo?.kind === 1111 || replyTo?.kind === 30023;
       const tags = [];
       if (replyTo) {
-        for (const t of replyTagsForPublish(replyTo, events)) tags.push(t);
+        if (isNip22Reply) {
+          for (const t of kind1111TagsForPublish(replyTo, events)) tags.push(t);
+        } else {
+          for (const t of replyTagsForPublish(replyTo, events)) tags.push(t);
+        }
       }
       let finalContent = full;
       if (quotedEvent) {
@@ -129,7 +134,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
         const noteUri = `nostr:${nip19.noteEncode(quotedEvent.id)}`;
         finalContent = finalContent ? `${finalContent}\n${noteUri}` : noteUri;
       }
-      if (selectedCircle) {
+      if (!isNip22Reply && selectedCircle) {
         for (const pk of selectedCircle.members) {
           tags.push(["p", pk]);
         }
@@ -140,7 +145,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
       for (const ht of hashtags) tags.push(["t", ht]);
       for (const et of emojiTags) tags.push(et);
       if (replyTo && replyTo.pubkey !== myPubkey) broadcastEvent(replyTo);
-      const published = await publishEvent({ kind: 1, content: finalContent, tags });
+      const published = await publishEvent({ kind: isNip22Reply ? 1111 : 1, content: finalContent, tags });
       if (published) onPrepend?.(published);
     } else {
       onPost?.(full);
