@@ -843,6 +843,20 @@
   .zap-msg{font-family:'DM Sans',sans-serif;font-size:13px;resize:none;min-height:48px;line-height:1.5;}
   .zap-send-btn{width:100%;padding:13px;background:var(--primary);color:white;border:none;border-radius:12px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;cursor:pointer;transition:all .2s;margin-top:12px;}
   .zap-send-btn:hover{background:#5B21B6;transform:translateY(-1px);}
+  .noffer-modal{min-width:280px;}
+  .noffer-amount-input{width:100%;padding:11px 13px;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;box-sizing:border-box;transition:border-color .15s;}
+  .noffer-amount-input:focus{border-color:#f7931a;}
+  .noffer-loading{display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 0;color:var(--text-muted);font-size:14px;}
+  .noffer-spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:#f7931a;border-radius:50%;animation:spin .7s linear infinite;}
+  .noffer-invoice{display:flex;flex-direction:column;align-items:center;gap:10px;padding-top:4px;}
+  .noffer-qr{background:white;padding:14px;display:flex;align-items:center;justify-content:center;width:328px;height:328px;box-sizing:border-box;}
+  .noffer-invoice-string{display:flex;align-items:center;width:328px;border:1.5px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface);box-sizing:border-box;}
+  .noffer-invoice-input{flex:1;min-width:0;border:none;background:transparent;color:var(--text-muted);font-family:monospace;font-size:11px;padding:9px 10px;outline:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .noffer-invoice-copy-btn{flex-shrink:0;border:none;border-left:1.5px solid var(--border);background:transparent;color:var(--text-faint);padding:0 10px;height:100%;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:color .15s;}
+  .noffer-invoice-copy-btn.copied{color:var(--primary);}
+  .noffer-invoice-copy-btn:hover{color:var(--text);}
+  .noffer-error{display:flex;flex-direction:column;gap:12px;padding-top:4px;}
+  .noffer-error-msg{padding:10px 13px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:10px;color:#ef4444;font-size:13px;line-height:1.5;}
   .zap-cancel{width:100%;padding:10px;background:none;border:none;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text-muted);cursor:pointer;margin-top:6px;}
 
   /* Emoji picker */

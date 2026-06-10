@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { decodeInvoice } from "@getalby/lightning-tools";
 import { haptic } from "../utils.js";
+import NofferModal from "./NofferModal.jsx";
 
 const LABELS = {
   "bolt11": "Invoice",
@@ -24,7 +25,8 @@ function truncate(str, max = 48) {
 }
 
 export default function LightningCard({ value, subtype }) {
-  const [copied, setCopied] = useState(false);
+  const [copied,      setCopied]      = useState(false);
+  const [showNoffer,  setShowNoffer]  = useState(false);
 
   const decoded = useMemo(() => {
     if (subtype !== "bolt11") return null;
@@ -36,8 +38,6 @@ export default function LightningCard({ value, subtype }) {
   const isExpired = decoded?.expiry && decoded?.timestamp
     ? (decoded.timestamp + decoded.expiry) * 1000 < Date.now()
     : false;
-
-  const canPay = subtype !== "noffer";
 
   const handleCopy = (e) => {
     e.stopPropagation();
@@ -51,43 +51,47 @@ export default function LightningCard({ value, subtype }) {
   const handlePay = (e) => {
     e.stopPropagation();
     haptic.medium?.();
-    window.open(`lightning:${value}`, "_blank");
+    if (subtype === "noffer") {
+      setShowNoffer(true);
+    } else {
+      window.open(`lightning:${value}`, "_blank");
+    }
   };
 
   return (
-    <div className="lightning-card" onClick={e => e.stopPropagation()}>
-      <div className="lightning-card-left">
-        <span className="lightning-card-icon">⚡</span>
-      </div>
-      <div className="lightning-card-body">
-        <span className="lightning-card-badge">{LABELS[subtype] ?? "Lightning"}</span>
-        {sats != null && (
-          <span className="lightning-card-amount">{formatSats(sats)}</span>
-        )}
-        {description && (
-          <span className="lightning-card-desc">{description}</span>
-        )}
-        {!sats && !description && (
-          <span className="lightning-card-id">{truncate(value)}</span>
-        )}
-        {isExpired && (
-          <span className="lightning-card-expired">Expired</span>
-        )}
-      </div>
-      <div className="lightning-card-actions">
-        <button
-          type="button"
-          className={`lightning-card-copy-btn${copied ? " copied" : ""}`}
-          onClick={handleCopy}
-          aria-label={copied ? "Copied" : "Copy"}
-          title={copied ? "Copied!" : "Copy"}
-        >
-          {copied
-            ? <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><polyline points="20 6 9 17 4 12" /></svg>
-            : <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
-          }
-        </button>
-        {canPay && (
+    <>
+      <div className="lightning-card" onClick={e => e.stopPropagation()}>
+        <div className="lightning-card-left">
+          <span className="lightning-card-icon">⚡</span>
+        </div>
+        <div className="lightning-card-body">
+          <span className="lightning-card-badge">{LABELS[subtype] ?? "Lightning"}</span>
+          {sats != null && (
+            <span className="lightning-card-amount">{formatSats(sats)}</span>
+          )}
+          {description && (
+            <span className="lightning-card-desc">{description}</span>
+          )}
+          {!sats && !description && (
+            <span className="lightning-card-id">{truncate(value)}</span>
+          )}
+          {isExpired && (
+            <span className="lightning-card-expired">Expired</span>
+          )}
+        </div>
+        <div className="lightning-card-actions">
+          <button
+            type="button"
+            className={`lightning-card-copy-btn${copied ? " copied" : ""}`}
+            onClick={handleCopy}
+            aria-label={copied ? "Copied" : "Copy"}
+            title={copied ? "Copied!" : "Copy"}
+          >
+            {copied
+              ? <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><polyline points="20 6 9 17 4 12" /></svg>
+              : <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+            }
+          </button>
           <button
             type="button"
             className="lightning-card-pay-btn"
@@ -96,8 +100,12 @@ export default function LightningCard({ value, subtype }) {
           >
             Pay
           </button>
-        )}
+        </div>
       </div>
-    </div>
+
+      {showNoffer && (
+        <NofferModal value={value} onDismiss={() => setShowNoffer(false)} />
+      )}
+    </>
   );
 }

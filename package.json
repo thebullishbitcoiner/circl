@@ -1,7 +1,7 @@
 {
   "name": "circl",
   "private": true,
-  "version": "0.30.0",
+  "version": "0.30.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,6 +11,7 @@
   "dependencies": {
     "@getalby/lightning-tools": "^8.1.1",
     "@getalby/sdk": "^8.0.3",
+    "@shocknet/clink-sdk": "^1.5.5",
     "applesauce-core": "^6.0.0",
     "applesauce-extra": "^6.0.0",
     "applesauce-loaders": "^6.0.0",
@@ -20,6 +21,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
+    "react-qr-code": "^2.2.0",
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
