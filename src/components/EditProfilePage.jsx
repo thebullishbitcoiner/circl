@@ -183,7 +183,7 @@ export default function EditProfilePage({ myProfile, myPubkey, publishEvent, onB
     setSaving(true); setSaveError("");
     try {
       const meta = {
-        ...p,
+        ...(p._raw ?? {}),
         name: username.trim() || undefined,
         display_name: displayName.trim() || undefined,
         picture: picture.trim() || undefined,

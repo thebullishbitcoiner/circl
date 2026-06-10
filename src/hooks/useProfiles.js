@@ -56,6 +56,8 @@ function toProfileShape(k, data) {
     lud06: data.lud06 ?? null,
     website: data.website ?? data.url ?? null,
     banner: data.banner ?? data.cover ?? data.header ?? null,
+    clink_noffer: data.clink_noffer ?? null,
+    _raw: data,
   };
 }
 
