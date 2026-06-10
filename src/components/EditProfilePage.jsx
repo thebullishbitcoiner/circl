@@ -121,13 +121,15 @@ function EditOverlay({ onClick, uploading, style }) {
 export default function EditProfilePage({ myProfile, myPubkey, publishEvent, onBack, onSaved, blossomServers = [] }) {
   const p = myProfile ?? {};
 
-  const [displayName, setDisplayName] = useState(p.display_name ?? p.name ?? "");
-  const [picture,     setPicture]     = useState(p.picture ?? "");
-  const [banner,      setBanner]      = useState(p.banner ?? "");
-  const [about,       setAbout]       = useState(p.about ?? "");
-  const [website,     setWebsite]     = useState(p.website ?? "");
-  const [nip05,       setNip05]       = useState(p.nip05 ?? "");
-  const [lud16,       setLud16]       = useState(p.lud16 ?? "");
+  const [displayName,  setDisplayName]  = useState(p.display_name ?? "");
+  const [username,     setUsername]     = useState(p.name ?? "");
+  const [picture,      setPicture]      = useState(p.picture ?? "");
+  const [banner,       setBanner]       = useState(p.banner ?? "");
+  const [about,        setAbout]        = useState(p.about ?? "");
+  const [website,      setWebsite]      = useState(p.website ?? "");
+  const [nip05,        setNip05]        = useState(p.nip05 ?? "");
+  const [lud16,        setLud16]        = useState(p.lud16 ?? "");
+  const [clinkNoffer,  setClinkNoffer]  = useState(p.clink_noffer ?? "");
 
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
@@ -182,7 +184,7 @@ export default function EditProfilePage({ myProfile, myPubkey, publishEvent, onB
     try {
       const meta = {
         ...p,
-        name: displayName.trim() || undefined,
+        name: username.trim() || undefined,
         display_name: displayName.trim() || undefined,
         picture: picture.trim() || undefined,
         banner: banner.trim() || undefined,
@@ -190,6 +192,7 @@ export default function EditProfilePage({ myProfile, myPubkey, publishEvent, onB
         website: website.trim() || undefined,
         nip05: nip05.trim() || undefined,
         lud16: lud16.trim() || undefined,
+        clink_noffer: clinkNoffer.trim() || undefined,
       };
       const clean = Object.fromEntries(Object.entries(meta).filter(([, v]) => v !== undefined));
       const result = await publishEvent({ kind: 0, content: JSON.stringify(clean), tags: [] });
@@ -203,7 +206,7 @@ export default function EditProfilePage({ myProfile, myPubkey, publishEvent, onB
     }
   };
 
-  const name = displayName || p.name || "";
+  const name = displayName || username || "";
 
   return (
     <div className="slide-panel-scroll" style={{ height: "100%", overflowY: "auto" }}>
@@ -299,13 +302,15 @@ export default function EditProfilePage({ myProfile, myPubkey, publishEvent, onB
 
       {/* Form fields */}
       <div style={{ padding: "4px 20px 32px", animation: "fadeUp .35s .05s ease both" }}>
-        <Field label="Display name"      value={displayName} onChange={setDisplayName} placeholder="Your name" />
-        <Field label="Profile picture"   value={picture}     onChange={setPicture}     placeholder="https://…" hint="URL or upload via the avatar above" />
-        <Field label="Banner image"      value={banner}      onChange={setBanner}      placeholder="https://…" hint="URL or upload via the banner above" />
-        <Field label="Bio"               value={about}       onChange={setAbout}       placeholder="Tell the world about yourself" multiline />
-        <Field label="Website"           value={website}     onChange={setWebsite}     placeholder="https://yoursite.com" />
-        <Field label="NIP-05 identifier" value={nip05}       onChange={setNip05}       placeholder="you@domain.com" hint="Verified Nostr address" />
-        <Field label="Lightning address" value={lud16}       onChange={setLud16}       placeholder="you@wallet.com" hint="For receiving zaps" />
+        <Field label="Display name"      value={displayName}  onChange={setDisplayName}  placeholder="Your name" />
+        <Field label="Username"          value={username}     onChange={setUsername}     placeholder="yourhandle" hint="Short handle, no spaces (name field)" />
+        <Field label="Profile picture"   value={picture}      onChange={setPicture}      placeholder="https://…" hint="URL or upload via the avatar above" />
+        <Field label="Banner image"      value={banner}       onChange={setBanner}       placeholder="https://…" hint="URL or upload via the banner above" />
+        <Field label="Bio"               value={about}        onChange={setAbout}        placeholder="Tell the world about yourself" multiline />
+        <Field label="Website"           value={website}      onChange={setWebsite}      placeholder="https://yoursite.com" />
+        <Field label="NIP-05 identifier" value={nip05}        onChange={setNip05}        placeholder="you@domain.com" hint="Verified Nostr address" />
+        <Field label="Lightning address" value={lud16}        onChange={setLud16}        placeholder="you@wallet.com" hint="For receiving zaps" />
+        <Field label="Noffer (CLINK)"    value={clinkNoffer}  onChange={setClinkNoffer}  placeholder="noffer1…" hint="CLINK static Lightning offer" />
 
         {saveError && (
           <div style={{ padding: "10px 14px", background: "rgba(239,68,68,.1)", border: "1px solid rgba(239,68,68,.3)", borderRadius: 10, color: "#ef4444", fontFamily: "'DM Sans',sans-serif", fontSize: 13 }}>
