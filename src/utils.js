@@ -361,8 +361,37 @@ export function classifyMediaUrl(url) {
   return null;
 }
 
+// BOLT-11 HRP can include amount+multiplier digits before the bech32 separator, so use [0-9a-z].
+// BOLT-12, LNURL, Noffer have an explicit "1" separator in the prefix so strict bech32 data chars follow.
+const LIGHTNING_RE = /(lnbcrt[0-9a-z]{50,}|lntb[0-9a-z]{50,}|lnbc[0-9a-z]{50,}|lnurl1[023456789acdefghjklmnpqrstuvwxyz]{50,}|lno1[023456789acdefghjklmnpqrstuvwxyz]{50,}|lni1[023456789acdefghjklmnpqrstuvwxyz]{50,}|noffer1[023456789acdefghjklmnpqrstuvwxyz]{50,})/gi;
+
+function lightningSubtype(token) {
+  const t = token.toLowerCase();
+  if (t.startsWith("lnbcrt") || t.startsWith("lntb")) return "bolt11";
+  if (t.startsWith("lnbc")) return "bolt11";
+  if (t.startsWith("lnurl")) return "lnurl";
+  if (t.startsWith("lno1")) return "bolt12-offer";
+  if (t.startsWith("lni1")) return "bolt12-invoice";
+  if (t.startsWith("noffer1")) return "noffer";
+  return "unknown";
+}
+
+function extractLightningFromText(text) {
+  const out = [];
+  const re = new RegExp(LIGHTNING_RE.source, "gi");
+  let last = 0;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) out.push({ type: "text", value: text.slice(last, m.index) });
+    out.push({ type: "lightning", value: m[0], subtype: lightningSubtype(m[0]) });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push({ type: "text", value: text.slice(last) });
+  return out.length ? out : [{ type: "text", value: text }];
+}
+
 /**
- * Split note body into text / image / video segments (plain https URLs and markdown ![…](url)).
+ * Split note body into text / image / video / lightning segments (plain https URLs and markdown ![…](url)).
  */
 export function parseNoteMediaSegments(raw) {
   const input = (raw || "").replace(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/gi, (_, u) => trimMediaUrl(u));
@@ -388,7 +417,14 @@ export function parseNoteMediaSegments(raw) {
     if (rest) segments.push({ type: "text", value: rest });
   }
   if (!segments.length) segments.push({ type: "text", value: input });
-  return segments;
+
+  // Second pass: extract lightning payment strings from text segments
+  const result = [];
+  for (const seg of segments) {
+    if (seg.type !== "text") { result.push(seg); continue; }
+    for (const s of extractLightningFromText(seg.value)) result.push(s);
+  }
+  return result;
 }
 
 export function parseStreamEvent(event) {

@@ -5,6 +5,7 @@ import MediaLightbox from "./MediaLightbox.jsx";
 import PollPreview from "./PollPreview.jsx";
 import CalendarInlineCard from "./CalendarInlineCard.jsx";
 import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
+import LightningCard from "./LightningCard.jsx";
 import { parseNoteMediaSegments, groupNoteMediaSegments, displayName, relativeTime, nip19, isHexPubkey, normPubkey } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
@@ -378,7 +379,11 @@ export default function NoteContent({
   return (
     <>
     <div className={`note-content-stack${isCollapsed ? " note-content-collapsed" : ""}`}>
-      {normalizedSegments.map((seg, i) => seg.type === "text" ? renderTextSegment(seg, i) : null)}
+      {normalizedSegments.map((seg, i) => {
+        if (seg.type === "text") return renderTextSegment(seg, i);
+        if (seg.type === "lightning") return <LightningCard key={i} value={seg.value} subtype={seg.subtype} />;
+        return null;
+      })}
       {isCollapsed && <div className="note-content-fade" />}
     </div>
 
