@@ -4,6 +4,7 @@ import QRCode from "react-qr-code";
 import Overlay from "./Overlay.jsx";
 import { haptic } from "../utils.js";
 import { ClinkSDK, decodeBech32, generateSecretKey, OfferPriceType } from "@shocknet/clink-sdk";
+import { payWithNWC, hasWallet } from "../utils/nwcPay.js";
 
 export default function NofferModal({ value, onDismiss }) {
   const decoded = useMemo(() => {
@@ -13,14 +14,15 @@ export default function NofferModal({ value, onDismiss }) {
     } catch { return null; }
   }, [value]);
 
-  const isFixed      = decoded?.priceType === OfferPriceType.Fixed;
-  const fixedSats    = decoded?.price || 0;
+  const isFixed   = decoded?.priceType === OfferPriceType.Fixed;
+  const fixedSats = decoded?.price || 0;
+  const walletConnected = hasWallet();
 
-  const [phase,    setPhase]    = useState("amount"); // "amount"|"loading"|"invoice"|"error"
-  const [amount,   setAmount]   = useState(isFixed ? String(fixedSats) : "");
-  const [invoice,  setInvoice]  = useState("");
-  const [error,    setError]    = useState("");
-  const [copied,   setCopied]   = useState(false);
+  const [phase,   setPhase]   = useState("amount"); // "amount"|"loading"|"invoice"|"paying"|"paid"|"error"
+  const [amount,  setAmount]  = useState(isFixed ? String(fixedSats) : "");
+  const [invoice, setInvoice] = useState("");
+  const [error,   setError]   = useState("");
+  const [copied,  setCopied]  = useState(false);
 
   // Auto-fetch for fixed-price offers
   useEffect(() => {
@@ -43,7 +45,11 @@ export default function NofferModal({ value, onDismiss }) {
       });
       if (res?.bolt11) {
         setInvoice(res.bolt11);
-        setPhase("invoice");
+        if (walletConnected) {
+          attemptWalletPay(res.bolt11);
+        } else {
+          setPhase("invoice");
+        }
       } else {
         const msg = res?.error || "No invoice returned";
         const rangeHint = res?.range ? ` (${res.range.min}–${res.range.max} sats)` : "";
@@ -52,6 +58,19 @@ export default function NofferModal({ value, onDismiss }) {
     } catch (e) {
       setError(e?.message || "Failed to fetch invoice");
       setPhase("error");
+    }
+  };
+
+  const attemptWalletPay = async (inv) => {
+    setPhase("paying");
+    haptic.medium?.();
+    const result = await payWithNWC(inv);
+    if (result.ok) {
+      haptic.heavy?.();
+      setPhase("paid");
+    } else {
+      setError(result.reason || "Payment failed");
+      setPhase("invoice");
     }
   };
 
@@ -68,11 +87,6 @@ export default function NofferModal({ value, onDismiss }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     }).catch(() => {});
-  };
-
-  const handlePay = () => {
-    haptic.medium?.();
-    window.open(`lightning:${invoice}`, "_blank");
   };
 
   return createPortal(
@@ -111,17 +125,27 @@ export default function NofferModal({ value, onDismiss }) {
           </>
         )}
 
-        {/* Loading */}
-        {phase === "loading" && (
+        {/* Loading / paying */}
+        {(phase === "loading" || phase === "paying") && (
           <div className="noffer-loading">
             <div className="noffer-spinner" />
-            <span>Requesting invoice…</span>
+            <span>{phase === "paying" ? "Paying with wallet…" : "Requesting invoice…"}</span>
+          </div>
+        )}
+
+        {/* Paid */}
+        {phase === "paid" && (
+          <div className="noffer-paid">
+            <svg width={48} height={48} viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth={2}><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>
+            <span className="noffer-paid-label">Payment sent!</span>
+            <button className="zap-send-btn" style={{ marginTop: 4 }} onClick={onDismiss}>Done</button>
           </div>
         )}
 
         {/* Invoice + QR */}
         {phase === "invoice" && (
           <div className="noffer-invoice">
+            {error && <div className="noffer-error-msg" style={{ width: "100%", boxSizing: "border-box" }}>{error}</div>}
             <div className="noffer-qr">
               <QRCode
                 value={`lightning:${invoice}`}
@@ -152,6 +176,11 @@ export default function NofferModal({ value, onDismiss }) {
                 }
               </button>
             </div>
+            {walletConnected && (
+              <button className="zap-send-btn" style={{ width: "328px" }} onClick={() => attemptWalletPay(invoice)}>
+                Pay with wallet
+              </button>
+            )}
           </div>
         )}
 
@@ -159,7 +188,7 @@ export default function NofferModal({ value, onDismiss }) {
         {phase === "error" && (
           <div className="noffer-error">
             <div className="noffer-error-msg">{error}</div>
-            <button className="zap-send-btn" onClick={() => setPhase("amount")}>
+            <button className="zap-send-btn" onClick={() => { setError(""); setPhase("amount"); }}>
               Try again
             </button>
           </div>

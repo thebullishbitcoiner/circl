@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { decodeInvoice } from "@getalby/lightning-tools";
 import { haptic } from "../utils.js";
 import NofferModal from "./NofferModal.jsx";
+import { payWithNWC } from "../utils/nwcPay.js";
 
 const LABELS = {
   "bolt11": "Lightning Invoice",
@@ -27,6 +28,8 @@ function truncate(str, max = 48) {
 export default function LightningCard({ value, subtype }) {
   const [copied,      setCopied]      = useState(false);
   const [showNoffer,  setShowNoffer]  = useState(false);
+  const [paying,      setPaying]      = useState(false);
+  const [payResult,   setPayResult]   = useState(null); // "ok" | "error"
 
   const decoded = useMemo(() => {
     if (subtype !== "bolt11") return null;
@@ -48,13 +51,25 @@ export default function LightningCard({ value, subtype }) {
     }).catch(() => {});
   };
 
-  const handlePay = (e) => {
+  const handlePay = async (e) => {
     e.stopPropagation();
     haptic.medium?.();
     if (subtype === "noffer") {
       setShowNoffer(true);
-    } else {
+      return;
+    }
+    setPaying(true);
+    setPayResult(null);
+    const result = await payWithNWC(value);
+    setPaying(false);
+    if (result.ok) {
+      setPayResult("ok");
+      setTimeout(() => setPayResult(null), 3000);
+    } else if (result.noWallet) {
       window.open(`lightning:${value}`, "_blank");
+    } else {
+      setPayResult("error");
+      setTimeout(() => setPayResult(null), 3000);
     }
   };
 
@@ -94,11 +109,12 @@ export default function LightningCard({ value, subtype }) {
           </button>
           <button
             type="button"
-            className="lightning-card-pay-btn"
+            className={`lightning-card-pay-btn${payResult === "ok" ? " paid" : payResult === "error" ? " pay-error" : ""}`}
             onClick={handlePay}
+            disabled={paying}
             aria-label="Pay"
           >
-            Pay
+            {paying ? "…" : payResult === "ok" ? "Sent!" : payResult === "error" ? "Failed" : "Pay"}
           </button>
         </div>
       </div>
