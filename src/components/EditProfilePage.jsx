@@ -250,7 +250,7 @@ export default function EditProfilePage({ myProfile, myPubkey, publishEvent, onB
       </div>
 
       {/* Avatar + Save header row */}
-      <div className="profile-identity" style={{ paddingBottom: 8, animation: "fadeUp .35s ease both" }}>
+      <div className="profile-identity" style={{ paddingBottom: 8 }}>
         <div className="profile-av-wrap">
           {/* Avatar with edit overlay */}
           <div style={{ position: "relative", display: "inline-block" }}>
@@ -266,7 +266,7 @@ export default function EditProfilePage({ myProfile, myPubkey, publishEvent, onB
             <EditOverlay
               uploading={uploadingAvatar}
               onClick={() => !uploadingAvatar && avatarInputRef.current?.click()}
-              style={{ bottom: -4, right: -4, width: 26, height: 26 }}
+              style={{ bottom: -4, right: -4, width: 26, height: 26, animation: "fadeIn .35s ease both" }}
             />
           </div>
 
@@ -285,6 +285,7 @@ export default function EditProfilePage({ myProfile, myPubkey, publishEvent, onB
               fontWeight: 600,
               cursor: saving ? "default" : "pointer",
               opacity: saving ? .6 : 1,
+              animation: "fadeIn .35s ease both",
               transition: "opacity .15s",
             }}
           >
