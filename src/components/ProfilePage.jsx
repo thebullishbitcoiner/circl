@@ -24,6 +24,8 @@ import StreamCard from "./StreamCard.jsx";
 import HighlightCard from "./HighlightCard.jsx";
 import PollInline from "./PollInline.jsx";
 import useActiveStream from "../hooks/useActiveStream.js";
+import ListingCard from "./ListingCard.jsx";
+import CreateListingSheet from "./CreateListingSheet.jsx";
 
 // Persists across component mounts so returning to a profile doesn't refetch
 const mediaCache = new Map(); // pubkey → { items, until, exhausted }
@@ -172,6 +174,10 @@ export default function ProfilePage({
   const [mediaItems, setMediaItems] = useState([]);
   const [mediaLoading, setMediaLoading] = useState(false);
   const [mediaExhausted, setMediaExhausted] = useState(false);
+  const [listingsLoading, setListingsLoading] = useState(false);
+  const [listingEvents, setListingEvents] = useState([]);
+  const [listingsSearch, setListingsSearch] = useState("");
+  const [createListingOpen, setCreateListingOpen] = useState(false);
   const scrollRef = useRef(null);
   useEffect(() => {
     if (scrollToTopTrigger > 0) scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
@@ -207,6 +213,10 @@ export default function ProfilePage({
     setVisibleHighlights(10);
     setRenderedTab("notes");
     setTab("notes");
+    setListingsLoading(false);
+    setListingEvents([]);
+    setListingsSearch("");
+    setCreateListingOpen(false);
   }, [pubkey]);
 
   useEffect(() => {
@@ -365,14 +375,29 @@ export default function ProfilePage({
     });
     activeSubs.push(otherSub);
 
-    // Phase 3 — articles get their own budget so a large repost count can't crowd them out
+    // Phase 3 — listings (30402 active + 30403 drafts for own profile only)
+    // Uses dedicated state updated in next so events appear even if complete never fires
+    setListingsLoading(true);
+    const listingKinds = isOwn ? [30402, 30403] : [30402];
+    const listingsSub = pool.request(relayUrls, [{ kinds: listingKinds, authors: [pubkey], limit: 100 }]).subscribe({
+      next: raw => {
+        if (cancelled) return;
+        eventStore.add(raw);
+        setListingEvents(prev => prev.some(e => e.id === raw.id) ? prev : [...prev, raw]);
+      },
+      complete: () => { if (!cancelled) setListingsLoading(false); },
+      error:    () => { if (!cancelled) setListingsLoading(false); },
+    });
+    activeSubs.push(listingsSub);
+
+    // Phase 4 — articles get their own budget so a large repost count can't crowd them out
     const articlesSub = pool.request(relayUrls, [{ kinds: [30023], authors: [pubkey], limit: 100 }]).subscribe({
       next: raw => { eventStore.add(raw); byId.set(raw.id, raw); },
       complete: flush,
     });
     activeSubs.push(articlesSub);
 
-    // Phase 4 — highlights (kind 9802)
+    // Phase 5 — highlights (kind 9802)
     const highlightsSub = pool.request(relayUrls, [{ kinds: [9802], authors: [pubkey], limit: 100 }]).subscribe({
       next: raw => { eventStore.add(raw); byId.set(raw.id, raw); },
       complete: flush,
@@ -429,6 +454,11 @@ export default function ProfilePage({
       .filter(e => e.pubkey === pubkey && e.kind === 9802)
       .sort((a, b) => b.created_at - a.created_at),
     [mergedEvents, pubkey]
+  );
+
+  const listings = useMemo(
+    () => [...listingEvents].sort((a, b) => b.created_at - a.created_at),
+    [listingEvents]
   );
 
   useEffect(() => { topLevelLenRef.current  = topLevel.length;  }, [topLevel.length]);
@@ -608,6 +638,9 @@ export default function ProfilePage({
             <div className="profile-stat-label">Between us</div>
           </div>
         )}
+        <div className={`profile-stat ${tab === "listings" ? "active" : ""}`} onClick={() => switchTab("listings")}>
+          <div className="profile-stat-label">Listings</div>
+        </div>
         <div className={`profile-stat ${tab === "articles" ? "active" : ""}`} onClick={() => switchTab("articles")}>
           <div className="profile-stat-label">Articles</div>
         </div>
@@ -808,6 +841,77 @@ export default function ProfilePage({
                   delay={0}
                 />
             )
+      )}
+
+      {/* Listings tab */}
+      {renderedTab === "listings" && (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px 0" }}>
+            <div style={{ flex: 1, position: "relative" }}>
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "var(--text-faint)", pointerEvents: "none" }}>
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search listings…"
+                value={listingsSearch}
+                onChange={e => setListingsSearch(e.target.value)}
+                style={{ width: "100%", boxSizing: "border-box", padding: "7px 10px 7px 28px", borderRadius: 20, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none" }}
+              />
+            </div>
+            {isOwn && (
+              <button
+                type="button"
+                className="profile-follow-btn"
+                style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, flexShrink: 0 }}
+                onClick={() => setCreateListingOpen(true)}
+              >
+                <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                New listing
+              </button>
+            )}
+          </div>
+          {(() => {
+            const q = listingsSearch.trim().toLowerCase();
+            const filtered = q
+              ? listings.filter(e => {
+                  const title    = e.tags?.find(t => t[0] === "title")?.[1]    || "";
+                  const summary  = e.tags?.find(t => t[0] === "summary")?.[1]  || "";
+                  const location = e.tags?.find(t => t[0] === "location")?.[1] || "";
+                  const tags     = e.tags?.filter(t => t[0] === "t").map(t => t[1]).join(" ") || "";
+                  return [title, summary, location, tags, e.content].join(" ").toLowerCase().includes(q);
+                })
+              : listings;
+            if (listingsLoading && listings.length === 0)
+              return [0, 1, 2].map(i => <SkelCard key={i} />);
+            if (filtered.length === 0)
+              return <div className="empty-state"><div className="empty-state-title">{listings.length === 0 ? "No listings yet" : "No results"}</div><div className="empty-state-sub">{listings.length === 0 ? "Classified listings will appear here" : "Try a different search term"}</div></div>;
+            return (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: "12px 12px 20px" }}>
+                {filtered.map(e => (
+                      <ListingCard
+                        key={e.id}
+                        event={e}
+                        profiles={profiles}
+                        myPubkey={myPubkey}
+                        onOpenProfile={onOpenProfile}
+                        publishEvent={publishEvent}
+                        onDelete={id => setListingEvents(prev => prev.filter(ev => ev.id !== id))}
+                        onUpdated={(oldId, newEv) => setListingEvents(prev => prev.map(ev => ev.id === oldId ? newEv : ev))}
+                        delay={0}
+                      />
+                    ))}
+                  </div>
+            );
+          })()}
+          {createListingOpen && (
+            <CreateListingSheet
+              publishEvent={publishEvent}
+              onCreated={ev => setListingEvents(prev => prev.some(e => e.id === ev.id) ? prev : [ev, ...prev])}
+              onDismiss={() => setCreateListingOpen(false)}
+            />
+          )}
+        </>
       )}
 
       {/* Media tab — always mounted so thumbnail images stay in DOM across tab switches */}
