@@ -15,15 +15,20 @@ function hasNip44() {
 
 export default function useMutes({ pubkey, signAndPublish } = {}) {
   const [mutes, setMutes] = useState([]);
+  const [muteEvent, setMuteEvent] = useState(null);
   const mutesRef = useRef([]);
   useEffect(() => { mutesRef.current = mutes; }, [mutes]);
+  // true when we found existing encrypted content we couldn't read — block publishing to avoid data loss
+  const unreadableRef = useRef(false);
 
   useEffect(() => {
     const pk = normPubkey(pubkey);
-    if (!isHexPubkey(pk)) { setMutes([]); return; }
+    if (!isHexPubkey(pk)) { setMutes([]); unreadableRef.current = false; return; }
 
     let cancelled = false;
+    unreadableRef.current = false;
     setMutes([]);
+    setMuteEvent(null);
     const received = [];
 
     const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
@@ -40,6 +45,7 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
         if (!latest) { if (!cancelled) setMutes([]); return; }
 
         let pubkeys = [];
+        let decryptFailed = false;
         const content = (latest.content || "").trim();
         if (content && hasNip44()) {
           try {
@@ -48,16 +54,27 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
             if (Array.isArray(parsed)) {
               pubkeys = parsed.filter(pk => typeof pk === "string" && isHexPubkey(normPubkey(pk))).map(normPubkey);
             }
-          } catch {}
+          } catch {
+            decryptFailed = true;
+          }
+        } else if (content && !hasNip44()) {
+          decryptFailed = true;
         }
-        // Also include any public "p" tags as fallback
-        for (const t of latest.tags || []) {
-          if (t[0] === "p" && isHexPubkey(normPubkey(t[1]))) {
-            const norm = normPubkey(t[1]);
-            if (!pubkeys.includes(norm)) pubkeys.push(norm);
+        // Public "p" tags fallback (only when no encrypted content was found)
+        if (!decryptFailed) {
+          for (const t of latest.tags || []) {
+            if (t[0] === "p" && isHexPubkey(normPubkey(t[1]))) {
+              const norm = normPubkey(t[1]);
+              if (!pubkeys.includes(norm)) pubkeys.push(norm);
+            }
           }
         }
-        if (!cancelled) setMutes(pubkeys);
+        if (!cancelled) {
+          // If we found content we can't read, block any future publish to avoid overwriting foreign data
+          unreadableRef.current = decryptFailed;
+          setMutes(pubkeys);
+          setMuteEvent(latest);
+        }
       },
       error: () => { if (!cancelled) setMutes([]); },
     });
@@ -73,6 +90,7 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
       const pk = normPubkey(pubkey);
       if (!signAndPublish || !isHexPubkey(pk)) throw new Error("Sign in to update mute list");
       if (!hasNip44()) throw new Error("Your wallet does not support NIP-44 (update the extension)");
+      if (unreadableRef.current) throw new Error("Existing mute list was created by a different signer and cannot be safely modified");
       const ciphertext = await window.nostr.nip44.encrypt(pk, JSON.stringify(nextMutes));
       await signAndPublish({ kind: MUTE_LIST_KIND, content: ciphertext, tags: [] });
     },
@@ -138,5 +156,5 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
     [mute, unmute]
   );
 
-  return { mutes, mute, unmute, isMuted, toggleMute };
+  return { mutes, muteEvent, mute, unmute, isMuted, toggleMute };
 }

@@ -117,7 +117,7 @@ export default function App() {
   const { items: notificationEvents, loading: notifLoading } = useNotifications({ pubkey });
   const [bookmarkRefreshKey, setBookmarkRefreshKey] = useState(0);
   const { toggle: toggleBm, isBookmarked, bookmarkItems } = useBookmarks({ pubkey, signAndPublish, refreshKey: bookmarkRefreshKey });
-  const { mutes, mute: muteUser, unmute: unmuteUser, isMuted } = useMutes({ pubkey, signAndPublish });
+  const { mutes, muteEvent, mute: muteUser, unmute: unmuteUser, isMuted } = useMutes({ pubkey, signAndPublish });
   const { circles, createCircle, renameCircle, deleteCircle, addMember: addCircleMember, removeMember: removeCircleMember } = useCircles({ pubkey, signAndPublish });
   const { emojis: customEmojis, sets: customEmojiSets, allCustomEmojis, addEmoji, removeEmoji, addSet: addEmojiSet, removeSet: removeEmojiSet, loading: customEmojiLoading } = useCustomEmojiList({ pubkey, signAndPublish });
   const { servers: blossomServers, saveServers: saveBlossomServers } = useBlossomServers({ pubkey, signAndPublish });
@@ -714,6 +714,7 @@ export default function App() {
                       <div key="hidden-muted" style={{ display: "none", height: "100%" }}>
                         <MutedPage
                           mutes={mutes}
+                          muteEvent={muteEvent}
                           profiles={profiles}
                           onUnmute={handleUnmuteUser}
                           onOpenProfile={handleOpenProfile}
@@ -830,6 +831,7 @@ export default function App() {
                       <MutedPage
                         key="muted"
                         mutes={mutes}
+                        muteEvent={muteEvent}
                         profiles={profiles}
                         onUnmute={handleUnmuteUser}
                         onOpenProfile={handleOpenProfile}
