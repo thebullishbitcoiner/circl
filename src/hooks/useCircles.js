@@ -58,6 +58,7 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
           if (ev.tags?.some(t => t[0] === "deleted")) continue;
 
           let members = [];
+          let decryptionFailed = false;
           const content = (ev.content || "").trim();
           if (content && hasNip44()) {
             try {
@@ -68,17 +69,23 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
                   .filter(x => typeof x === "string" && isHexPubkey(normPubkey(x)))
                   .map(normPubkey);
               }
-            } catch {}
+            } catch {
+              decryptionFailed = true;
+            }
+          } else if (content && !hasNip44()) {
+            decryptionFailed = true;
           }
-          // Fallback: public p tags
-          for (const t of ev.tags || []) {
-            if (t[0] === "p" && isHexPubkey(normPubkey(t[1]))) {
-              const norm = normPubkey(t[1]);
-              if (!members.includes(norm)) members.push(norm);
+          // Fallback: public p tags (only when no encrypted content)
+          if (!decryptionFailed) {
+            for (const t of ev.tags || []) {
+              if (t[0] === "p" && isHexPubkey(normPubkey(t[1]))) {
+                const norm = normPubkey(t[1]);
+                if (!members.includes(norm)) members.push(norm);
+              }
             }
           }
 
-          parsed.push({ id, title, members });
+          parsed.push({ id, title, members, decryptionFailed, event: ev });
         }
 
         if (!cancelled) setCircles(parsed);
