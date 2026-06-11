@@ -4,6 +4,7 @@ import Overlay from "./Overlay.jsx";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
+import ZapOutModal from "./ZapOutModal.jsx";
 import { displayName, nip05OrNpub, relativeTime, nip19 } from "../utils.js";
 import { broadcastEvent } from "../nostr.js";
 
@@ -31,12 +32,14 @@ function ListingContextMenu({ event, onClose, onViewJson, onDelete }) {
 }
 
 export default function ListingDetailModal({ event, profiles, myPubkey, onOpenProfile, publishEvent, onDelete, onUpdated, onClose }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [jsonOpen, setJsonOpen] = useState(false);
-  const [busy,     setBusy]     = useState(false);
-  const [error,    setError]    = useState(null);
+  const [menuOpen,    setMenuOpen]    = useState(false);
+  const [jsonOpen,    setJsonOpen]    = useState(false);
+  const [zapOutOpen,  setZapOutOpen]  = useState(false);
+  const [busy,        setBusy]        = useState(false);
+  const [error,       setError]       = useState(null);
 
-  const isOwn  = event.pubkey === myPubkey;
+  const isOwn         = event.pubkey === myPubkey;
+  const sellerLnAddr  = profiles?.[event.pubkey]?.lud16 || profiles?.[event.pubkey]?.lud06 || null;
 
   // Derived tag values
   const initTitle    = event.tags?.find(t => t[0] === "title")?.[1]    || "";
@@ -221,6 +224,14 @@ export default function ListingDetailModal({ event, profiles, myPubkey, onOpenPr
           </>
         )}
 
+        {!isOwn && sellerLnAddr && (
+          <div style={{ padding: "0 16px 8px" }}>
+            <button type="button" className="zap-send-btn" style={{ width: "100%" }} onClick={() => setZapOutOpen(true)}>
+              ⚡ Zap Out
+            </button>
+          </div>
+        )}
+
         <button type="button" className="action-sheet-cancel" style={{ marginBottom: 16 }} onClick={onClose}>
           {isOwn ? "Cancel" : "Close"}
         </button>
@@ -228,6 +239,10 @@ export default function ListingDetailModal({ event, profiles, myPubkey, onOpenPr
 
       {jsonOpen && createPortal(
         <NoteJsonModal event={event} onClose={() => setJsonOpen(false)} />,
+        document.body
+      )}
+      {zapOutOpen && createPortal(
+        <ZapOutModal event={event} sellerLnAddr={sellerLnAddr} onClose={() => setZapOutOpen(false)} />,
         document.body
       )}
     </Overlay>

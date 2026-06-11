@@ -2,7 +2,7 @@ import { useState, memo } from "react";
 import { createPortal } from "react-dom";
 import ListingDetailModal from "./ListingDetailModal.jsx";
 
-function ListingCard({ event, profiles, myPubkey, onOpenProfile, publishEvent, onDelete, onUpdated, delay = 0 }) {
+function ListingCard({ event, profiles, myPubkey, onOpenProfile, publishEvent, onDelete, onUpdated, onSelect, delay = 0 }) {
   const [detailOpen, setDetailOpen] = useState(false);
 
   const title    = event.tags?.find(t => t[0] === "title")?.[1]   || "";
@@ -25,7 +25,7 @@ function ListingCard({ event, profiles, myPubkey, onOpenProfile, publishEvent, o
       <div
         className="listing-tile"
         style={{ animationDelay: `${delay}s`, cursor: "pointer" }}
-        onClick={() => setDetailOpen(true)}
+        onClick={() => onSelect ? onSelect(event) : setDetailOpen(true)}
       >
         <div className="listing-tile-image">
           {image
