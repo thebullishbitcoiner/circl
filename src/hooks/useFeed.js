@@ -30,10 +30,18 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap }) {
     const since = Math.floor(Date.now() / 1000) - 60 * 60 * 48;
 
     // Pre-fetch profiles for all follows in parallel with the feed so names are
-    // ready before (or immediately as) feed events render.
-    const profilePrefetch = pool.request(relayUrls, [{ kinds: [0], authors }]).subscribe({
-      next: event => eventStore.add(event),
-    });
+    // ready before (or immediately as) feed events render. Chunked to 50 per
+    // request to stay within relay filter size limits.
+    const CHUNK = 50;
+    const profileSubs = [];
+    for (let i = 0; i < authors.length; i += CHUNK) {
+      const chunk = authors.slice(i, i + CHUNK);
+      profileSubs.push(
+        pool.request(relayUrls, [{ kinds: [0], authors: chunk }]).subscribe({
+          next: event => eventStore.add(event),
+        })
+      );
+    }
 
     const mainSub = pool.subscription(relayUrls, [{ kinds: [1, 6, 9802, 30023, 1068, 6969, 31922, 31923, 30311, 9041], authors, since, limit: 300 }]).subscribe({
       next: raw => {
@@ -82,7 +90,7 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap }) {
 
     return () => {
       clearTimeout(eoseTimer);
-      profilePrefetch.unsubscribe();
+      for (const s of profileSubs) s.unsubscribe();
       mainSub.unsubscribe();
       metaSub.unsubscribe();
     };

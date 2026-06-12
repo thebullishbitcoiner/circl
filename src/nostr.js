@@ -11,7 +11,7 @@ export const pool = new RelayPool();
 // the first React render — eliminates the npub flash on repeat visits.
 
 const PROFILE_CACHE_KEY = "circl_profiles_v1";
-const MAX_PROFILES = 500;
+const MAX_PROFILES = 2000;
 
 function loadProfileCache() {
   try {

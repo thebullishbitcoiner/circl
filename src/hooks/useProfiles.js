@@ -61,12 +61,18 @@ function toProfileShape(k, data) {
   };
 }
 
+const FETCH_CHUNK_SIZE = 50;
+
 function fetchBatch(pubkeys) {
   if (!pubkeys.length) return;
   const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
-  pool.request(relayUrls, [{ kinds: [0], authors: pubkeys }]).subscribe({
-    next: event => eventStore.add(event), // triggers insert$ → updates profiles reactively
-  });
+  // Chunk to stay within relay filter size limits
+  for (let i = 0; i < pubkeys.length; i += FETCH_CHUNK_SIZE) {
+    const chunk = pubkeys.slice(i, i + FETCH_CHUNK_SIZE);
+    pool.request(relayUrls, [{ kinds: [0], authors: chunk }]).subscribe({
+      next: event => eventStore.add(event),
+    });
+  }
 }
 
 function flushRest() {
