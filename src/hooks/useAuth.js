@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { RELAYS, NOSTR_CLIENT_TAG } from "../constants.js";
 import { isHexPubkey, normPubkey } from "../utils.js";
-import { pool } from "../nostr.js";
+import { pool, validRelays } from "../nostr.js";
 import useMailboxes from "./useMailboxes.js";
 
 function withTimeout(promise, ms, message) {
@@ -63,7 +63,7 @@ export default function useAuth() {
   const { outboxes } = useMailboxes(pubkey);
   useEffect(() => {
     if (!pubkey || !outboxes.length) return;
-    for (const url of outboxes) pool.relay(url);
+    for (const url of validRelays(outboxes)) pool.relay(url);
   }, [pubkey, outboxes]);
 
   const signAndPublish = useCallback(async tmpl => {

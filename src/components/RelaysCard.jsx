@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import useMailboxes from "../hooks/useMailboxes.js";
 import { pool } from "../nostr.js";
 
+const isValidRelay = url => /^wss?:\/\/[^\s]+$/.test(url) && !/wss?:\/\//i.test(url.slice(6));
 const fmtUrl = url => url.replace(/^wss?:\/\//, "").replace(/\/$/, "");
 
 export default function RelaysCard({ profilePubkey }) {
@@ -15,7 +16,7 @@ export default function RelaysCard({ profilePubkey }) {
     return () => clearInterval(id);
   }, [profilePubkey]);
 
-  const relays = profilePubkey ? inboxes : poolRelays;
+  const relays = (profilePubkey ? inboxes : poolRelays).filter(isValidRelay);
 
   return (
     <div className="panel-card">
@@ -27,7 +28,6 @@ export default function RelaysCard({ profilePubkey }) {
       )}
       {relays.map((r, i) => (
         <div className="relay-item" key={i}>
-          <div className="relay-dot" />
           {fmtUrl(r)}
         </div>
       ))}

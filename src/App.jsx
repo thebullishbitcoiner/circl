@@ -13,7 +13,7 @@ import {
   zapperPubkeyFromKind9735,
 } from "./utils.js";
 import useAuth from "./hooks/useAuth.js";
-import { nostrSubscribe, eventLoader, eventStore, pool } from "./nostr.js";
+import { nostrSubscribe, eventLoader, eventStore, pool, validRelays } from "./nostr.js";
 import { RELAYS } from "./constants.js";
 import useFollows from "./hooks/useFollows.js";
 import useFeed from "./hooks/useFeed.js";
@@ -145,7 +145,7 @@ export default function App() {
     // Always include connected relays so note1 refs (no hints) still get fetched
     const connected = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
     const allRelays = relayHints.length
-      ? [...new Set([...relayHints, ...connected])]
+      ? [...new Set([...validRelays(relayHints), ...connected])]
       : connected;
     return new Promise(resolve => {
       let done = false;
@@ -233,7 +233,7 @@ export default function App() {
 
   const prevEntry = navStack[navStack.length - 2] ?? null;
   const backLabel = (() => {
-    if (!prevEntry) return "Your Circle";
+    if (!prevEntry) return "Home";
     if (prevEntry.type === "profile") {
       const n = profiles?.[prevEntry.payload]?.name;
       return n || "Profile";
@@ -509,7 +509,7 @@ export default function App() {
               <div className="feed-header">
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <div className="feed-title">
-                    {activeNav === "home" && "Your Circle"}
+                    {activeNav === "home" && "Home"}
                     {activeNav === "bookmarks" && "Bookmarks"}
                     {activeNav === "notifications" && "Notifications"}
                     {activeNav === "zaps" && "Wallet"}

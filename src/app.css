@@ -373,8 +373,7 @@
   .sugg-bio{font-size:9.5px;color:var(--text-faint);margin-top:1px;}
   .follow-btn{padding:3px 10px;border-radius:50px;border:1.5px solid var(--primary);background:none;color:var(--primary);font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:500;cursor:pointer;transition:all .15s;flex-shrink:0;}
   .follow-btn:hover{background:var(--primary);color:white;}
-  .relay-item{display:flex;align-items:center;font-size:calc(var(--font-base) - 3px);color:var(--text-muted);padding:3px 0;font-family:monospace;}
-  .relay-dot{width:5px;height:5px;border-radius:50%;background:var(--sage);margin-right:5px;box-shadow:0 0 0 2px var(--sage-soft);flex-shrink:0;}
+  .relay-item{font-size:calc(var(--font-base) - 3px);color:var(--text-muted);padding:3px 0;font-family:monospace;word-break:break-all;}
 
   /* ── Slide panels (reader + profile) ── */
   .slide-panel{

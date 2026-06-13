@@ -6,6 +6,11 @@ import { RELAYS } from "./constants.js";
 export const eventStore = new EventStore();
 export const pool = new RelayPool();
 
+// Reject URLs that contain embedded protocol prefixes (concatenated relay lists)
+// or literal/encoded whitespace — these come from malformed NIP-65 events.
+export const validRelays = urls =>
+  urls.filter(u => /^wss?:\/\/[^\s]+$/.test(u) && !/wss?:\/\//i.test(u.slice(6)));
+
 // ── Profile localStorage cache ──────────────────────────────────────────────
 // Seeded synchronously at module init so profiles are in EventStore before
 // the first React render — eliminates the npub flash on repeat visits.
