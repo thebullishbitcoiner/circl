@@ -49,6 +49,15 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
           if (!existing || ev.created_at > existing.created_at) byId.set(d, ev);
         }
 
+        // On mobile, the signer may not be injected yet at EOSE — wait up to 3 s
+        if (!hasNip44() && [...byId.values()].some(ev => (ev.content || "").trim())) {
+          for (let i = 0; i < 6; i++) {
+            await new Promise(r => setTimeout(r, 500));
+            if (cancelled || hasNip44()) break;
+          }
+        }
+        if (cancelled) return;
+
         const parsed = [];
         for (const [id, ev] of byId) {
           const titleTag = ev.tags?.find(t => t[0] === "title");

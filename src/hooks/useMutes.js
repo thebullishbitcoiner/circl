@@ -47,6 +47,14 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
         let pubkeys = [];
         let decryptFailed = false;
         const content = (latest.content || "").trim();
+        // On mobile, the signer may not be injected yet at EOSE — wait up to 3 s
+        if (content && !hasNip44()) {
+          for (let i = 0; i < 6; i++) {
+            await new Promise(r => setTimeout(r, 500));
+            if (cancelled || hasNip44()) break;
+          }
+        }
+        if (cancelled) return;
         if (content && hasNip44()) {
           try {
             const plain = await window.nostr.nip44.decrypt(latest.pubkey, latest.content);
