@@ -1276,6 +1276,7 @@ export default function App() {
                         profiles={profiles}
                         onBack={handleBack}
                         onOpenProfile={handleOpenProfile}
+                        onOpenThread={handleOpenThread}
                       />
                     );
                   }

@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import Avatar from "./Avatar.jsx";
+import NoteContent from "./NoteContent.jsx";
 import { Bk } from "./icons.jsx";
-import { displayName, getZapReqFromCache } from "../utils.js";
+import { displayName, nip05OrNpub, relativeTime, getZapReqFromCache } from "../utils.js";
 import { decodeInvoice } from "@getalby/lightning-tools";
 import { pool } from "../nostr.js";
 import { RELAYS } from "../constants.js";
@@ -118,7 +119,7 @@ function resolvedPubkeySource(tx) {
   return { pk: null, source: "none found" };
 }
 
-function ZappedNote({ noteId, relayHints, profiles, onOpenProfile }) {
+function ZappedNote({ noteId, relayHints, profiles, onOpenProfile, onOpenThread }) {
   const [note, setNote] = useState(null);
   const [failed, setFailed] = useState(false);
 
@@ -136,42 +137,45 @@ function ZappedNote({ noteId, relayHints, profiles, onOpenProfile }) {
     return () => { cancelled = true; clearTimeout(timeout); sub.unsubscribe(); };
   }, [noteId]);
 
-  if (!noteId) return null;
-
-  const cardStyle = { margin: "0 16px 16px", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" };
-
   if (failed && !note) return (
-    <div style={{ ...cardStyle, padding: "12px 16px", fontSize: 13, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", textAlign: "center" }}>
+    <div className="note-card" style={{ margin: "0 16px 16px", color: "var(--text-muted)", fontSize: 13, fontFamily: "'DM Sans',sans-serif", textAlign: "center" }}>
       Could not load note
     </div>
   );
 
   if (!note) return (
-    <div style={{ ...cardStyle, padding: "12px 16px", fontSize: 13, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", textAlign: "center" }}>
+    <div className="note-card" style={{ margin: "0 16px 16px", color: "var(--text-muted)", fontSize: 13, fontFamily: "'DM Sans',sans-serif", textAlign: "center" }}>
       Loading note…
     </div>
   );
 
   return (
-    <div style={cardStyle}>
-      <div
-        style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--border)", cursor: "pointer" }}
-        onClick={() => onOpenProfile?.(note.pubkey)}
-      >
-        <Avatar pk={note.pubkey} profiles={profiles} size={32} />
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif" }}>{displayName(note.pubkey, profiles)}</div>
-          <div style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif" }}>{fmtDate(note.created_at)}</div>
+    <div className="note-card" style={{ margin: "0 16px 16px" }} onClick={() => onOpenThread?.(note)}>
+      <div className="note-header">
+        <div onClick={e => { e.stopPropagation(); onOpenProfile?.(note.pubkey); }} style={{ cursor: "pointer", flexShrink: 0 }}>
+          <Avatar pk={note.pubkey} profiles={profiles} size={36} />
+        </div>
+        <div className="note-meta">
+          <span className="note-name" style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); onOpenProfile?.(note.pubkey); }}>
+            {displayName(note.pubkey, profiles)}
+          </span>
+          <span className="note-npub">{nip05OrNpub(note.pubkey, profiles)}</span>
+          <span className="meta-dot" aria-hidden="true">·</span>
+          <span className="note-time">{relativeTime(note.created_at)}</span>
         </div>
       </div>
-      <div style={{ padding: "10px 12px", fontSize: 13, color: "var(--text)", fontFamily: "'DM Sans',sans-serif", whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 220, overflowY: "auto" }}>
-        {note.content}
-      </div>
+      <NoteContent
+        content={note.content}
+        tags={note.tags}
+        profiles={profiles}
+        onOpenProfile={onOpenProfile}
+        collapsible
+      />
     </div>
   );
 }
 
-export default function TxDetailPage({ tx, profiles, onBack, onOpenProfile }) {
+export default function TxDetailPage({ tx, profiles, onBack, onOpenProfile, onOpenThread }) {
   const pk         = nostrPubkeyFromTx(tx);
   const name       = pk ? displayName(pk, profiles) : null;
   const comment    = txComment(tx);
@@ -179,22 +183,9 @@ export default function TxDetailPage({ tx, profiles, onBack, onOpenProfile }) {
   const feesSats   = tx.fees_paid ? Math.round(tx.fees_paid / 1000) : 0;
   const zapReq     = getZapReq(tx);
 
-  // Extract structured fields from the zap request
-  const zapReqId        = zapReq?.id ?? null;
-  const zapReqSig       = zapReq?.sig ?? null;
-  const zapReqCreatedAt = zapReq?.created_at ? fmtDate(zapReq.created_at) : null;
-  const zapReqSenderPk  = zapReq?.pubkey ?? null;
-  const zapReqTags      = zapReq?.tags ?? [];
-  const zappedNoteId    = zapReqTags.find(t => t[0] === "e")?.[1] ?? null;
+  const zapReqTags     = zapReq?.tags ?? [];
+  const zappedNoteId   = zapReqTags.find(t => t[0] === "e")?.[1] ?? null;
   const zapReqRelayUrls = (() => { const r = zapReqTags.find(t => t[0] === "relays"); return r ? r.slice(1) : []; })();
-  const zapReqRelays    = zapReqRelayUrls.length ? zapReqRelayUrls.join(", ") : null;
-  const zapReqAmountTag = zapReqTags.find(t => t[0] === "amount")?.[1];
-  const zapReqAmtSats   = zapReqAmountTag ? `${Math.round(Number(zapReqAmountTag) / 1000)} sats` : null;
-
-  // tx.metadata.nostr has { pubkey, tags } — show tags not already covered above
-  const metaNostrTags   = tx.metadata?.nostr?.tags;
-
-  const hasNostrData = zapReq || tx.metadata?.nostr;
 
   const { pk: resolvedPk, source: pkSource } = resolvedPubkeySource(tx);
 
@@ -235,43 +226,19 @@ export default function TxDetailPage({ tx, profiles, onBack, onOpenProfile }) {
         {tx.preimage && <DetailRow label="Preimage" value={tx.preimage} mono wrap />}
         {tx.invoice  && <DetailRow label="Invoice"  value={tx.invoice}  mono wrap />}
 
-        {/* Nostr / Zap Request (NIP-57) */}
-        {hasNostrData && (
-          <>
-            <SectionLabel>Zap Request (NIP-57)</SectionLabel>
-            {zapReqId        && <DetailRow label="Event ID"      value={zapReqId}        mono wrap />}
-            {zapReqSenderPk  && <DetailRow label="Sender Pubkey" value={zapReqSenderPk}  mono wrap />}
-            {pk && pk !== zapReqSenderPk && <DetailRow label="Recipient Pubkey" value={pk} mono wrap />}
-            {zappedNoteId    && <DetailRow label="Zapped Note ID" value={zappedNoteId}   mono wrap />}
-            {zapReqAmtSats   && <DetailRow label="Requested Amount" value={zapReqAmtSats} />}
-            {zapReqCreatedAt && <DetailRow label="Request Created"  value={zapReqCreatedAt} />}
-            {zapReqRelays    && <DetailRow label="Relays"           value={zapReqRelays}  wrap />}
-            {zapReqSig       && <DetailRow label="Signature"        value={zapReqSig}     mono wrap />}
-            {metaNostrTags   && <DetailRow label="Metadata Tags"    value={JSON.stringify(metaNostrTags, null, 2)} mono wrap />}
-          </>
-        )}
-
-        {/* Zapped Note */}
-        {zappedNoteId && (
-          <>
-            <SectionLabel>Zapped Note</SectionLabel>
-            <ZappedNote noteId={zappedNoteId} relayHints={zapReqRelayUrls} profiles={profiles} onOpenProfile={onOpenProfile} />
-          </>
-        )}
-
         {/* Raw data for debugging */}
         <SectionLabel>Raw Data</SectionLabel>
         <DetailRow label="Resolved Pubkey Source" value={`${pkSource}${resolvedPk ? `: ${resolvedPk.slice(0, 16)}…` : ""}`} />
         <DetailRow
           label="tx.description"
-          value={tx.description ? (tx.description.trim().startsWith("{") ? "(JSON — see Zap Request above)" : tx.description) : "(empty)"}
+          value={tx.description ? (tx.description.trim().startsWith("{") ? "(JSON)" : tx.description) : "(empty)"}
           wrap
         />
         {tx.invoice && (() => {
           try {
             const desc = decodeInvoice(tx.invoice)?.description;
             if (!desc) return <DetailRow label="invoice description" value="(empty)" />;
-            return <DetailRow label="invoice description" value={desc.trim().startsWith("{") ? "(JSON — see Zap Request above)" : desc} wrap />;
+            return <DetailRow label="invoice description" value={desc.trim().startsWith("{") ? "(JSON)" : desc} wrap />;
           } catch { return <DetailRow label="invoice description" value="(decode error)" />; }
         })()}
         <DetailRow
@@ -279,6 +246,14 @@ export default function TxDetailPage({ tx, profiles, onBack, onOpenProfile }) {
           value={tx.metadata ? JSON.stringify(tx.metadata, null, 2) : "(none)"}
           mono pre
         />
+
+        {/* Zapped Note */}
+        {zappedNoteId && (
+          <>
+            <SectionLabel>Zapped Note</SectionLabel>
+            <ZappedNote noteId={zappedNoteId} relayHints={zapReqRelayUrls} profiles={profiles} onOpenProfile={onOpenProfile} onOpenThread={onOpenThread} />
+          </>
+        )}
       </div>
     </div>
   );
