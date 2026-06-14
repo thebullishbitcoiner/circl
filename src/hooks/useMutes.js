@@ -4,6 +4,7 @@ import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 
 const MUTE_LIST_KIND = 10000;
+const CACHE_KEY = "circl_mutes";
 
 function hasNip44() {
   return (
@@ -13,21 +14,26 @@ function hasNip44() {
   );
 }
 
-// Persists decrypted output across remounts so navigation doesn't flash empty
-const _cache = new Map(); // pk → { mutes, muteEvent }
+// Cache stores decrypted pubkeys per account — no crypto needed on reload
+function readCache(pk) {
+  try { return JSON.parse(localStorage.getItem(CACHE_KEY))?.[pk] ?? null; } catch { return null; }
+}
+function writeCache(pk, pubkeys, created_at) {
+  try {
+    const store = JSON.parse(localStorage.getItem(CACHE_KEY) ?? "{}");
+    store[pk] = { created_at, pubkeys };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(store));
+  } catch {}
+}
 
 export default function useMutes({ pubkey, signAndPublish } = {}) {
   const [mutes, setMutes] = useState(() => {
     const pk = normPubkey(pubkey);
-    return isHexPubkey(pk) ? (_cache.get(pk)?.mutes ?? []) : [];
+    return isHexPubkey(pk) ? (readCache(pk)?.pubkeys ?? []) : [];
   });
-  const [muteEvent, setMuteEvent] = useState(() => {
-    const pk = normPubkey(pubkey);
-    return isHexPubkey(pk) ? (_cache.get(pk)?.muteEvent ?? null) : null;
-  });
+  const [muteEvent, setMuteEvent] = useState(null);
   const mutesRef = useRef([]);
   useEffect(() => { mutesRef.current = mutes; }, [mutes]);
-  // true when we found existing encrypted content we couldn't read — block publishing to avoid data loss
   const unreadableRef = useRef(false);
 
   useEffect(() => {
@@ -37,9 +43,19 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
     let cancelled = false;
     let generation = 0;
     unreadableRef.current = false;
-    // Only wipe visible state if we have nothing cached to show while re-fetching
-    if (!_cache.has(pk)) { setMutes([]); setMuteEvent(null); }
+
+    // Restore from decrypted cache immediately — no relay round-trip or crypto needed
+    const cached = readCache(pk);
+    if (cached) {
+      setMutes(cached.pubkeys);
+    } else {
+      setMutes([]);
+      setMuteEvent(null);
+    }
+
+    // Track the best event seen; skip relay events older than what we have cached
     let latestEvent = null;
+    let knownCreatedAt = cached?.created_at ?? 0;
     let processTimer = null;
 
     const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
@@ -52,7 +68,7 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
       let pubkeys = [];
       let decryptFailed = false;
       const content = (ev.content || "").trim();
-      // On mobile, the signer may not be injected yet — wait up to 3 s
+      // On mobile the signer may not be injected yet — wait up to 3 s
       if (content && !hasNip44()) {
         for (let i = 0; i < 6; i++) {
           await new Promise(r => setTimeout(r, 500));
@@ -64,16 +80,12 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
         try {
           const plain = await window.nostr.nip44.decrypt(ev.pubkey, ev.content);
           const parsed = JSON.parse(plain);
-          if (Array.isArray(parsed)) {
+          if (Array.isArray(parsed))
             pubkeys = parsed.filter(p => typeof p === "string" && isHexPubkey(normPubkey(p))).map(normPubkey);
-          }
-        } catch {
-          decryptFailed = true;
-        }
+        } catch { decryptFailed = true; }
       } else if (content) {
         decryptFailed = true;
       }
-      // Public "p" tags fallback (only when no encrypted content was found)
       if (!decryptFailed) {
         for (const t of ev.tags || []) {
           if (t[0] === "p" && isHexPubkey(normPubkey(t[1]))) {
@@ -86,30 +98,25 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
         unreadableRef.current = decryptFailed;
         setMutes(pubkeys);
         setMuteEvent(ev);
-        if (!decryptFailed) _cache.set(pk, { mutes: pubkeys, muteEvent: ev });
+        if (!decryptFailed) {
+          writeCache(pk, pubkeys, ev.created_at);
+          knownCreatedAt = ev.created_at;
+        }
       }
     };
 
-    // Seed from eventStore immediately — no relay round-trip needed on remount
-    try {
-      const stored = eventStore.getTimeline([{ kinds: [MUTE_LIST_KIND], authors: [pk], limit: 1 }])?.[0];
-      if (stored) { latestEvent = stored; processTimer = setTimeout(process, 0); }
-    } catch {}
-
-    // Use subscription (not request) so events arriving after EOSE aren't dropped
     const sub = pool.subscription(relayUrls, [{ kinds: [MUTE_LIST_KIND], authors: [pk] }]).subscribe({
       next: raw => {
         eventStore.add(raw);
-        if (!cancelled && (!latestEvent || raw.created_at > latestEvent.created_at)) {
+        if (!cancelled && raw.created_at > Math.max(knownCreatedAt, latestEvent?.created_at ?? 0)) {
           latestEvent = raw;
           clearTimeout(processTimer);
           processTimer = setTimeout(process, 300);
         }
       },
-      error: () => { if (!cancelled) setMutes([]); },
+      error: () => { if (!cancelled && !cached) setMutes([]); },
     });
 
-    // Hard cutoff: process whatever we have and close
     const cutoffTimer = setTimeout(() => { sub.unsubscribe(); process(); }, 8000);
 
     return () => {
@@ -141,13 +148,7 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
       const next = [...prev, norm];
       mutesRef.current = next;
       setMutes(next);
-      try {
-        await persist(next);
-      } catch (e) {
-        mutesRef.current = prev;
-        setMutes(prev);
-        throw e;
-      }
+      try { await persist(next); } catch (e) { mutesRef.current = prev; setMutes(prev); throw e; }
     },
     [persist]
   );
@@ -161,13 +162,7 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
       if (next.length === prev.length) return;
       mutesRef.current = next;
       setMutes(next);
-      try {
-        await persist(next);
-      } catch (e) {
-        mutesRef.current = prev;
-        setMutes(prev);
-        throw e;
-      }
+      try { await persist(next); } catch (e) { mutesRef.current = prev; setMutes(prev); throw e; }
     },
     [persist]
   );
@@ -175,8 +170,7 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
   const isMuted = useCallback(
     targetPk => {
       if (!targetPk) return false;
-      const norm = normPubkey(targetPk);
-      return mutesRef.current.includes(norm);
+      return mutesRef.current.includes(normPubkey(targetPk));
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [mutes]

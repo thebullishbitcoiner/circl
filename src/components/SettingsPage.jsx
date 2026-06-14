@@ -555,7 +555,10 @@ function BlossomSubPage({ onBack, servers, saveServers }) {
 
 const KEY_LABELS = {
   circl_profiles_v1:   "Profile cache",
-  circl_lists_v1:      "Mute / bookmark / circle events",
+  circl_lists_v1:      "Legacy list event cache (can be deleted)",
+  circl_mutes:         "Mute list (decrypted)",
+  circl_bookmarks:     "Bookmark list (decrypted)",
+  circl_circles:       "Circles (decrypted)",
   circl_zap_req_cache: "Zap request cache",
 };
 

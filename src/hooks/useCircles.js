@@ -4,6 +4,7 @@ import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 
 const CIRCLE_KIND = 30000;
+const CACHE_KEY = "circl_circles";
 
 function hasNip44() {
   return (
@@ -20,13 +21,31 @@ function randomId() {
   return `circl_${hex}`;
 }
 
-// Persists decrypted output across remounts so navigation doesn't flash empty
-const _cache = new Map(); // pk → circles[]
+// Cache stores decrypted circle data per account, keyed by d-tag.
+// Shape: { [pk]: { [d]: { created_at, title, members } } }
+function readCache(pk) {
+  try { return JSON.parse(localStorage.getItem(CACHE_KEY))?.[pk] ?? null; } catch { return null; }
+}
+function writeCache(pk, byId) {
+  try {
+    const store = JSON.parse(localStorage.getItem(CACHE_KEY) ?? "{}");
+    store[pk] = byId;
+    localStorage.setItem(CACHE_KEY, JSON.stringify(store));
+  } catch {}
+}
+
+function cacheToCircles(byId) {
+  return Object.entries(byId)
+    .filter(([, v]) => !v.deleted)
+    .map(([id, v]) => ({ id, title: v.title, members: v.members, decryptionFailed: false }));
+}
 
 export default function useCircles({ pubkey, signAndPublish } = {}) {
   const [circles, setCircles] = useState(() => {
     const pk = normPubkey(pubkey);
-    return isHexPubkey(pk) ? (_cache.get(pk) ?? []) : [];
+    if (!isHexPubkey(pk)) return [];
+    const cached = readCache(pk);
+    return cached ? cacheToCircles(cached) : [];
   });
   const circlesRef = useRef([]);
   useEffect(() => { circlesRef.current = circles; }, [circles]);
@@ -37,19 +56,26 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
 
     let cancelled = false;
     let generation = 0;
-    // Only wipe state if we have nothing cached to show while re-fetching
-    if (!_cache.has(pk)) setCircles([]);
-    const byId = new Map(); // d-tag → latest event
+
+    // Restore from decrypted cache immediately — no relay round-trip or crypto needed
+    const cached = readCache(pk);
+    // byId tracks the best event seen per d-tag (for relay comparison)
+    // Values: { created_at, title, members, deleted }
+    const byId = cached ? { ...cached } : {};
+    if (cached) setCircles(cacheToCircles(cached));
+    else setCircles([]);
+
     let processTimer = null;
 
     const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
 
     const process = async () => {
-      if (cancelled || byId.size === 0) return;
+      if (cancelled || Object.keys(byId).length === 0) return;
       const gen = ++generation;
 
-      // On mobile, the signer may not be injected yet — wait up to 3 s
-      if (!hasNip44() && [...byId.values()].some(ev => (ev.content || "").trim())) {
+      // On mobile the signer may not be injected yet — wait up to 3 s
+      const needsDecrypt = Object.values(byId).some(v => v._raw);
+      if (needsDecrypt && !hasNip44()) {
         for (let i = 0; i < 6; i++) {
           await new Promise(r => setTimeout(r, 500));
           if (cancelled || hasNip44()) break;
@@ -57,12 +83,13 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
       }
       if (cancelled || generation !== gen) return;
 
-      const parsed = [];
-      for (const [id, ev] of byId) {
+      let changed = false;
+      for (const [id, entry] of Object.entries(byId)) {
+        if (!entry._raw) continue; // already decoded from cache
+        const ev = entry._raw;
         const titleTag = ev.tags?.find(t => t[0] === "title");
         const title = titleTag?.[1] ?? "Untitled Circle";
-
-        if (ev.tags?.some(t => t[0] === "deleted")) continue;
+        const deleted = ev.tags?.some(t => t[0] === "deleted") ?? false;
 
         let members = [];
         let decryptionFailed = false;
@@ -71,14 +98,9 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
           try {
             const plain = await window.nostr.nip44.decrypt(ev.pubkey, ev.content);
             const arr = JSON.parse(plain);
-            if (Array.isArray(arr)) {
-              members = arr
-                .filter(x => typeof x === "string" && isHexPubkey(normPubkey(x)))
-                .map(normPubkey);
-            }
-          } catch {
-            decryptionFailed = true;
-          }
+            if (Array.isArray(arr))
+              members = arr.filter(x => typeof x === "string" && isHexPubkey(normPubkey(x))).map(normPubkey);
+          } catch { decryptionFailed = true; }
         } else if (content) {
           decryptionFailed = true;
         }
@@ -90,32 +112,30 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
             }
           }
         }
-        parsed.push({ id, title, members, decryptionFailed, event: ev });
+
+        if (!decryptionFailed) {
+          byId[id] = { created_at: ev.created_at, title, members, deleted };
+          changed = true;
+        }
+        if (cancelled || generation !== gen) return;
       }
 
       if (!cancelled && generation === gen) {
-        setCircles(parsed);
-        _cache.set(pk, parsed);
+        if (changed) writeCache(pk, byId);
+        setCircles(cacheToCircles(byId));
       }
     };
 
     const ingestRaw = raw => {
       const d = raw.tags?.find(t => t[0] === "d")?.[1];
       if (!d || !d.startsWith("circl_")) return false;
-      const existing = byId.get(d);
-      if (!existing || raw.created_at > existing.created_at) { byId.set(d, raw); return true; }
-      return false;
+      const existing = byId[d];
+      if (existing && raw.created_at <= existing.created_at) return false;
+      // Store raw event for decryption; _raw is stripped before caching
+      byId[d] = { created_at: raw.created_at, _raw: raw };
+      return true;
     };
 
-    // Seed from eventStore immediately — no relay round-trip needed on remount
-    try {
-      const stored = eventStore.getTimeline([{ kinds: [CIRCLE_KIND], authors: [pk] }]) ?? [];
-      let seeded = false;
-      for (const ev of stored) { if (ingestRaw(ev)) seeded = true; }
-      if (seeded) processTimer = setTimeout(process, 0);
-    } catch {}
-
-    // Use subscription (not request) so events arriving after EOSE aren't dropped
     const sub = pool.subscription(relayUrls, [{ kinds: [CIRCLE_KIND], authors: [pk] }]).subscribe({
       next: raw => {
         eventStore.add(raw);
@@ -124,7 +144,7 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
           processTimer = setTimeout(process, 300);
         }
       },
-      error: () => { if (!cancelled) setCircles([]); },
+      error: () => { if (!cancelled && !cached) setCircles([]); },
     });
 
     const cutoffTimer = setTimeout(() => { sub.unsubscribe(); process(); }, 8000);
@@ -148,6 +168,14 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
         ? await window.nostr.nip44.encrypt(pk, JSON.stringify([]))
         : await window.nostr.nip44.encrypt(pk, JSON.stringify(members));
       await signAndPublish({ kind: CIRCLE_KIND, content: ciphertext, tags });
+      // Update cache immediately with the new state
+      try {
+        const store = JSON.parse(localStorage.getItem(CACHE_KEY) ?? "{}");
+        const pkCache = store[pk] ?? {};
+        pkCache[id] = { created_at: Math.floor(Date.now() / 1000), title, members, deleted };
+        store[pk] = pkCache;
+        localStorage.setItem(CACHE_KEY, JSON.stringify(store));
+      } catch {}
     },
     [signAndPublish, pubkey]
   );
@@ -183,11 +211,7 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
       setCircles(next);
       try {
         await persist({ id, title: trimmed, members: circle.members });
-      } catch (e) {
-        circlesRef.current = prev;
-        setCircles(prev);
-        throw e;
-      }
+      } catch (e) { circlesRef.current = prev; setCircles(prev); throw e; }
     },
     [persist]
   );
@@ -202,11 +226,7 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
       setCircles(next);
       try {
         await persist({ id, title: circle.title, members: [], deleted: true });
-      } catch (e) {
-        circlesRef.current = prev;
-        setCircles(prev);
-        throw e;
-      }
+      } catch (e) { circlesRef.current = prev; setCircles(prev); throw e; }
     },
     [persist]
   );
@@ -224,11 +244,7 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
       setCircles(next);
       try {
         await persist(updated);
-      } catch (e) {
-        circlesRef.current = prev;
-        setCircles(prev);
-        throw e;
-      }
+      } catch (e) { circlesRef.current = prev; setCircles(prev); throw e; }
     },
     [persist]
   );
@@ -245,11 +261,7 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
       setCircles(next);
       try {
         await persist(updated);
-      } catch (e) {
-        circlesRef.current = prev;
-        setCircles(prev);
-        throw e;
-      }
+      } catch (e) { circlesRef.current = prev; setCircles(prev); throw e; }
     },
     [persist]
   );

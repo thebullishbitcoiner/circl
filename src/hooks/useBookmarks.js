@@ -4,6 +4,7 @@ import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 
 const BOOKMARK_LIST_KIND = 10003;
+const CACHE_KEY = "circl_bookmarks";
 
 export function bookmarkTagFromEvent(event) {
   if (!event?.id || !event.pubkey) return null;
@@ -32,14 +33,8 @@ function mergeBookmarkTags(decryptedTags, publicEventTags) {
     seen.add(k);
     out.push(t);
   };
-  if (Array.isArray(decryptedTags)) {
-    for (const t of decryptedTags) {
-      if (Array.isArray(t)) push(t);
-    }
-  }
-  for (const t of publicEventTags || []) {
-    if (t[0] === "e" || t[0] === "a") push(t);
-  }
+  if (Array.isArray(decryptedTags)) for (const t of decryptedTags) { if (Array.isArray(t)) push(t); }
+  for (const t of publicEventTags || []) { if (t[0] === "e" || t[0] === "a") push(t); }
   return out;
 }
 
@@ -51,13 +46,22 @@ function hasNip44() {
   );
 }
 
-// Persists decrypted output across remounts so navigation doesn't flash empty
-const _cache = new Map(); // pk → items[]
+// Cache stores decrypted bookmark tags per account — no crypto needed on reload
+function readCache(pk) {
+  try { return JSON.parse(localStorage.getItem(CACHE_KEY))?.[pk] ?? null; } catch { return null; }
+}
+function writeCache(pk, items, created_at) {
+  try {
+    const store = JSON.parse(localStorage.getItem(CACHE_KEY) ?? "{}");
+    store[pk] = { created_at, items };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(store));
+  } catch {}
+}
 
 export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } = {}) {
   const [items, setItems] = useState(() => {
     const pk = normPubkey(pubkey);
-    return isHexPubkey(pk) ? (_cache.get(pk) ?? []) : [];
+    return isHexPubkey(pk) ? (readCache(pk)?.items ?? []) : [];
   });
   const itemsRef = useRef([]);
   useEffect(() => { itemsRef.current = items; }, [items]);
@@ -68,9 +72,17 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
 
     let cancelled = false;
     let generation = 0;
-    // Only wipe state if we have nothing cached to show while re-fetching
-    if (!_cache.has(pk)) setItems([]);
+
+    // Restore from decrypted cache immediately — no relay round-trip or crypto needed
+    const cached = readCache(pk);
+    if (cached) {
+      setItems(cached.items);
+    } else {
+      setItems([]);
+    }
+
     let latestEvent = null;
+    let knownCreatedAt = cached?.created_at ?? 0;
     let processTimer = null;
 
     const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
@@ -82,7 +94,7 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
 
       let decrypted = [];
       const content = (ev.content || "").trim();
-      // On mobile, the signer may not be injected yet — wait up to 3 s
+      // On mobile the signer may not be injected yet — wait up to 3 s
       if (content && !hasNip44()) {
         for (let i = 0; i < 6; i++) {
           await new Promise(r => setTimeout(r, 500));
@@ -100,27 +112,21 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
       if (!cancelled && generation === gen) {
         const merged = mergeBookmarkTags(decrypted, ev.tags);
         setItems(merged);
-        _cache.set(pk, merged);
+        writeCache(pk, merged, ev.created_at);
+        knownCreatedAt = ev.created_at;
       }
     };
 
-    // Seed from eventStore immediately — no relay round-trip needed on remount
-    try {
-      const stored = eventStore.getTimeline([{ kinds: [BOOKMARK_LIST_KIND], authors: [pk], limit: 1 }])?.[0];
-      if (stored) { latestEvent = stored; processTimer = setTimeout(process, 0); }
-    } catch {}
-
-    // Use subscription (not request) so events arriving after EOSE aren't dropped
     const sub = pool.subscription(relayUrls, [{ kinds: [BOOKMARK_LIST_KIND], authors: [pk] }]).subscribe({
       next: raw => {
         eventStore.add(raw);
-        if (!cancelled && (!latestEvent || raw.created_at > latestEvent.created_at)) {
+        if (!cancelled && raw.created_at > Math.max(knownCreatedAt, latestEvent?.created_at ?? 0)) {
           latestEvent = raw;
           clearTimeout(processTimer);
           processTimer = setTimeout(process, 300);
         }
       },
-      error: () => { if (!cancelled) setItems([]); },
+      error: () => { if (!cancelled && !cached) setItems([]); },
     });
 
     const cutoffTimer = setTimeout(() => { sub.unsubscribe(); process(); }, 8000);
@@ -138,13 +144,8 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
       const pk = normPubkey(pubkey);
       if (!signAndPublish || !isHexPubkey(pk)) throw new Error("Sign in to sync bookmarks");
       if (!hasNip44()) throw new Error("Your wallet does not support NIP-44 (update the extension)");
-      const plaintext = JSON.stringify(nextItems);
-      const ciphertext = await window.nostr.nip44.encrypt(pk, plaintext);
-      await signAndPublish({
-        kind: BOOKMARK_LIST_KIND,
-        content: ciphertext,
-        tags: [],
-      });
+      const ciphertext = await window.nostr.nip44.encrypt(pk, JSON.stringify(nextItems));
+      await signAndPublish({ kind: BOOKMARK_LIST_KIND, content: ciphertext, tags: [] });
     },
     [signAndPublish, pubkey]
   );
@@ -159,13 +160,7 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
       const next = filtered.length < prev.length ? filtered : [...filtered, tag];
       itemsRef.current = next;
       setItems(next);
-      try {
-        await persist(next);
-      } catch (e) {
-        itemsRef.current = prev;
-        setItems(prev);
-        throw e;
-      }
+      try { await persist(next); } catch (e) { itemsRef.current = prev; setItems(prev); throw e; }
     },
     [persist]
   );
