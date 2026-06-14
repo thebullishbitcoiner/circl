@@ -360,7 +360,7 @@ export default function NoteContent({
     // Only render plain-text parts; nevent refs are lifted to bottom
     const textParts = splitNostrEventRefs(seg.value).filter(p => p.type === "text");
     return textParts.map((part, idx) => {
-      if (!part.value) return null;
+      if (!part.value || !part.value.trim()) return null;
       return (
         <NoteText
           key={`${i}-t-${idx}`}

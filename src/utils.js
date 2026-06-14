@@ -445,10 +445,25 @@ export function parseStreamEvent(event) {
 const ZAP_REQ_CACHE_KEY = "circl_zap_req_cache";
 const ZAP_REQ_CACHE_MAX = 200;
 
+// In-memory cache — parsed once, avoids repeated JSON.parse on wallet list renders
+let _zapReqMemCache = null;
+function getZapReqMemCache() {
+  if (!_zapReqMemCache) {
+    try { _zapReqMemCache = JSON.parse(localStorage.getItem(ZAP_REQ_CACHE_KEY) ?? "{}"); }
+    catch { _zapReqMemCache = {}; }
+  }
+  return _zapReqMemCache;
+}
+
 export function cacheZapReq(paymentHash, zapReq) {
   try {
-    const cache = JSON.parse(localStorage.getItem(ZAP_REQ_CACHE_KEY) || "{}");
-    cache[paymentHash] = zapReq;
+    const cache = getZapReqMemCache();
+    // Store only fields used for display — drop id/sig/created_at/kind and relay/lnurl tags
+    cache[paymentHash] = {
+      pubkey: zapReq.pubkey,
+      content: zapReq.content ?? "",
+      tags: (zapReq.tags ?? []).filter(t => t[0] === "p" || t[0] === "e" || t[0] === "relays"),
+    };
     const keys = Object.keys(cache);
     if (keys.length > ZAP_REQ_CACHE_MAX) {
       keys.slice(0, keys.length - ZAP_REQ_CACHE_MAX).forEach(k => delete cache[k]);
@@ -458,11 +473,8 @@ export function cacheZapReq(paymentHash, zapReq) {
 }
 
 export function getZapReqFromCache(paymentHash) {
-  try {
-    const raw = localStorage.getItem(ZAP_REQ_CACHE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw)[paymentHash] ?? null;
-  } catch { return null; }
+  try { return getZapReqMemCache()[paymentHash] ?? null; }
+  catch { return null; }
 }
 
 /**

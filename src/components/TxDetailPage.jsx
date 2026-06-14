@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Avatar from "./Avatar.jsx";
 import { Bk } from "./icons.jsx";
 import { displayName, getZapReqFromCache } from "../utils.js";
 import { decodeInvoice } from "@getalby/lightning-tools";
+import { pool } from "../nostr.js";
+import { RELAYS } from "../constants.js";
 
 function zapReqFromDesc(tx) {
   try {
@@ -116,6 +118,59 @@ function resolvedPubkeySource(tx) {
   return { pk: null, source: "none found" };
 }
 
+function ZappedNote({ noteId, relayHints, profiles, onOpenProfile }) {
+  const [note, setNote] = useState(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!noteId) return;
+    let found = false;
+    let cancelled = false;
+    const relays = relayHints?.length ? relayHints : RELAYS;
+    const sub = pool.request(relays, [{ ids: [noteId], limit: 1 }]).subscribe({
+      next: ev => { if (!cancelled) { found = true; setNote(ev); } },
+      error: () => { if (!cancelled && !found) setFailed(true); },
+      complete: () => { if (!cancelled && !found) setFailed(true); },
+    });
+    const timeout = setTimeout(() => { if (!found) setFailed(true); cancelled = true; sub.unsubscribe(); }, 8000);
+    return () => { cancelled = true; clearTimeout(timeout); sub.unsubscribe(); };
+  }, [noteId]);
+
+  if (!noteId) return null;
+
+  const cardStyle = { margin: "0 16px 16px", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" };
+
+  if (failed && !note) return (
+    <div style={{ ...cardStyle, padding: "12px 16px", fontSize: 13, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", textAlign: "center" }}>
+      Could not load note
+    </div>
+  );
+
+  if (!note) return (
+    <div style={{ ...cardStyle, padding: "12px 16px", fontSize: 13, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", textAlign: "center" }}>
+      Loading note…
+    </div>
+  );
+
+  return (
+    <div style={cardStyle}>
+      <div
+        style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderBottom: "1px solid var(--border)", cursor: "pointer" }}
+        onClick={() => onOpenProfile?.(note.pubkey)}
+      >
+        <Avatar pk={note.pubkey} profiles={profiles} size={32} />
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif" }}>{displayName(note.pubkey, profiles)}</div>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif" }}>{fmtDate(note.created_at)}</div>
+        </div>
+      </div>
+      <div style={{ padding: "10px 12px", fontSize: 13, color: "var(--text)", fontFamily: "'DM Sans',sans-serif", whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 220, overflowY: "auto" }}>
+        {note.content}
+      </div>
+    </div>
+  );
+}
+
 export default function TxDetailPage({ tx, profiles, onBack, onOpenProfile }) {
   const pk         = nostrPubkeyFromTx(tx);
   const name       = pk ? displayName(pk, profiles) : null;
@@ -131,7 +186,8 @@ export default function TxDetailPage({ tx, profiles, onBack, onOpenProfile }) {
   const zapReqSenderPk  = zapReq?.pubkey ?? null;
   const zapReqTags      = zapReq?.tags ?? [];
   const zappedNoteId    = zapReqTags.find(t => t[0] === "e")?.[1] ?? null;
-  const zapReqRelays    = (() => { const r = zapReqTags.find(t => t[0] === "relays"); return r ? r.slice(1).join(", ") : null; })();
+  const zapReqRelayUrls = (() => { const r = zapReqTags.find(t => t[0] === "relays"); return r ? r.slice(1) : []; })();
+  const zapReqRelays    = zapReqRelayUrls.length ? zapReqRelayUrls.join(", ") : null;
   const zapReqAmountTag = zapReqTags.find(t => t[0] === "amount")?.[1];
   const zapReqAmtSats   = zapReqAmountTag ? `${Math.round(Number(zapReqAmountTag) / 1000)} sats` : null;
 
@@ -192,6 +248,14 @@ export default function TxDetailPage({ tx, profiles, onBack, onOpenProfile }) {
             {zapReqRelays    && <DetailRow label="Relays"           value={zapReqRelays}  wrap />}
             {zapReqSig       && <DetailRow label="Signature"        value={zapReqSig}     mono wrap />}
             {metaNostrTags   && <DetailRow label="Metadata Tags"    value={JSON.stringify(metaNostrTags, null, 2)} mono wrap />}
+          </>
+        )}
+
+        {/* Zapped Note */}
+        {zappedNoteId && (
+          <>
+            <SectionLabel>Zapped Note</SectionLabel>
+            <ZappedNote noteId={zappedNoteId} relayHints={zapReqRelayUrls} profiles={profiles} onOpenProfile={onOpenProfile} />
           </>
         )}
 
