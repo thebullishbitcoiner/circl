@@ -41,10 +41,49 @@ function saveProfileToCache(event) {
   } catch {}
 }
 
-// Seed on module load (sync) then persist new profiles reactively
+// ── List localStorage cache ─────────────────────────────────────────────────
+// Persists mute lists (10000), bookmark lists (10003), and circles (30000)
+// so they are available immediately on page reload without a relay round-trip.
+
+const LIST_CACHE_KEY = "circl_lists_v1";
+const LIST_KINDS = new Set([10000, 10003, 30000]);
+
+function listCacheKey(event) {
+  if (event.kind === 30000) {
+    const d = event.tags?.find(t => t[0] === "d")?.[1];
+    return d ? `30000:${event.pubkey}:${d}` : null;
+  }
+  return `${event.kind}:${event.pubkey}`;
+}
+
+function loadListCache() {
+  try {
+    const raw = localStorage.getItem(LIST_CACHE_KEY);
+    if (!raw) return;
+    const cache = JSON.parse(raw);
+    for (const ev of Object.values(cache)) eventStore.add(ev);
+  } catch {}
+}
+
+function saveListEvent(event) {
+  try {
+    const key = listCacheKey(event);
+    if (!key) return;
+    const raw = localStorage.getItem(LIST_CACHE_KEY);
+    const cache = raw ? JSON.parse(raw) : {};
+    // Only overwrite if this event is newer than what we have
+    if (cache[key] && cache[key].created_at >= event.created_at) return;
+    cache[key] = event;
+    localStorage.setItem(LIST_CACHE_KEY, JSON.stringify(cache));
+  } catch {}
+}
+
+// Seed on module load (sync) then persist new profiles and list events reactively
 loadProfileCache();
+loadListCache();
 eventStore.insert$.subscribe(event => {
   if (event.kind === 0) saveProfileToCache(event);
+  if (LIST_KINDS.has(event.kind)) saveListEvent(event);
 });
 
 // ── Broadcast ───────────────────────────────────────────────────────────────
