@@ -20,8 +20,14 @@ function randomId() {
   return `circl_${hex}`;
 }
 
+// Persists decrypted output across remounts so navigation doesn't flash empty
+const _cache = new Map(); // pk → circles[]
+
 export default function useCircles({ pubkey, signAndPublish } = {}) {
-  const [circles, setCircles] = useState([]);
+  const [circles, setCircles] = useState(() => {
+    const pk = normPubkey(pubkey);
+    return isHexPubkey(pk) ? (_cache.get(pk) ?? []) : [];
+  });
   const circlesRef = useRef([]);
   useEffect(() => { circlesRef.current = circles; }, [circles]);
 
@@ -30,7 +36,9 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
     if (!isHexPubkey(pk)) { setCircles([]); return; }
 
     let cancelled = false;
-    setCircles([]);
+    let generation = 0;
+    // Only wipe state if we have nothing cached to show while re-fetching
+    if (!_cache.has(pk)) setCircles([]);
     const byId = new Map(); // d-tag → latest event
     let processTimer = null;
 
@@ -38,6 +46,7 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
 
     const process = async () => {
       if (cancelled || byId.size === 0) return;
+      const gen = ++generation;
 
       // On mobile, the signer may not be injected yet — wait up to 3 s
       if (!hasNip44() && [...byId.values()].some(ev => (ev.content || "").trim())) {
@@ -46,7 +55,7 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
           if (cancelled || hasNip44()) break;
         }
       }
-      if (cancelled) return;
+      if (cancelled || generation !== gen) return;
 
       const parsed = [];
       for (const [id, ev] of byId) {
@@ -70,7 +79,7 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
           } catch {
             decryptionFailed = true;
           }
-        } else if (content && !hasNip44()) {
+        } else if (content) {
           decryptionFailed = true;
         }
         if (!decryptionFailed) {
@@ -84,19 +93,33 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
         parsed.push({ id, title, members, decryptionFailed, event: ev });
       }
 
-      if (!cancelled) setCircles(parsed);
+      if (!cancelled && generation === gen) {
+        setCircles(parsed);
+        _cache.set(pk, parsed);
+      }
     };
+
+    const ingestRaw = raw => {
+      const d = raw.tags?.find(t => t[0] === "d")?.[1];
+      if (!d || !d.startsWith("circl_")) return false;
+      const existing = byId.get(d);
+      if (!existing || raw.created_at > existing.created_at) { byId.set(d, raw); return true; }
+      return false;
+    };
+
+    // Seed from eventStore immediately — no relay round-trip needed on remount
+    try {
+      const stored = eventStore.getTimeline([{ kinds: [CIRCLE_KIND], authors: [pk] }]) ?? [];
+      let seeded = false;
+      for (const ev of stored) { if (ingestRaw(ev)) seeded = true; }
+      if (seeded) processTimer = setTimeout(process, 0);
+    } catch {}
 
     // Use subscription (not request) so events arriving after EOSE aren't dropped
     const sub = pool.subscription(relayUrls, [{ kinds: [CIRCLE_KIND], authors: [pk] }]).subscribe({
       next: raw => {
         eventStore.add(raw);
-        if (cancelled) return;
-        const d = raw.tags?.find(t => t[0] === "d")?.[1];
-        if (!d || !d.startsWith("circl_")) return;
-        const existing = byId.get(d);
-        if (!existing || raw.created_at > existing.created_at) {
-          byId.set(d, raw);
+        if (!cancelled && ingestRaw(raw)) {
           clearTimeout(processTimer);
           processTimer = setTimeout(process, 300);
         }
@@ -216,7 +239,7 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
       const prev = circlesRef.current;
       const circle = prev.find(c => c.id === id);
       if (!circle) return;
-      const updated = { ...circle, members: circle.members.filter(pk => pk !== norm) };
+      const updated = { ...circle, members: circle.members.filter(p => p !== norm) };
       const next = prev.map(c => c.id === id ? updated : c);
       circlesRef.current = next;
       setCircles(next);

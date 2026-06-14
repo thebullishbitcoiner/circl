@@ -51,8 +51,14 @@ function hasNip44() {
   );
 }
 
+// Persists decrypted output across remounts so navigation doesn't flash empty
+const _cache = new Map(); // pk → items[]
+
 export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } = {}) {
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState(() => {
+    const pk = normPubkey(pubkey);
+    return isHexPubkey(pk) ? (_cache.get(pk) ?? []) : [];
+  });
   const itemsRef = useRef([]);
   useEffect(() => { itemsRef.current = items; }, [items]);
 
@@ -61,7 +67,9 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
     if (!isHexPubkey(pk)) { setItems([]); return; }
 
     let cancelled = false;
-    setItems([]);
+    let generation = 0;
+    // Only wipe state if we have nothing cached to show while re-fetching
+    if (!_cache.has(pk)) setItems([]);
     let latestEvent = null;
     let processTimer = null;
 
@@ -69,10 +77,11 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
 
     const process = async () => {
       if (cancelled || !latestEvent) return;
-      const latest = latestEvent;
+      const gen = ++generation;
+      const ev = latestEvent;
 
       let decrypted = [];
-      const content = (latest.content || "").trim();
+      const content = (ev.content || "").trim();
       // On mobile, the signer may not be injected yet — wait up to 3 s
       if (content && !hasNip44()) {
         for (let i = 0; i < 6; i++) {
@@ -80,16 +89,26 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
           if (cancelled || hasNip44()) break;
         }
       }
-      if (cancelled) return;
+      if (cancelled || generation !== gen) return;
       if (content && hasNip44()) {
         try {
-          const plain = await window.nostr.nip44.decrypt(latest.pubkey, latest.content);
+          const plain = await window.nostr.nip44.decrypt(ev.pubkey, ev.content);
           const parsed = JSON.parse(plain);
           if (Array.isArray(parsed)) decrypted = parsed;
         } catch {}
       }
-      if (!cancelled) setItems(mergeBookmarkTags(decrypted, latest.tags));
+      if (!cancelled && generation === gen) {
+        const merged = mergeBookmarkTags(decrypted, ev.tags);
+        setItems(merged);
+        _cache.set(pk, merged);
+      }
     };
+
+    // Seed from eventStore immediately — no relay round-trip needed on remount
+    try {
+      const stored = eventStore.getTimeline([{ kinds: [BOOKMARK_LIST_KIND], authors: [pk], limit: 1 }])?.[0];
+      if (stored) { latestEvent = stored; processTimer = setTimeout(process, 0); }
+    } catch {}
 
     // Use subscription (not request) so events arriving after EOSE aren't dropped
     const sub = pool.subscription(relayUrls, [{ kinds: [BOOKMARK_LIST_KIND], authors: [pk] }]).subscribe({

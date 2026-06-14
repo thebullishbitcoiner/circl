@@ -13,9 +13,18 @@ function hasNip44() {
   );
 }
 
+// Persists decrypted output across remounts so navigation doesn't flash empty
+const _cache = new Map(); // pk → { mutes, muteEvent }
+
 export default function useMutes({ pubkey, signAndPublish } = {}) {
-  const [mutes, setMutes] = useState([]);
-  const [muteEvent, setMuteEvent] = useState(null);
+  const [mutes, setMutes] = useState(() => {
+    const pk = normPubkey(pubkey);
+    return isHexPubkey(pk) ? (_cache.get(pk)?.mutes ?? []) : [];
+  });
+  const [muteEvent, setMuteEvent] = useState(() => {
+    const pk = normPubkey(pubkey);
+    return isHexPubkey(pk) ? (_cache.get(pk)?.muteEvent ?? null) : null;
+  });
   const mutesRef = useRef([]);
   useEffect(() => { mutesRef.current = mutes; }, [mutes]);
   // true when we found existing encrypted content we couldn't read — block publishing to avoid data loss
@@ -26,9 +35,10 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
     if (!isHexPubkey(pk)) { setMutes([]); unreadableRef.current = false; return; }
 
     let cancelled = false;
+    let generation = 0;
     unreadableRef.current = false;
-    setMutes([]);
-    setMuteEvent(null);
+    // Only wipe visible state if we have nothing cached to show while re-fetching
+    if (!_cache.has(pk)) { setMutes([]); setMuteEvent(null); }
     let latestEvent = null;
     let processTimer = null;
 
@@ -36,11 +46,12 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
 
     const process = async () => {
       if (cancelled || !latestEvent) return;
-      const latest = latestEvent;
+      const gen = ++generation;
+      const ev = latestEvent;
 
       let pubkeys = [];
       let decryptFailed = false;
-      const content = (latest.content || "").trim();
+      const content = (ev.content || "").trim();
       // On mobile, the signer may not be injected yet — wait up to 3 s
       if (content && !hasNip44()) {
         for (let i = 0; i < 6; i++) {
@@ -48,35 +59,42 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
           if (cancelled || hasNip44()) break;
         }
       }
-      if (cancelled) return;
+      if (cancelled || generation !== gen) return;
       if (content && hasNip44()) {
         try {
-          const plain = await window.nostr.nip44.decrypt(latest.pubkey, latest.content);
+          const plain = await window.nostr.nip44.decrypt(ev.pubkey, ev.content);
           const parsed = JSON.parse(plain);
           if (Array.isArray(parsed)) {
-            pubkeys = parsed.filter(pk => typeof pk === "string" && isHexPubkey(normPubkey(pk))).map(normPubkey);
+            pubkeys = parsed.filter(p => typeof p === "string" && isHexPubkey(normPubkey(p))).map(normPubkey);
           }
         } catch {
           decryptFailed = true;
         }
-      } else if (content && !hasNip44()) {
+      } else if (content) {
         decryptFailed = true;
       }
       // Public "p" tags fallback (only when no encrypted content was found)
       if (!decryptFailed) {
-        for (const t of latest.tags || []) {
+        for (const t of ev.tags || []) {
           if (t[0] === "p" && isHexPubkey(normPubkey(t[1]))) {
             const norm = normPubkey(t[1]);
             if (!pubkeys.includes(norm)) pubkeys.push(norm);
           }
         }
       }
-      if (!cancelled) {
+      if (!cancelled && generation === gen) {
         unreadableRef.current = decryptFailed;
         setMutes(pubkeys);
-        setMuteEvent(latest);
+        setMuteEvent(ev);
+        if (!decryptFailed) _cache.set(pk, { mutes: pubkeys, muteEvent: ev });
       }
     };
+
+    // Seed from eventStore immediately — no relay round-trip needed on remount
+    try {
+      const stored = eventStore.getTimeline([{ kinds: [MUTE_LIST_KIND], authors: [pk], limit: 1 }])?.[0];
+      if (stored) { latestEvent = stored; processTimer = setTimeout(process, 0); }
+    } catch {}
 
     // Use subscription (not request) so events arriving after EOSE aren't dropped
     const sub = pool.subscription(relayUrls, [{ kinds: [MUTE_LIST_KIND], authors: [pk] }]).subscribe({
@@ -139,7 +157,7 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
       const norm = normPubkey(targetPk);
       if (!isHexPubkey(norm)) return;
       const prev = mutesRef.current;
-      const next = prev.filter(pk => pk !== norm);
+      const next = prev.filter(p => p !== norm);
       if (next.length === prev.length) return;
       mutesRef.current = next;
       setMutes(next);
