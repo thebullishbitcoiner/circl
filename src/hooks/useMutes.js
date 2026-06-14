@@ -29,66 +29,75 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
     unreadableRef.current = false;
     setMutes([]);
     setMuteEvent(null);
-    const received = [];
+    let latestEvent = null;
+    let processTimer = null;
 
     const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
 
-    const sub = pool.request(relayUrls, [{ kinds: [MUTE_LIST_KIND], authors: [pk] }]).subscribe({
-      next: raw => { eventStore.add(raw); received.push(raw); },
-      complete: async () => {
-        if (cancelled) return;
-        const latest =
-          received.length === 0
-            ? null
-            : [...received].sort((a, b) => (b.created_at || 0) - (a.created_at || 0))[0];
+    const process = async () => {
+      if (cancelled || !latestEvent) return;
+      const latest = latestEvent;
 
-        if (!latest) { if (!cancelled) setMutes([]); return; }
-
-        let pubkeys = [];
-        let decryptFailed = false;
-        const content = (latest.content || "").trim();
-        // On mobile, the signer may not be injected yet at EOSE — wait up to 3 s
-        if (content && !hasNip44()) {
-          for (let i = 0; i < 6; i++) {
-            await new Promise(r => setTimeout(r, 500));
-            if (cancelled || hasNip44()) break;
-          }
+      let pubkeys = [];
+      let decryptFailed = false;
+      const content = (latest.content || "").trim();
+      // On mobile, the signer may not be injected yet — wait up to 3 s
+      if (content && !hasNip44()) {
+        for (let i = 0; i < 6; i++) {
+          await new Promise(r => setTimeout(r, 500));
+          if (cancelled || hasNip44()) break;
         }
-        if (cancelled) return;
-        if (content && hasNip44()) {
-          try {
-            const plain = await window.nostr.nip44.decrypt(latest.pubkey, latest.content);
-            const parsed = JSON.parse(plain);
-            if (Array.isArray(parsed)) {
-              pubkeys = parsed.filter(pk => typeof pk === "string" && isHexPubkey(normPubkey(pk))).map(normPubkey);
-            }
-          } catch {
-            decryptFailed = true;
+      }
+      if (cancelled) return;
+      if (content && hasNip44()) {
+        try {
+          const plain = await window.nostr.nip44.decrypt(latest.pubkey, latest.content);
+          const parsed = JSON.parse(plain);
+          if (Array.isArray(parsed)) {
+            pubkeys = parsed.filter(pk => typeof pk === "string" && isHexPubkey(normPubkey(pk))).map(normPubkey);
           }
-        } else if (content && !hasNip44()) {
+        } catch {
           decryptFailed = true;
         }
-        // Public "p" tags fallback (only when no encrypted content was found)
-        if (!decryptFailed) {
-          for (const t of latest.tags || []) {
-            if (t[0] === "p" && isHexPubkey(normPubkey(t[1]))) {
-              const norm = normPubkey(t[1]);
-              if (!pubkeys.includes(norm)) pubkeys.push(norm);
-            }
+      } else if (content && !hasNip44()) {
+        decryptFailed = true;
+      }
+      // Public "p" tags fallback (only when no encrypted content was found)
+      if (!decryptFailed) {
+        for (const t of latest.tags || []) {
+          if (t[0] === "p" && isHexPubkey(normPubkey(t[1]))) {
+            const norm = normPubkey(t[1]);
+            if (!pubkeys.includes(norm)) pubkeys.push(norm);
           }
         }
-        if (!cancelled) {
-          // If we found content we can't read, block any future publish to avoid overwriting foreign data
-          unreadableRef.current = decryptFailed;
-          setMutes(pubkeys);
-          setMuteEvent(latest);
+      }
+      if (!cancelled) {
+        unreadableRef.current = decryptFailed;
+        setMutes(pubkeys);
+        setMuteEvent(latest);
+      }
+    };
+
+    // Use subscription (not request) so events arriving after EOSE aren't dropped
+    const sub = pool.subscription(relayUrls, [{ kinds: [MUTE_LIST_KIND], authors: [pk] }]).subscribe({
+      next: raw => {
+        eventStore.add(raw);
+        if (!cancelled && (!latestEvent || raw.created_at > latestEvent.created_at)) {
+          latestEvent = raw;
+          clearTimeout(processTimer);
+          processTimer = setTimeout(process, 300);
         }
       },
       error: () => { if (!cancelled) setMutes([]); },
     });
 
+    // Hard cutoff: process whatever we have and close
+    const cutoffTimer = setTimeout(() => { sub.unsubscribe(); process(); }, 8000);
+
     return () => {
       cancelled = true;
+      clearTimeout(processTimer);
+      clearTimeout(cutoffTimer);
       sub.unsubscribe();
     };
   }, [pubkey]);

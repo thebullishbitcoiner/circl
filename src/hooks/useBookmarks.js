@@ -62,37 +62,54 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
 
     let cancelled = false;
     setItems([]);
-    const received = [];
+    let latestEvent = null;
+    let processTimer = null;
 
     const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
 
-    const sub = pool.request(relayUrls, [{ kinds: [BOOKMARK_LIST_KIND], authors: [pk] }]).subscribe({
-      next: raw => { eventStore.add(raw); received.push(raw); },
-      complete: async () => {
-        if (cancelled) return;
-        const latest =
-          received.length === 0
-            ? null
-            : [...received].sort((a, b) => (b.created_at || 0) - (a.created_at || 0))[0];
+    const process = async () => {
+      if (cancelled || !latestEvent) return;
+      const latest = latestEvent;
 
-        if (!latest) { if (!cancelled) setItems([]); return; }
-
-        let decrypted = [];
-        const content = (latest.content || "").trim();
-        if (content && hasNip44()) {
-          try {
-            const plain = await window.nostr.nip44.decrypt(latest.pubkey, latest.content);
-            const parsed = JSON.parse(plain);
-            if (Array.isArray(parsed)) decrypted = parsed;
-          } catch {}
+      let decrypted = [];
+      const content = (latest.content || "").trim();
+      // On mobile, the signer may not be injected yet — wait up to 3 s
+      if (content && !hasNip44()) {
+        for (let i = 0; i < 6; i++) {
+          await new Promise(r => setTimeout(r, 500));
+          if (cancelled || hasNip44()) break;
         }
-        if (!cancelled) setItems(mergeBookmarkTags(decrypted, latest.tags));
+      }
+      if (cancelled) return;
+      if (content && hasNip44()) {
+        try {
+          const plain = await window.nostr.nip44.decrypt(latest.pubkey, latest.content);
+          const parsed = JSON.parse(plain);
+          if (Array.isArray(parsed)) decrypted = parsed;
+        } catch {}
+      }
+      if (!cancelled) setItems(mergeBookmarkTags(decrypted, latest.tags));
+    };
+
+    // Use subscription (not request) so events arriving after EOSE aren't dropped
+    const sub = pool.subscription(relayUrls, [{ kinds: [BOOKMARK_LIST_KIND], authors: [pk] }]).subscribe({
+      next: raw => {
+        eventStore.add(raw);
+        if (!cancelled && (!latestEvent || raw.created_at > latestEvent.created_at)) {
+          latestEvent = raw;
+          clearTimeout(processTimer);
+          processTimer = setTimeout(process, 300);
+        }
       },
       error: () => { if (!cancelled) setItems([]); },
     });
 
+    const cutoffTimer = setTimeout(() => { sub.unsubscribe(); process(); }, 8000);
+
     return () => {
       cancelled = true;
+      clearTimeout(processTimer);
+      clearTimeout(cutoffTimer);
       sub.unsubscribe();
     };
   }, [pubkey, refreshKey]);

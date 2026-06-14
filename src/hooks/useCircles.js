@@ -31,79 +31,85 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
 
     let cancelled = false;
     setCircles([]);
-    const received = [];
+    const byId = new Map(); // d-tag → latest event
+    let processTimer = null;
 
     const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
 
-    const sub = pool.request(relayUrls, [{ kinds: [CIRCLE_KIND], authors: [pk] }]).subscribe({
-      next: raw => { eventStore.add(raw); received.push(raw); },
-      complete: async () => {
-        if (cancelled) return;
+    const process = async () => {
+      if (cancelled || byId.size === 0) return;
 
-        // Group by d tag, keep latest per id
-        const byId = new Map();
-        for (const ev of received) {
-          const d = ev.tags?.find(t => t[0] === "d")?.[1];
-          if (!d || !d.startsWith("circl_")) continue;
-          const existing = byId.get(d);
-          if (!existing || ev.created_at > existing.created_at) byId.set(d, ev);
+      // On mobile, the signer may not be injected yet — wait up to 3 s
+      if (!hasNip44() && [...byId.values()].some(ev => (ev.content || "").trim())) {
+        for (let i = 0; i < 6; i++) {
+          await new Promise(r => setTimeout(r, 500));
+          if (cancelled || hasNip44()) break;
         }
+      }
+      if (cancelled) return;
 
-        // On mobile, the signer may not be injected yet at EOSE — wait up to 3 s
-        if (!hasNip44() && [...byId.values()].some(ev => (ev.content || "").trim())) {
-          for (let i = 0; i < 6; i++) {
-            await new Promise(r => setTimeout(r, 500));
-            if (cancelled || hasNip44()) break;
-          }
-        }
-        if (cancelled) return;
+      const parsed = [];
+      for (const [id, ev] of byId) {
+        const titleTag = ev.tags?.find(t => t[0] === "title");
+        const title = titleTag?.[1] ?? "Untitled Circle";
 
-        const parsed = [];
-        for (const [id, ev] of byId) {
-          const titleTag = ev.tags?.find(t => t[0] === "title");
-          const title = titleTag?.[1] ?? "Untitled Circle";
+        if (ev.tags?.some(t => t[0] === "deleted")) continue;
 
-          // Skip deleted circles
-          if (ev.tags?.some(t => t[0] === "deleted")) continue;
-
-          let members = [];
-          let decryptionFailed = false;
-          const content = (ev.content || "").trim();
-          if (content && hasNip44()) {
-            try {
-              const plain = await window.nostr.nip44.decrypt(ev.pubkey, ev.content);
-              const arr = JSON.parse(plain);
-              if (Array.isArray(arr)) {
-                members = arr
-                  .filter(x => typeof x === "string" && isHexPubkey(normPubkey(x)))
-                  .map(normPubkey);
-              }
-            } catch {
-              decryptionFailed = true;
+        let members = [];
+        let decryptionFailed = false;
+        const content = (ev.content || "").trim();
+        if (content && hasNip44()) {
+          try {
+            const plain = await window.nostr.nip44.decrypt(ev.pubkey, ev.content);
+            const arr = JSON.parse(plain);
+            if (Array.isArray(arr)) {
+              members = arr
+                .filter(x => typeof x === "string" && isHexPubkey(normPubkey(x)))
+                .map(normPubkey);
             }
-          } else if (content && !hasNip44()) {
+          } catch {
             decryptionFailed = true;
           }
-          // Fallback: public p tags (only when no encrypted content)
-          if (!decryptionFailed) {
-            for (const t of ev.tags || []) {
-              if (t[0] === "p" && isHexPubkey(normPubkey(t[1]))) {
-                const norm = normPubkey(t[1]);
-                if (!members.includes(norm)) members.push(norm);
-              }
+        } else if (content && !hasNip44()) {
+          decryptionFailed = true;
+        }
+        if (!decryptionFailed) {
+          for (const t of ev.tags || []) {
+            if (t[0] === "p" && isHexPubkey(normPubkey(t[1]))) {
+              const norm = normPubkey(t[1]);
+              if (!members.includes(norm)) members.push(norm);
             }
           }
-
-          parsed.push({ id, title, members, decryptionFailed, event: ev });
         }
+        parsed.push({ id, title, members, decryptionFailed, event: ev });
+      }
 
-        if (!cancelled) setCircles(parsed);
+      if (!cancelled) setCircles(parsed);
+    };
+
+    // Use subscription (not request) so events arriving after EOSE aren't dropped
+    const sub = pool.subscription(relayUrls, [{ kinds: [CIRCLE_KIND], authors: [pk] }]).subscribe({
+      next: raw => {
+        eventStore.add(raw);
+        if (cancelled) return;
+        const d = raw.tags?.find(t => t[0] === "d")?.[1];
+        if (!d || !d.startsWith("circl_")) return;
+        const existing = byId.get(d);
+        if (!existing || raw.created_at > existing.created_at) {
+          byId.set(d, raw);
+          clearTimeout(processTimer);
+          processTimer = setTimeout(process, 300);
+        }
       },
       error: () => { if (!cancelled) setCircles([]); },
     });
 
+    const cutoffTimer = setTimeout(() => { sub.unsubscribe(); process(); }, 8000);
+
     return () => {
       cancelled = true;
+      clearTimeout(processTimer);
+      clearTimeout(cutoffTimer);
       sub.unsubscribe();
     };
   }, [pubkey]);
