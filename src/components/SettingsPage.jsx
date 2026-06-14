@@ -551,6 +551,130 @@ function BlossomSubPage({ onBack, servers, saveServers }) {
   );
 }
 
+// ── Storage sub-page ─────────────────────────────────────────────────────────
+
+const KEY_LABELS = {
+  circl_profiles_v1:   "Profile cache",
+  circl_lists_v1:      "Mute / bookmark / circle events",
+  circl_zap_req_cache: "Zap request cache",
+};
+
+function formatBytes(n) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(2)} MB`;
+}
+
+function getAppKeys() {
+  const out = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith("circl_")) continue;
+      const raw = localStorage.getItem(key) ?? "";
+      out.push({ key, size: raw.length });
+    }
+  } catch {}
+  return out.sort((a, b) => a.key.localeCompare(b.key));
+}
+
+function StorageDetailPage({ storageKey, onBack, onDeleted }) {
+  const raw = localStorage.getItem(storageKey) ?? "";
+  let pretty = raw;
+  let summary = null;
+  try {
+    const parsed = JSON.parse(raw);
+    pretty = JSON.stringify(parsed, null, 2);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
+      summary = `${Object.keys(parsed).length} entries`;
+    else if (Array.isArray(parsed))
+      summary = `${parsed.length} items`;
+  } catch {}
+  const MAX_DISPLAY = 60000;
+  const display = pretty.length > MAX_DISPLAY ? pretty.slice(0, MAX_DISPLAY) + "\n\n… [truncated]" : pretty;
+
+  function del() {
+    localStorage.removeItem(storageKey);
+    onDeleted();
+  }
+
+  return (
+    <SubPage title={storageKey} onBack={onBack}>
+      <div style={{ padding: "12px 16px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <span style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif" }}>
+            {summary ? `${summary} · ` : ""}{formatBytes(raw.length)}
+          </span>
+          <button onClick={del} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #E05C8A", background: "transparent", color: "#E05C8A", fontSize: 12, fontFamily: "'DM Sans',sans-serif", cursor: "pointer" }}>
+            Delete
+          </button>
+        </div>
+        <pre style={{
+          fontFamily: "monospace", fontSize: 11, color: "var(--text)",
+          background: "var(--surface)", border: "1px solid var(--border)",
+          borderRadius: 8, padding: 12, margin: 0,
+          overflow: "auto", maxHeight: "62vh",
+          whiteSpace: "pre-wrap", wordBreak: "break-all",
+        }}>{display}</pre>
+      </div>
+    </SubPage>
+  );
+}
+
+function StorageSubPage({ onBack }) {
+  const [keys, setKeys] = useState(getAppKeys);
+  const [selectedKey, setSelectedKey] = useState(null);
+
+  if (selectedKey) {
+    return (
+      <StorageDetailPage
+        storageKey={selectedKey}
+        onBack={() => setSelectedKey(null)}
+        onDeleted={() => { setSelectedKey(null); setKeys(getAppKeys()); }}
+      />
+    );
+  }
+
+  const totalSize = keys.reduce((s, k) => s + k.size, 0);
+
+  return (
+    <SubPage title="Storage" onBack={onBack}>
+      <div style={{ padding: "12px 16px 0" }}>
+        {keys.length === 0 ? (
+          <div style={{ fontSize: 13, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", padding: "8px 0" }}>
+            No local data stored
+          </div>
+        ) : (
+          <>
+            <div style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", marginBottom: 10 }}>
+              {keys.length} item{keys.length !== 1 ? "s" : ""} · {formatBytes(totalSize)} total
+            </div>
+            {keys.map(({ key, size }, i) => (
+              <div
+                key={key}
+                style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 0", borderBottom: i < keys.length - 1 ? "1px solid var(--border)" : "none", cursor: "pointer" }}
+                onClick={() => setSelectedKey(key)}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "calc(var(--font-base) - 2px)", fontFamily: "monospace", color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{key}</div>
+                  {KEY_LABELS[key] && (
+                    <div style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", marginTop: 2 }}>{KEY_LABELS[key]}</div>
+                  )}
+                </div>
+                <span style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", flexShrink: 0 }}>{formatBytes(size)}</span>
+                <button
+                  onClick={e => { e.stopPropagation(); localStorage.removeItem(key); setKeys(getAppKeys()); }}
+                  style={{ padding: "3px 9px", borderRadius: 6, border: "1px solid var(--border)", background: "transparent", color: "var(--text-faint)", fontSize: "calc(var(--font-base) + 2px)", fontFamily: "'DM Sans',sans-serif", cursor: "pointer", lineHeight: 1, flexShrink: 0 }}
+                >×</button>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    </SubPage>
+  );
+}
+
 // ── Main settings page ────────────────────────────────────────────────────────
 
 export default function SettingsPage({
@@ -588,6 +712,9 @@ export default function SettingsPage({
   }
   if (subPage === "blossom") {
     return <BlossomSubPage onBack={() => setSubPage(null)} servers={blossomServers} saveServers={saveBlossomServers} />;
+  }
+  if (subPage === "storage") {
+    return <StorageSubPage onBack={() => setSubPage(null)} />;
   }
 
   const walletSub = wallet?.nwc_uri
@@ -652,6 +779,14 @@ export default function SettingsPage({
               ? `${blossomServers.length} server${blossomServers.length > 1 ? "s" : ""} configured`
               : "Media server storage"}
           </div>
+        </div>
+        <div style={{ color: "var(--text-muted)", fontSize: 18 }}>›</div>
+      </div>
+
+      <div className="settings-row" onClick={() => setSubPage("storage")}>
+        <div>
+          <div className="settings-row-label">Storage</div>
+          <div className="settings-row-sub">View and clear local cache</div>
         </div>
         <div style={{ color: "var(--text-muted)", fontSize: 18 }}>›</div>
       </div>
