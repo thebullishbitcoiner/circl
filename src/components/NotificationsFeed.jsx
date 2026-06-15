@@ -90,10 +90,11 @@ function NotePreview({ ev, profiles }) {
     const text = (title || summary || "").trim();
     return text ? <div className="notif-preview">{text}</div> : null;
   }
-  if (typeof ev.content !== "string" || !ev.content.trim()) return null;
+  const text = (ev.content || "").replace(/nostr:\S+/g, "").trim();
+  if (!text) return null;
   return (
     <div className="notif-preview">
-      <NoteContent content={ev.content} tags={ev.tags} profiles={profiles} allEvents={[]} allowEmbeds={false} className="notif-note-text" collapsible />
+      <NoteContent content={text} tags={ev.tags} profiles={profiles} allEvents={[]} allowEmbeds={false} className="notif-note-text" collapsible />
     </div>
   );
 }
@@ -196,19 +197,48 @@ export default function NotificationsFeed({ items, profiles: propProfiles, onOpe
           const zappedKind = zappedEv?.kind;
           if (zappedKind === 9041) {
             headline = `zapped your goal ${satsStr} ${satsLabel}`;
+            detail = comment;
           } else if (zappedKind === 1068 || zappedKind === 6969) {
-            headline = `zap-voted in your poll ${satsStr} ${satsLabel}`;
+            let optionLabel = null;
+            const descTag = ev.tags?.find(t => t[0] === "description");
+            if (descTag) {
+              try {
+                const zapReq = JSON.parse(descTag[1]);
+                const optId = zapReq.tags?.find(t => t[0] === "poll_option")?.[1];
+                if (optId && zappedEv) {
+                  optionLabel = zappedEv.tags?.find(t => t[0] === "poll_option" && t[1] === optId)?.[2] ?? null;
+                }
+              } catch {}
+            }
+            headline = `voted ${satsStr} ${satsLabel} in your zap poll`;
+            detail = optionLabel ?? "";
           } else if (zappedEv) {
             headline = `zapped your note ${satsStr} ${satsLabel}`;
+            detail = comment;
           } else {
             headline = `zapped you ${satsStr} ${satsLabel}`;
+            detail = comment;
           }
-          detail = comment;
           preview = zappedEv ? <NotePreview ev={zappedEv} profiles={profiles} /> : null;
         } else {
-          ({ headline, detail } = getNotificationSummary(ev));
-          if (ev.kind === 1 || ev.kind === 30023) {
+          if (ev.kind === 1) {
+            const rootId = ev.tags?.find(t => t[0] === "e" && t[3] === "root")?.[1];
+            const rootEv = rootId ? (evById.get(rootId) ?? eventStore.getTimeline([{ ids: [rootId] }])?.[0]) : null;
+            if (rootEv?.kind === 6969) {
+              headline = "Replied to your zap poll";
+              detail = "";
+            } else if (rootEv?.kind === 1068) {
+              headline = "Replied to your poll";
+              detail = "";
+            } else {
+              ({ headline, detail } = getNotificationSummary(ev));
+            }
             preview = <NotePreview ev={ev} profiles={profiles} />;
+          } else {
+            ({ headline, detail } = getNotificationSummary(ev));
+            if (ev.kind === 30023) {
+              preview = <NotePreview ev={ev} profiles={profiles} />;
+            }
           }
         }
 
