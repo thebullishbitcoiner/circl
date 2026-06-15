@@ -98,14 +98,6 @@ function DetailRow({ label, value, mono = false, wrap = false, pre = false }) {
   );
 }
 
-function SectionLabel({ children }) {
-  return (
-    <div style={{ padding: "14px 16px 4px", fontSize: 11, fontWeight: 600, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-      {children}
-    </div>
-  );
-}
-
 function resolvedPubkeySource(tx) {
   const zr = getZapReq(tx);
   const metaNostr = tx.metadata?.nostr;
@@ -117,6 +109,91 @@ function resolvedPubkeySource(tx) {
   if (metaNostr?.pubkey) return { pk: metaNostr.pubkey, source: "metadata.nostr.pubkey" };
   if (zr?.pubkey) return { pk: zr.pubkey, source: "zap request pubkey field" };
   return { pk: null, source: "none found" };
+}
+
+function TxDetailCard({ tx, pk, profiles, onOpenProfile }) {
+  const [expanded, setExpanded] = useState(false);
+  const isIncoming = tx.type === "incoming";
+  const feesSats = tx.fees_paid ? Math.round(tx.fees_paid / 1000) : 0;
+  const { pk: resolvedPk, source: pkSource } = resolvedPubkeySource(tx);
+
+  return (
+    <div style={{ margin: "12px 16px", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+      {/* Header: avatar + name + nip05 + date */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px" }}>
+        {pk && (
+          <div style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => onOpenProfile?.(pk)}>
+            <Avatar pk={pk} profiles={profiles} size={44} />
+          </div>
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {pk && (
+            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {displayName(pk, profiles)}
+            </div>
+          )}
+          {pk && (
+            <div style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 1 }}>
+              {nip05OrNpub(pk, profiles)}
+            </div>
+          )}
+          <div style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", marginTop: pk ? 3 : 0 }}>
+            {fmtDate(tx.settled_at || tx.created_at)}
+          </div>
+        </div>
+      </div>
+
+      {/* Collapsible toggle */}
+      <button
+        onClick={() => setExpanded(v => !v)}
+        style={{
+          width: "100%", background: "none", border: "none",
+          borderTop: "1px solid var(--border)",
+          padding: "10px 16px",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          cursor: "pointer",
+          color: "var(--text-muted)",
+          fontSize: 11, fontFamily: "'DM Sans',sans-serif", fontWeight: 600,
+          textTransform: "uppercase", letterSpacing: "0.05em",
+        }}
+      >
+        Transaction details
+        <span style={{ fontSize: 9, display: "inline-block", transform: expanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.15s" }}>▼</span>
+      </button>
+
+      {expanded && (
+        <>
+          <DetailRow label="Direction"    value={isIncoming ? "Received" : "Sent"} />
+          <DetailRow label="Status"       value={tx.state} />
+          {feesSats > 0 && <DetailRow label="Fees" value={`${feesSats} sats`} />}
+          <DetailRow label="Payment Hash" value={tx.payment_hash} mono wrap />
+          {tx.preimage && <DetailRow label="Preimage" value={tx.preimage} mono wrap />}
+          {tx.invoice  && <DetailRow label="Invoice"  value={tx.invoice}  mono wrap />}
+          <div style={{ padding: "10px 16px 4px", fontSize: 11, fontWeight: 600, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", borderTop: "1px solid var(--border)" }}>
+            Raw Data
+          </div>
+          <DetailRow label="Resolved Pubkey Source" value={`${pkSource}${resolvedPk ? `: ${resolvedPk.slice(0, 16)}…` : ""}`} />
+          <DetailRow
+            label="tx.description"
+            value={tx.description ? (tx.description.trim().startsWith("{") ? "(JSON)" : tx.description) : "(empty)"}
+            wrap
+          />
+          {tx.invoice && (() => {
+            try {
+              const desc = decodeInvoice(tx.invoice)?.description;
+              if (!desc) return <DetailRow label="invoice description" value="(empty)" />;
+              return <DetailRow label="invoice description" value={desc.trim().startsWith("{") ? "(JSON)" : desc} wrap />;
+            } catch { return <DetailRow label="invoice description" value="(decode error)" />; }
+          })()}
+          <DetailRow
+            label="tx.metadata"
+            value={tx.metadata ? JSON.stringify(tx.metadata, null, 2) : "(none)"}
+            mono pre
+          />
+        </>
+      )}
+    </div>
+  );
 }
 
 function ZappedNote({ noteId, relayHints, profiles, onOpenProfile, onOpenThread }) {
@@ -177,17 +254,13 @@ function ZappedNote({ noteId, relayHints, profiles, onOpenProfile, onOpenThread 
 
 export default function TxDetailPage({ tx, profiles, onBack, onOpenProfile, onOpenThread }) {
   const pk         = nostrPubkeyFromTx(tx);
-  const name       = pk ? displayName(pk, profiles) : null;
   const comment    = txComment(tx);
   const isIncoming = tx.type === "incoming";
-  const feesSats   = tx.fees_paid ? Math.round(tx.fees_paid / 1000) : 0;
   const zapReq     = getZapReq(tx);
 
-  const zapReqTags     = zapReq?.tags ?? [];
-  const zappedNoteId   = zapReqTags.find(t => t[0] === "e")?.[1] ?? null;
+  const zapReqTags      = zapReq?.tags ?? [];
+  const zappedNoteId    = zapReqTags.find(t => t[0] === "e")?.[1] ?? null;
   const zapReqRelayUrls = (() => { const r = zapReqTags.find(t => t[0] === "relays"); return r ? r.slice(1) : []; })();
-
-  const { pk: resolvedPk, source: pkSource } = resolvedPubkeySource(tx);
 
   return (
     <div className="slide-panel-scroll">
@@ -198,11 +271,6 @@ export default function TxDetailPage({ tx, profiles, onBack, onOpenProfile, onOp
 
       {/* Amount hero */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "28px 16px 24px", borderBottom: "1px solid var(--border)" }}>
-        {pk && (
-          <div style={{ marginBottom: 12, cursor: "pointer" }} onClick={() => onOpenProfile?.(pk)}>
-            <Avatar pk={pk} profiles={profiles} size={56} />
-          </div>
-        )}
         <div style={{ fontSize: 38, fontWeight: 700, letterSpacing: "-0.02em", color: isIncoming ? "#4CAF50" : "var(--text)", fontFamily: "'DM Sans',sans-serif", lineHeight: 1 }}>
           {isIncoming ? "+" : "−"}{fmtSatsFull(tx.amount)}
         </div>
@@ -215,42 +283,13 @@ export default function TxDetailPage({ tx, profiles, onBack, onOpenProfile, onOp
       </div>
 
       <div style={{ paddingBottom: 40 }}>
-        {/* Payment details */}
-        <SectionLabel>Payment</SectionLabel>
-        <DetailRow label="Direction"    value={isIncoming ? "Received" : "Sent"} />
-        <DetailRow label="Status"       value={tx.state} />
-        {name && <DetailRow label={isIncoming ? "From" : "To"} value={name} />}
-        <DetailRow label="Date"         value={fmtDate(tx.settled_at || tx.created_at)} />
-        {feesSats > 0 && <DetailRow label="Fees" value={`${feesSats} sats`} />}
-        <DetailRow label="Payment Hash" value={tx.payment_hash} mono wrap />
-        {tx.preimage && <DetailRow label="Preimage" value={tx.preimage} mono wrap />}
-        {tx.invoice  && <DetailRow label="Invoice"  value={tx.invoice}  mono wrap />}
+        <TxDetailCard tx={tx} pk={pk} profiles={profiles} onOpenProfile={onOpenProfile} />
 
-        {/* Raw data for debugging */}
-        <SectionLabel>Raw Data</SectionLabel>
-        <DetailRow label="Resolved Pubkey Source" value={`${pkSource}${resolvedPk ? `: ${resolvedPk.slice(0, 16)}…` : ""}`} />
-        <DetailRow
-          label="tx.description"
-          value={tx.description ? (tx.description.trim().startsWith("{") ? "(JSON)" : tx.description) : "(empty)"}
-          wrap
-        />
-        {tx.invoice && (() => {
-          try {
-            const desc = decodeInvoice(tx.invoice)?.description;
-            if (!desc) return <DetailRow label="invoice description" value="(empty)" />;
-            return <DetailRow label="invoice description" value={desc.trim().startsWith("{") ? "(JSON)" : desc} wrap />;
-          } catch { return <DetailRow label="invoice description" value="(decode error)" />; }
-        })()}
-        <DetailRow
-          label="tx.metadata"
-          value={tx.metadata ? JSON.stringify(tx.metadata, null, 2) : "(none)"}
-          mono pre
-        />
-
-        {/* Zapped Note */}
         {zappedNoteId && (
           <>
-            <SectionLabel>Zapped Note</SectionLabel>
+            <div style={{ padding: "14px 16px 4px", fontSize: 11, fontWeight: 600, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              Zapped Note
+            </div>
             <ZappedNote noteId={zappedNoteId} relayHints={zapReqRelayUrls} profiles={profiles} onOpenProfile={onOpenProfile} onOpenThread={onOpenThread} />
           </>
         )}
