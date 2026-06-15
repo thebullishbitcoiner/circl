@@ -43,10 +43,14 @@ export default function useFollows({ pubkey, signAndPublish }) {
     if (!signAndPublish || !rawEvent) return;
     const norm = normPubkey(targetPk);
     const newTags = rawEvent.tags.filter(t => !(t[0] === "p" && normPubkey(t[1]) === norm));
+    // Optimistic update
+    setFollows(prev => prev.filter(pk => pk !== norm));
+    setRawEvent(prev => ({ ...prev, tags: newTags }));
     const ev = await signAndPublish({ kind: 3, tags: newTags, content: rawEvent.content ?? "" });
-    if (ev) {
-      setFollows(prev => prev.filter(pk => pk !== norm));
-      setRawEvent(prev => ({ ...prev, tags: newTags }));
+    if (!ev) {
+      // Revert on failure
+      setFollows(prev => prev.includes(norm) ? prev : [...prev, norm]);
+      setRawEvent(prev => rawEvent);
     }
   }, [rawEvent, signAndPublish]);
 
@@ -56,10 +60,14 @@ export default function useFollows({ pubkey, signAndPublish }) {
     const baseTags = rawEvent?.tags ?? [];
     if (baseTags.some(t => t[0] === "p" && normPubkey(t[1]) === norm)) return;
     const newTags = [...baseTags, ["p", norm]];
+    // Optimistic update
+    setFollows(prev => prev.includes(norm) ? prev : [...prev, norm]);
+    setRawEvent(prev => prev ? { ...prev, tags: newTags } : { tags: newTags, content: "" });
     const ev = await signAndPublish({ kind: 3, tags: newTags, content: rawEvent?.content ?? "" });
-    if (ev) {
-      setFollows(prev => prev.includes(norm) ? prev : [...prev, norm]);
-      setRawEvent(prev => prev ? { ...prev, tags: newTags } : { tags: newTags, content: "" });
+    if (!ev) {
+      // Revert on failure
+      setFollows(prev => prev.filter(pk => pk !== norm));
+      setRawEvent(prev => rawEvent);
     }
   }, [rawEvent, signAndPublish]);
 

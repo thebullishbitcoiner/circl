@@ -25,6 +25,8 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap }) {
     const authors = (follows || []).filter(isHexPubkey);
     if (!authors.length) return;
     setLoading(true);
+    setEvents([]);
+    seen.current = new Set();
 
     const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
     const since = Math.floor(Date.now() / 1000) - 60 * 60 * 48;
