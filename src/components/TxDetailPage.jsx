@@ -67,8 +67,16 @@ function CopyButton({ text }) {
   );
 }
 
-function DetailRow({ label, value, mono = false, wrap = false, pre = false }) {
+function DetailRow({ label, value, mono = false, wrap = false, pre = false, inline = false }) {
   if (!value) return null;
+  if (inline) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "10px 16px", borderBottom: "1px solid var(--border)" }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", flexShrink: 0 }}>{label}</span>
+        <span style={{ fontSize: 13, color: "var(--text)", fontFamily: "'DM Sans',sans-serif", textAlign: "right" }}>{value}</span>
+      </div>
+    );
+  }
   return (
     <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
@@ -113,14 +121,13 @@ function resolvedPubkeySource(tx) {
 
 function TxDetailCard({ tx, pk, profiles, onOpenProfile }) {
   const [expanded, setExpanded] = useState(false);
-  const isIncoming = tx.type === "incoming";
   const feesSats = tx.fees_paid ? Math.round(tx.fees_paid / 1000) : 0;
   const { pk: resolvedPk, source: pkSource } = resolvedPubkeySource(tx);
 
   return (
     <div style={{ margin: "12px 16px", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
       {/* Header: avatar + name + nip05 */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px 10px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px 10px", borderBottom: "1px solid var(--border)" }}>
         {pk && (
           <div style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => onOpenProfile?.(pk)}>
             <Avatar pk={pk} profiles={profiles} size={44} />
@@ -139,11 +146,10 @@ function TxDetailCard({ tx, pk, profiles, onOpenProfile }) {
           )}
         </div>
       </div>
-      {/* Date row */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", borderTop: "1px solid var(--border)" }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>Date</span>
-        <span style={{ fontSize: 13, color: "var(--text)", fontFamily: "'DM Sans',sans-serif" }}>{fmtDate(tx.settled_at || tx.created_at)}</span>
-      </div>
+      {/* Always-visible rows */}
+      <DetailRow label="Date"   value={fmtDate(tx.settled_at || tx.created_at)} inline />
+      <DetailRow label="Status" value={tx.state} inline />
+      {feesSats > 0 && <DetailRow label="Fees" value={`${feesSats} sats`} inline />}
 
       {/* Collapsible toggle */}
       <button
@@ -165,9 +171,6 @@ function TxDetailCard({ tx, pk, profiles, onOpenProfile }) {
 
       {expanded && (
         <>
-          <DetailRow label="Direction"    value={isIncoming ? "Received" : "Sent"} />
-          <DetailRow label="Status"       value={tx.state} />
-          {feesSats > 0 && <DetailRow label="Fees" value={`${feesSats} sats`} />}
           <DetailRow label="Payment Hash" value={tx.payment_hash} mono wrap />
           {tx.preimage && <DetailRow label="Preimage" value={tx.preimage} mono wrap />}
           {tx.invoice  && <DetailRow label="Invoice"  value={tx.invoice}  mono wrap />}
