@@ -149,7 +149,7 @@ function TxDetailCard({ tx, pk, profiles, onOpenProfile }) {
       {/* Always-visible rows */}
       <DetailRow label="Date"   value={fmtDate(tx.settled_at || tx.created_at)} inline />
       <DetailRow label="Status" value={tx.state} inline />
-      {feesSats > 0 && <DetailRow label="Fees" value={`${feesSats} sats`} inline />}
+      {feesSats > 0 && <DetailRow label="Fee" value={`${feesSats} ${feesSats === 1 ? "sat" : "sats"}`} inline />}
 
       {/* Collapsible toggle */}
       <button
