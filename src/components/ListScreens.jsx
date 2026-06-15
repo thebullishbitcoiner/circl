@@ -1,9 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Avatar from "./Avatar.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
 import { Bk, Rpi } from "./icons.jsx";
 import { displayName, avatarUrl, avatarInitial, fmtSats, relativeTime, nip05OrNpub, normPubkey } from "../utils.js";
-import { eventStore } from "../nostr.js";
+import { eventStore, pool } from "../nostr.js";
+import { RELAYS } from "../constants.js";
 import NoteContent from "./NoteContent.jsx";
 import useProfiles from "../hooks/useProfiles.js";
 
@@ -16,7 +17,7 @@ function zapsRowLabel(pk, profiles) {
 }
 
 function resolveCustomEmoji(emoji, tags) {
-  const m = emoji?.match(/^:([a-zA-Z0-9_]+):$/);
+  const m = emoji?.match(/^:([a-zA-Z0-9_-]+):$/);
   if (!m) return null;
   return tags?.find(t => t[0] === "emoji" && t[1] === m[1])?.[2] ?? null;
 }
@@ -89,9 +90,28 @@ export function ZapsScreen({ eventId, zaps, profiles: propProfiles, onBack, onOp
   );
 }
 
-export function ReactionsScreen({ eventId, reactions, profiles: propProfiles, onBack, onOpenProfile }) {
+export function ReactionsScreen({ eventId, reactions: seedReactions, profiles: propProfiles, onBack, onOpenProfile }) {
   const [jsonEvent, setJsonEvent] = useState(null);
-  const items = useMemo(() => reactions.map(r => typeof r === "string" ? { pk: r, emoji: "🧡" } : r), [reactions]);
+  const [items, setItems] = useState(() =>
+    (seedReactions || []).map(r => typeof r === "string" ? { pk: r, emoji: "💜" } : r)
+  );
+
+  useEffect(() => {
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const sub = pool.request(relayUrls, [{ kinds: [7], "#e": [eventId] }]).subscribe({
+      next: raw => {
+        if (!raw.content) return;
+        eventStore.add(raw);
+        const emoji = raw.content === "+" ? "💜" : raw.content;
+        setItems(prev => {
+          if (prev.some(r => r.id === raw.id)) return prev;
+          return [...prev, { pk: raw.pubkey, emoji, tags: raw.tags, id: raw.id, created_at: raw.created_at }];
+        });
+      },
+    });
+    return () => sub.unsubscribe();
+  }, [eventId]);
+
   const reactorPks = useMemo(() => [...new Set(items.map(r => r.pk).filter(Boolean))], [items]);
   const { profiles: localProfiles } = useProfiles({ pubkeys: reactorPks });
   const profiles = useMemo(() => ({ ...propProfiles, ...localProfiles }), [propProfiles, localProfiles]);
@@ -116,7 +136,7 @@ export function ReactionsScreen({ eventId, reactions, profiles: propProfiles, on
             <div style={{ fontSize: 18, flexShrink: 0 }}>
               {customUrl
                 ? <img src={customUrl} alt={r.emoji} className="note-custom-emoji" style={{ height: 22, verticalAlign: "middle" }} />
-                : (r.emoji || "🧡")}
+                : (r.emoji || "💜")}
             </div>
             {r.id && <ThreeDot onClick={() => openJson(r)} />}
           </div>

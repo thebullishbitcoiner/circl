@@ -68,7 +68,7 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap }) {
         if (raw.kind === 7) {
           const targetId = raw.tags.find(t => t[0] === "e")?.[1];
           if (targetId && raw.content) {
-            setLocalReaction?.(targetId, raw.pubkey, raw.content === "+" ? "🧡" : raw.content, { id: raw.id, tags: raw.tags });
+            setLocalReaction?.(targetId, raw.pubkey, raw.content === "+" ? "💜" : raw.content, { id: raw.id, tags: raw.tags });
           }
         }
         if (raw.kind === 9735) {

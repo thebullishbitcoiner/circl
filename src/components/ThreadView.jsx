@@ -361,7 +361,7 @@ export default function ThreadView({
     }]).subscribe({
       next: raw => {
         if (!raw.content) return;
-        setLocalReaction?.(focusedEvent.id, raw.pubkey, raw.content === "+" ? "🧡" : raw.content, { id: raw.id, tags: raw.tags });
+        setLocalReaction?.(focusedEvent.id, raw.pubkey, raw.content === "+" ? "💜" : raw.content, { id: raw.id, tags: raw.tags });
       },
     });
     subs.push(reactionFetch);

@@ -101,7 +101,6 @@ export default function CustomEmojiSettingsPage({
         <div style={{ color: "var(--text-muted)", fontSize: 18 }}>›</div>
       </div>
 
-      {err && <div style={{ margin: "8px 16px 0", fontSize: 12, color: "#E05C8A", fontFamily: "'DM Sans',sans-serif" }}>{err}</div>}
 
       {/* Bookmarked sets */}
       {sets.length > 0 && (
@@ -139,7 +138,7 @@ export default function CustomEmojiSettingsPage({
         <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
           <input
             value={name}
-            onChange={e => setName(e.target.value)}
+            onChange={e => setName(e.target.value.replace(/:/g, ""))}
             onKeyDown={e => e.key === "Enter" && handleAdd()}
             placeholder="shortcode (e.g. doge)"
             style={{ ...inputStyle, flex: "0 0 140px" }}
@@ -162,12 +161,15 @@ export default function CustomEmojiSettingsPage({
           <button type="button" className="profile-follow-btn" disabled={!canAdd} onClick={handleAdd}>
             {saving === "__add__" ? "…" : "Add emoji"}
           </button>
-          {!isValidName && trimName && (
+          {err && (
+            <span style={{ fontSize: 12, color: "#E05C8A", fontFamily: "'DM Sans',sans-serif" }}>{err}</span>
+          )}
+          {!err && !isValidName && trimName && (
             <span style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif" }}>
               Only letters, numbers, hyphens, underscores
             </span>
           )}
-          {isDupe && (
+          {!err && isDupe && (
             <span style={{ fontSize: 12, color: "#E05C8A", fontFamily: "'DM Sans',sans-serif" }}>
               Name already exists
             </span>

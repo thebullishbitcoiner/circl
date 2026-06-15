@@ -468,6 +468,7 @@
   .profile-edit-btn:hover{border-color:var(--primary);color:var(--primary);}
   .profile-follow-btn{padding:6px 14px;border-radius:50px;border:1.5px solid var(--primary);background:var(--primary);color:#fff;font-family:'DM Sans',sans-serif;font-size:var(--font-base);font-weight:600;cursor:pointer;transition:all .15s;}
   .profile-follow-btn:hover{opacity:.85;}
+  .profile-follow-btn:disabled{opacity:.4;cursor:not-allowed;}
   .profile-unfollow-btn{padding:6px 14px;border-radius:50px;border:1.5px solid var(--border);background:none;color:var(--text-muted);font-family:'DM Sans',sans-serif;font-size:var(--font-base);cursor:pointer;transition:all .15s;}
   .profile-unfollow-btn:hover{border-color:#ef4444;color:#ef4444;}
   .profile-name{font-family:'DM Sans',sans-serif;font-size:22px;font-weight:700;letter-spacing:-.3px;margin-bottom:2px;}

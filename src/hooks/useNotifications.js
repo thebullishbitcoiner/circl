@@ -19,7 +19,7 @@ function compareDesc(a, b) {
 export function getNotificationSummary(ev) {
   const kind = ev?.kind;
   if (kind === 7) {
-    const emoji = ev.content === "+" ? "🧡" : (ev.content || "·").trim() || "·";
+    const emoji = ev.content === "+" ? "💜" : (ev.content || "·").trim() || "·";
     return { headline: `Reacted ${emoji} to your note`, detail: "", kind: "reaction" };
   }
   if (kind === 9735) {

@@ -102,10 +102,19 @@ export default function App() {
   );
   const setLocalReaction = useCallback((eventId, pk, emoji, meta = {}) => {
     if (!emoji) return;
+    const ts = meta.created_at ?? Math.floor(Date.now() / 1000);
     setReactionsByEvent(prev => {
       const current = prev[eventId] ?? [];
-      if (current.some(r => r.pk === pk)) return prev;
-      return { ...prev, [eventId]: [...current, { pk, emoji, created_at: Math.floor(Date.now() / 1000), ...meta }] };
+      if (meta.id) {
+        // Relay-confirmed event: deduplicate by event id, replace any optimistic placeholder
+        if (current.some(r => r.id === meta.id)) return prev;
+        const filtered = current.filter(r => !(r.pk === pk && !r.id && r.emoji === emoji));
+        return { ...prev, [eventId]: [...filtered, { pk, emoji, created_at: ts, ...meta }] };
+      } else {
+        // Optimistic (no id): one placeholder per pk while in-flight
+        if (current.some(r => r.pk === pk && !r.id)) return prev;
+        return { ...prev, [eventId]: [...current, { pk, emoji, created_at: ts }] };
+      }
     });
   }, []);
 
