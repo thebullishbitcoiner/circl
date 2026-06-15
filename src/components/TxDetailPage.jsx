@@ -119,8 +119,8 @@ function TxDetailCard({ tx, pk, profiles, onOpenProfile }) {
 
   return (
     <div style={{ margin: "12px 16px", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
-      {/* Header: avatar + name + nip05 + date */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px" }}>
+      {/* Header: avatar + name + nip05 */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px 10px" }}>
         {pk && (
           <div style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => onOpenProfile?.(pk)}>
             <Avatar pk={pk} profiles={profiles} size={44} />
@@ -137,10 +137,12 @@ function TxDetailCard({ tx, pk, profiles, onOpenProfile }) {
               {nip05OrNpub(pk, profiles)}
             </div>
           )}
-          <div style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", marginTop: pk ? 3 : 0 }}>
-            {fmtDate(tx.settled_at || tx.created_at)}
-          </div>
         </div>
+      </div>
+      {/* Date row */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", borderTop: "1px solid var(--border)" }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>Date</span>
+        <span style={{ fontSize: 13, color: "var(--text)", fontFamily: "'DM Sans',sans-serif" }}>{fmtDate(tx.settled_at || tx.created_at)}</span>
       </div>
 
       {/* Collapsible toggle */}
@@ -271,10 +273,12 @@ export default function TxDetailPage({ tx, profiles, onBack, onOpenProfile, onOp
 
       {/* Amount hero */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "28px 16px 24px", borderBottom: "1px solid var(--border)" }}>
-        <div style={{ fontSize: 38, fontWeight: 700, letterSpacing: "-0.02em", color: isIncoming ? "#4CAF50" : "var(--text)", fontFamily: "'DM Sans',sans-serif", lineHeight: 1 }}>
-          {isIncoming ? "+" : "−"}{fmtSatsFull(tx.amount)}
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+          <span style={{ fontSize: 38, fontWeight: 700, letterSpacing: "-0.02em", color: isIncoming ? "#4CAF50" : "var(--text)", fontFamily: "'DM Sans',sans-serif", lineHeight: 1 }}>
+            {isIncoming ? "+" : "−"}{fmtSatsFull(tx.amount)}
+          </span>
+          <span style={{ fontSize: 14, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif" }}>sats</span>
         </div>
-        <div style={{ fontSize: 14, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", marginTop: 4 }}>sats</div>
         {comment && (
           <div style={{ fontSize: 13, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", marginTop: 10, fontStyle: "italic", textAlign: "center" }}>
             "{comment}"
