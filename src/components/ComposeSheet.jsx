@@ -40,8 +40,22 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   const [showCirclePicker, setShowCirclePicker] = useState(false);
   const [emojiTags,       setEmojiTags]       = useState([]);
   const [isDragOver,      setIsDragOver]      = useState(false);
+  const [excludedMentions, setExcludedMentions] = useState(new Set());
   const fileRef   = useRef(null);
   const editorRef = useRef(null);
+
+  const isNip22Reply = replyTo?.kind === 1068 || replyTo?.kind === 6969 || replyTo?.kind === 1111 || replyTo?.kind === 30023;
+  const mentionedPubkeys = (replyTo && !isNip22Reply)
+    ? [...new Set(replyTagsForPublish(replyTo, events).filter(t => t[0] === "p").map(t => t[1]))]
+    : [];
+
+  const toggleMention = pk => {
+    setExcludedMentions(prev => {
+      const next = new Set(prev);
+      if (next.has(pk)) next.delete(pk); else next.add(pk);
+      return next;
+    });
+  };
 
   const title   = quotedEvent ? "Quote repost" : replyTo ? "Reply" : goalMode ? "New Goal" : pollMode ? "New Poll" : "New note";
   const pollValid = pollMode && pollOptions.filter(o => o.trim()).length >= 2;
@@ -119,13 +133,15 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     const urls = media.map(m => m.url).join("\n");
     const full = [content, urls].filter(Boolean).join("\n");
     if (publishEvent) {
-      const isNip22Reply = replyTo?.kind === 1068 || replyTo?.kind === 6969 || replyTo?.kind === 1111 || replyTo?.kind === 30023;
       const tags = [];
       if (replyTo) {
         if (isNip22Reply) {
           for (const t of kind1111TagsForPublish(replyTo, events)) tags.push(t);
         } else {
-          for (const t of replyTagsForPublish(replyTo, events)) tags.push(t);
+          for (const t of replyTagsForPublish(replyTo, events)) {
+            if (t[0] === "p" && excludedMentions.has(t[1])) continue;
+            tags.push(t);
+          }
         }
       }
       let finalContent = full;
@@ -426,6 +442,28 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
                 </p>
               </div>
             </div>
+            {mentionedPubkeys.length > 0 && (
+              <div style={{ marginTop: 10 }}>
+                <div className="compose-sheet-context-label">Tagging</div>
+                <div className="compose-tagged-list">
+                  {mentionedPubkeys.map(pk => {
+                    const removed = excludedMentions.has(pk);
+                    return (
+                      <button
+                        key={pk}
+                        type="button"
+                        className={`tagged-chip${removed ? " removed" : ""}`}
+                        onClick={() => toggleMention(pk)}
+                        title={removed ? "Tap to tag again" : "Tap to remove tag"}
+                      >
+                        @{displayName(pk, profiles)}
+                        <span className="tagged-chip-x">{removed ? "+" : "✕"}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -533,7 +571,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
         {uploading   && <div className="compose-upload-status">Uploading…</div>}
 
         {showEmoji && (
-          <EmojiPicker customEmojis={customEmojis} onSelect={emoji => { insertEmoji(emoji); }} />
+          <EmojiPicker customEmojis={customEmojis} onSelect={emoji => { insertEmoji(emoji); setShowEmoji(false); }} />
         )}
 
         {showGif && (

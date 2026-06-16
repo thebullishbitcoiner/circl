@@ -755,6 +755,10 @@
   .compose-richtext:empty::before{content:attr(data-placeholder);color:var(--text-faint);pointer-events:none;}
   .compose-richtext.drag-over{outline:2px dashed var(--primary);outline-offset:4px;border-radius:8px;}
   .mention-chip{display:inline;background:var(--primary-soft);color:var(--primary);border-radius:4px;padding:0 3px;font-weight:500;cursor:default;user-select:none;}
+  .compose-tagged-list{display:flex;flex-wrap:wrap;gap:6px;}
+  .tagged-chip{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;border:1px solid var(--border);background:var(--primary-soft);color:var(--primary);font-family:'DM Sans',sans-serif;font-size:11.5px;font-weight:500;cursor:pointer;}
+  .tagged-chip.removed{background:none;color:var(--text-faint);text-decoration:line-through;}
+  .tagged-chip-x{font-size:10px;text-decoration:none;}
   .compose-sheet-footer{
     padding:8px 16px 4px;border-top:1px solid var(--border);
     display:flex;align-items:center;gap:8px;flex-shrink:0;

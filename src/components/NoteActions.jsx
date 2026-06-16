@@ -143,7 +143,10 @@ export default function NoteActions({
             <Ri />{rCount || ""}
           </button>
           <button className="action-btn"
-            onClick={e => { e.stopPropagation(); openModal(<RepostSheet event={event} profiles={profiles} publishEvent={publishEvent} onPrepend={onPrepend} onQuoteRepost={() => openModal(<ComposeSheet quotedEvent={event} profiles={profiles} myPubkey={myPubkey} myProfile={myProfile} events={allEvents} publishEvent={publishEvent} onPrepend={onPrepend} onDismiss={dismiss} customEmojis={customEmojis} />)} onDismiss={dismiss} />); }}>
+            onClick={e => { e.stopPropagation(); openModal(<RepostSheet event={event} profiles={profiles} publishEvent={publishEvent} onPrepend={onPrepend} onQuoteRepost={() => openModal(<ComposeSheet quotedEvent={event} profiles={profiles} myPubkey={myPubkey} myProfile={myProfile} events={allEvents} publishEvent={publishEvent} onPrepend={onPrepend} onDismiss={dismiss} customEmojis={customEmojis} />)} onDismiss={dismiss} />); }}
+            onMouseDown={e => { e.stopPropagation(); const t = setTimeout(() => { haptic.longPress(); openModal(<ComposeSheet quotedEvent={event} profiles={profiles} myPubkey={myPubkey} myProfile={myProfile} events={allEvents} publishEvent={publishEvent} onPrepend={onPrepend} onDismiss={dismiss} customEmojis={customEmojis} />); }, 600); window.addEventListener("mouseup", () => clearTimeout(t), { once: true }); }}
+            onTouchStart={e => { e.stopPropagation(); const t = setTimeout(() => { haptic.longPress(); openModal(<ComposeSheet quotedEvent={event} profiles={profiles} myPubkey={myPubkey} myProfile={myProfile} events={allEvents} publishEvent={publishEvent} onPrepend={onPrepend} onDismiss={dismiss} customEmojis={customEmojis} />); }, 600); window.addEventListener("touchend", () => clearTimeout(t), { once: true }); }}
+          >
             <Rpi />{repostAndQuoteCount(event.id, allEvents) || ""}
           </button>
           <button className={`action-btn${isBookmarked?.(event) ? " saved" : ""}`}
