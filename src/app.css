@@ -753,6 +753,7 @@
   .compose-sheet-input::placeholder{color:var(--text-faint);}
   .compose-richtext{word-break:break-word;overflow-wrap:anywhere;white-space:pre-wrap;}
   .compose-richtext:empty::before{content:attr(data-placeholder);color:var(--text-faint);pointer-events:none;}
+  .compose-richtext.drag-over{outline:2px dashed var(--primary);outline-offset:4px;border-radius:8px;}
   .mention-chip{display:inline;background:var(--primary-soft);color:var(--primary);border-radius:4px;padding:0 3px;font-weight:500;cursor:default;user-select:none;}
   .compose-sheet-footer{
     padding:8px 16px 4px;border-top:1px solid var(--border);

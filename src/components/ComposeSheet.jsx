@@ -39,6 +39,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   const [selectedCircle,  setSelectedCircle]  = useState(initialCircle);
   const [showCirclePicker, setShowCirclePicker] = useState(false);
   const [emojiTags,       setEmojiTags]       = useState([]);
+  const [isDragOver,      setIsDragOver]      = useState(false);
   const fileRef   = useRef(null);
   const editorRef = useRef(null);
 
@@ -193,8 +194,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     return url;
   };
 
-  const handleFileChange = async e => {
-    const files = Array.from(e.target.files || []);
+  const uploadFiles = async files => {
     if (!files.length) return;
     setUploading(true); setUploadErr("");
     const errors = [];
@@ -208,7 +208,39 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     }
     if (errors.length) setUploadErr(`Upload failed — ${errors[0]}`);
     setUploading(false);
+  };
+
+  const handleFileChange = async e => {
+    const files = Array.from(e.target.files || []);
+    await uploadFiles(files);
     e.target.value = "";
+  };
+
+  const imageFilesFromClipboard = clipboardData => {
+    if (!clipboardData) return [];
+    const files = Array.from(clipboardData.files || []).filter(f => f.type.startsWith("image/"));
+    if (files.length) return files;
+    return Array.from(clipboardData.items || [])
+      .filter(item => item.kind === "file" && item.type.startsWith("image/"))
+      .map(item => item.getAsFile())
+      .filter(Boolean);
+  };
+
+  const handleDragOver = e => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = e => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = e => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith("image/"));
+    if (files.length) uploadFiles(files);
   };
 
   const fetchGifs = async url => {
@@ -326,6 +358,12 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   };
 
   const handlePaste = e => {
+    const imageFiles = imageFilesFromClipboard(e.clipboardData);
+    if (imageFiles.length) {
+      e.preventDefault();
+      uploadFiles(imageFiles);
+      return;
+    }
     e.preventDefault();
     const text = e.clipboardData.getData("text/plain");
     const sel = window.getSelection();
@@ -401,12 +439,15 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
             </div>
             <div
               ref={editorRef}
-              className="compose-sheet-input compose-richtext"
+              className={`compose-sheet-input compose-richtext${isDragOver ? " drag-over" : ""}`}
               contentEditable
               suppressContentEditableWarning
               onInput={handleInput}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
               data-placeholder={replyTo ? "Write your reply…" : "What's on your mind?"}
             />
           </div>}
