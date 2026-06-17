@@ -6,7 +6,8 @@ import PollPreview from "./PollPreview.jsx";
 import CalendarInlineCard from "./CalendarInlineCard.jsx";
 import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
 import LightningCard from "./LightningCard.jsx";
-import { parseNoteMediaSegments, groupNoteMediaSegments, displayName, relativeTime, nip19, isHexPubkey, normPubkey, fmtSats, parseBolt11Msats, zapCommentFromKind9735, zapperPubkeyFromKind9735 } from "../utils.js";
+import { parseNoteMediaSegments, groupNoteMediaSegments, displayName, relativeTime, nip19, isHexPubkey, normPubkey, fmtSats, parseBolt11Msats, zapCommentFromKind9735, zapperPubkeyFromKind9735, firstLinkPreviewUrl } from "../utils.js";
+import LinkPreviewCard from "./LinkPreviewCard.jsx";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 import { useNavigation } from "../context/NavigationContext.jsx";
@@ -488,6 +489,8 @@ export default function NoteContent({
         />
       );
     })}
+
+    {allowEmbeds && (() => { const u = firstLinkPreviewUrl(content); return u ? <LinkPreviewCard key={u} url={u} /> : null; })()}
 
     {lightbox && (
       <MediaLightbox

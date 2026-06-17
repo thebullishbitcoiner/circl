@@ -361,6 +361,18 @@ export function classifyMediaUrl(url) {
   return null;
 }
 
+/** First URL in note content that isn't an image or video — used for link preview. */
+export function firstLinkPreviewUrl(content) {
+  if (!content || typeof content !== "string") return null;
+  const re = /https?:\/\/[^\s<>'"]+/gi;
+  let m;
+  while ((m = re.exec(content)) !== null) {
+    const url = trimMediaUrl(m[0]);
+    if (url && !classifyMediaUrl(url)) return url;
+  }
+  return null;
+}
+
 // BOLT-11 HRP can include amount+multiplier digits before the bech32 separator, so use [0-9a-z].
 // BOLT-12, LNURL, Noffer have an explicit "1" separator in the prefix so strict bech32 data chars follow.
 const LIGHTNING_RE = /(lnbcrt[0-9a-z]{50,}|lntb[0-9a-z]{50,}|lnbc[0-9a-z]{50,}|lnurl1[023456789acdefghjklmnpqrstuvwxyz]{50,}|lno1[023456789acdefghjklmnpqrstuvwxyz]{50,}|lni1[023456789acdefghjklmnpqrstuvwxyz]{50,}|noffer1[023456789acdefghjklmnpqrstuvwxyz]{50,})/gi;
