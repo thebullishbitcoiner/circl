@@ -13,6 +13,63 @@ const SEARCH_RELAYS = [
 const SUGGEST_LIMIT = 8;
 const NOTE_LIMIT    = 30;
 const SUGGEST_DEBOUNCE_MS = 350;
+const RECENT_KEY    = "circl_recent_searches";
+const MAX_RECENT    = 8;
+
+function loadRecent() {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || []; } catch { return []; }
+}
+
+function IconCircle({ children, color = "var(--primary)" }) {
+  return (
+    <div style={{ flexShrink: 0, width: 40, height: 40, borderRadius: "50%", background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", color }}>
+      {children}
+    </div>
+  );
+}
+
+function RecentSearchItem({ item, profiles, onSelect }) {
+  if (item.type === "people") {
+    const pk  = item.pubkey;
+    const p   = profiles?.[pk] || {};
+    const name = p.display_name || p.name || "";
+    const sub  = p.nip05 || (() => { try { const n = nip19.npubEncode(pk); return n.slice(0, 8) + "…" + n.slice(-4); } catch { return ""; } })();
+    return (
+      <div className="search-result" role="button" tabIndex={0}
+        onClick={() => onSelect(item)}
+        onKeyDown={e => { if (e.key === "Enter" || e.key === " ") onSelect(item); }}
+      >
+        <div style={{ flexShrink: 0 }}>
+          <Avatar pk={pk} profiles={profiles} size={40} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="search-result-name">{name || sub}</div>
+          {name && sub && <div className="search-result-sub">{sub}</div>}
+        </div>
+      </div>
+    );
+  }
+
+  const label = item.type === "hashtag" ? `#${item.query}` : item.query;
+  const sub   = item.type === "hashtag" ? "Hashtag" : "Notes";
+  return (
+    <div className="search-result" role="button" tabIndex={0}
+      onClick={() => onSelect(item)}
+      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") onSelect(item); }}
+    >
+      <IconCircle>
+        {item.type === "hashtag"
+          ? <span style={{ fontSize: 18, fontWeight: 700, lineHeight: 1 }}>#</span>
+          : <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        }
+      </IconCircle>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="search-result-name">{label}</div>
+        <div className="search-result-sub">{sub}</div>
+      </div>
+    </div>
+  );
+}
 
 function ProfileSuggestion({ ev, onOpenProfile }) {
   let meta = {};
@@ -65,9 +122,9 @@ function HashtagSuggestion({ tag, onOpenHashtag }) {
       onClick={() => onOpenHashtag?.(tag)}
       onKeyDown={e => { if (e.key === "Enter" || e.key === " ") onOpenHashtag?.(tag); }}
     >
-      <div style={{ flexShrink: 0, width: 40, height: 40, borderRadius: "50%", background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, color: "var(--primary)" }}>
-        #
-      </div>
+      <IconCircle>
+        <span style={{ fontSize: 18, fontWeight: 700, lineHeight: 1 }}>#</span>
+      </IconCircle>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="search-result-name">#{tag}</div>
         <div className="search-result-sub">Browse hashtag</div>
@@ -91,12 +148,27 @@ export default function SearchPage({ profiles, onOpenProfile, onOpenThread, onOp
   const [mode,           setMode]           = useState("suggest"); // "suggest" | "notes"
   const [loadingSuggest, setLoadingSuggest] = useState(false);
   const [loadingNotes,   setLoadingNotes]   = useState(false);
+  const [recentSearches, setRecentSearches] = useState(() => loadRecent());
 
   const suggestSubRef  = useRef(null);
   const noteSubRef     = useRef(null);
   const suggestSeenRef = useRef(new Set());
   const noteSeenRef    = useRef(new Set());
   const debounceRef    = useRef(null);
+
+  const addRecent = useCallback((entry) => {
+    setRecentSearches(prev => {
+      const key = entry.type === "people" ? entry.pubkey : entry.query;
+      const next = [{ ...entry, ts: Date.now() }, ...prev.filter(r => !(r.type === entry.type && (r.type === "people" ? r.pubkey === key : r.query === key)))].slice(0, MAX_RECENT);
+      localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const clearRecent = () => {
+    localStorage.removeItem(RECENT_KEY);
+    setRecentSearches([]);
+  };
 
   const runPeopleSearch = useCallback(q => {
     suggestSubRef.current?.unsubscribe();
@@ -151,7 +223,6 @@ export default function SearchPage({ profiles, onOpenProfile, onOpenThread, onOp
   const handleInput = e => {
     const q = e.target.value;
     setQuery(q);
-    // Typing always resets to suggest mode
     setMode("suggest");
     setNoteResults([]);
     clearTimeout(debounceRef.current);
@@ -172,9 +243,12 @@ export default function SearchPage({ profiles, onOpenProfile, onOpenThread, onOp
       suggestSubRef.current?.unsubscribe();
       setSuggestions([]);
       if (query.trim().startsWith("#")) {
-        onOpenHashtag?.(query.trim().slice(1));
+        const tag = query.trim().slice(1);
+        addRecent({ type: "hashtag", query: tag });
+        onOpenHashtag?.(tag);
         return;
       }
+      addRecent({ type: "notes", query: query.trim() });
       setMode("notes");
       runNoteSearch(query.trim());
     }
@@ -188,8 +262,25 @@ export default function SearchPage({ profiles, onOpenProfile, onOpenThread, onOp
     setMode("suggest"); setLoadingSuggest(false); setLoadingNotes(false);
   };
 
+  const handleSelectRecent = item => {
+    if (item.type === "hashtag") {
+      addRecent({ type: "hashtag", query: item.query });
+      onOpenHashtag?.(item.query);
+    } else if (item.type === "notes") {
+      setQuery(item.query);
+      setMode("notes");
+      setSuggestions([]);
+      addRecent({ type: "notes", query: item.query });
+      runNoteSearch(item.query);
+    } else {
+      addRecent({ type: "people", pubkey: item.pubkey });
+      onOpenProfile?.(item.pubkey);
+    }
+  };
+
   const loading = mode === "suggest" ? loadingSuggest : loadingNotes;
   const results = mode === "suggest" ? suggestions    : noteResults;
+  const showRecent = !query && recentSearches.length > 0;
 
   return (
     <div className="search-shell">
@@ -224,7 +315,21 @@ export default function SearchPage({ profiles, onOpenProfile, onOpenThread, onOp
       <div className="search-results">
         {loading && <Spinner />}
 
-        {!loading && !query && (
+        {!loading && showRecent && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 18px 4px", fontFamily: "'DM Sans',sans-serif" }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Recent</span>
+              <button type="button" onClick={clearRecent} style={{ fontSize: 12, color: "var(--primary)", background: "none", border: "none", cursor: "pointer", padding: "2px 0", fontFamily: "inherit" }}>
+                Clear
+              </button>
+            </div>
+            {recentSearches.map((item, i) => (
+              <RecentSearchItem key={`${item.type}:${item.pubkey ?? item.query}:${i}`} item={item} profiles={profiles} onSelect={handleSelectRecent} />
+            ))}
+          </>
+        )}
+
+        {!loading && !query && !recentSearches.length && (
           <div className="empty-state" style={{ paddingTop: 56 }}>
             <div className="empty-state-title">Search Nostr</div>
             <div className="empty-state-sub">People appear as you type · Enter to search notes</div>
@@ -239,11 +344,11 @@ export default function SearchPage({ profiles, onOpenProfile, onOpenThread, onOp
         )}
 
         {mode === "suggest" && query.trim().startsWith("#") && (
-          <HashtagSuggestion tag={query.trim().slice(1)} onOpenHashtag={onOpenHashtag} />
+          <HashtagSuggestion tag={query.trim().slice(1)} onOpenHashtag={tag => { addRecent({ type: "hashtag", query: tag }); onOpenHashtag?.(tag); }} />
         )}
         {!(mode === "suggest" && query.trim().startsWith("#")) && results.map(ev =>
           mode === "suggest"
-            ? <ProfileSuggestion key={ev.pubkey} ev={ev} onOpenProfile={onOpenProfile} />
+            ? <ProfileSuggestion key={ev.pubkey} ev={ev} onOpenProfile={pk => { addRecent({ type: "people", pubkey: pk }); onOpenProfile?.(pk); }} />
             : <NoteResult key={ev.id} ev={ev} profiles={profiles} onOpenProfile={onOpenProfile} onOpenThread={onOpenThread} />
         )}
       </div>
