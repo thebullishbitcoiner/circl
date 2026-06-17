@@ -6,7 +6,7 @@ import PollPreview from "./PollPreview.jsx";
 import CalendarInlineCard from "./CalendarInlineCard.jsx";
 import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
 import LightningCard from "./LightningCard.jsx";
-import { parseNoteMediaSegments, groupNoteMediaSegments, displayName, relativeTime, nip19, isHexPubkey, normPubkey } from "../utils.js";
+import { parseNoteMediaSegments, groupNoteMediaSegments, displayName, relativeTime, nip19, isHexPubkey, normPubkey, fmtSats, parseBolt11Msats, zapCommentFromKind9735, zapperPubkeyFromKind9735 } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 import { useNavigation } from "../context/NavigationContext.jsx";
@@ -93,6 +93,50 @@ function EmbeddedEvent({ event, profiles, onOpenProfile }) {
         </div>
         <NoteContent content={event.content || ""} tags={event.tags} profiles={profiles} allowEmbeds={false} className="note-embed-text" />
         <ZapGoalProgressBlock event={event} hideBadge />
+      </div>
+    );
+  }
+
+  if (event.kind === 9735) {
+    const zapperPk    = zapperPubkeyFromKind9735(event) ?? event.tags?.find(t => t[0] === "P")?.[1] ?? null;
+    const recipientPk = event.tags?.find(t => t[0] === "p")?.[1] ?? null;
+    const msats       = parseBolt11Msats(event.tags?.find(t => t[0] === "bolt11")?.[1]);
+    const comment     = zapCommentFromKind9735(event);
+    const episodeTag  = event.tags?.find(t => t[0] === "i" && t[1]?.startsWith("podcast:item:guid:"));
+    const showTag     = event.tags?.find(t => t[0] === "i" && t[1]?.startsWith("podcast:guid:"));
+    const episodeUrl  = episodeTag?.[2] ?? null;
+    const showUrl     = showTag?.[2] ?? null;
+    const isPodcast   = !!(episodeUrl || showUrl);
+    const showRecip   = recipientPk && recipientPk !== zapperPk;
+    function linkLabel(url) { try { return new URL(url).hostname; } catch { return url; } }
+    return (
+      <div className="note-embed note-embed-ref" role="presentation">
+        <div className="note-embed-head">
+          {zapperPk && <div role="presentation" onClick={e => { e.stopPropagation(); onOpenProfile?.(zapperPk); }}><Avatar pk={zapperPk} profiles={profiles} size={20} /></div>}
+          <span className="note-embed-name" role="presentation" onClick={e => { e.stopPropagation(); zapperPk && onOpenProfile?.(zapperPk); }}>
+            {zapperPk ? displayName(zapperPk, profiles) : "Anonymous"}
+          </span>
+          <span className="note-embed-time">{relativeTime(event.created_at)}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", fontSize: 13, marginBottom: (comment || isPodcast) ? 6 : 0 }}>
+          <span style={{ color: "var(--text-faint)" }}>zapped</span>
+          <span style={{ fontWeight: 600, color: "#f59e0b" }}>⚡ {fmtSats(msats)}</span>
+          {showRecip && (
+            <>
+              <span style={{ color: "var(--text-faint)" }}>to</span>
+              <span style={{ fontWeight: 500, cursor: "pointer" }} role="presentation" onClick={e => { e.stopPropagation(); onOpenProfile?.(recipientPk); }}>
+                {displayName(recipientPk, profiles)}
+              </span>
+            </>
+          )}
+        </div>
+        {comment && <div style={{ fontSize: 13, color: "var(--text-muted)", fontStyle: "italic", marginBottom: isPodcast ? 6 : 0 }}>"{comment}"</div>}
+        {isPodcast && (
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+            {episodeUrl && <a className="highlight-source-chip" href={episodeUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}><svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>{linkLabel(episodeUrl)}</a>}
+            {showUrl && <a className="highlight-source-chip" href={showUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}><svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ flexShrink: 0 }}><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>{linkLabel(showUrl)}</a>}
+          </div>
+        )}
       </div>
     );
   }

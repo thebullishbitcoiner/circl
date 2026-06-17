@@ -201,6 +201,12 @@ export default function App() {
       if (e.kind === 6 && typeof e.content === "string" && e.content.trim().startsWith("{")) {
         try { add(JSON.parse(e.content)?.pubkey); } catch {}
       }
+      if (e.kind === 9735) {
+        const zapper = zapperPubkeyFromKind9735(e);
+        if (zapper) add(zapper);
+        const Ptag = e.tags?.find(t => t[0] === "P")?.[1];
+        if (Ptag) add(Ptag);
+      }
     }
     for (const zaps of Object.values(zapsByEvent)) {
       for (const z of zaps) add(z?.zapper);

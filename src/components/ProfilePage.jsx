@@ -7,7 +7,8 @@ import NoteActions from "./NoteActions.jsx";
 import ProfileText from "./ProfileText.jsx";
 import { Bk, Ck } from "./icons.jsx";
 import ProfileContextMenu from "./ProfileContextMenu.jsx";
-import { displayName, nip05OrNpub, relativeTime, shortNpub, truncNpub, avatarUrl, isQuoteRepost, isHexPubkey, replyCount, repostAndQuoteCount, normPubkey, directReplyParentId, parseKind6EmbeddedEvent, nip19, parseNoteMediaSegments } from "../utils.js";
+import { displayName, nip05OrNpub, relativeTime, shortNpub, truncNpub, avatarUrl, isQuoteRepost, isHexPubkey, replyCount, repostAndQuoteCount, normPubkey, directReplyParentId, parseKind6EmbeddedEvent, nip19, parseNoteMediaSegments, zapperPubkeyFromKind9735 } from "../utils.js";
+import useProfiles from "../hooks/useProfiles.js";
 import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
 import useInteractions from "../hooks/useInteractions.js";
@@ -137,7 +138,7 @@ function IxNote({ event, myPubkey, profiles, onOpenProfile, onOpenThread, resolv
 }
 
 export default function ProfilePage({
-  pubkey, myPubkey, profiles, follows, events, isOwn,
+  pubkey, myPubkey, profiles: profilesProp, follows, events, isOwn,
   onBack, onOpenProfile, onOpenNote, onOpenThread, onOpenHashtag, onOpenZaps, onOpenReactions, onOpenReposts,
   myProfile, onPublish, publishEvent, publishHighlight, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
@@ -190,6 +191,20 @@ export default function ProfilePage({
   const mediaExhaustedRef = useRef(false);
   const mediaStartedRef = useRef(false);
   const { stream: activeStream } = useActiveStream(pubkey);
+
+  const zapperPks = useMemo(() => {
+    const pks = [];
+    for (const e of profileEvents) {
+      if (e.kind !== 9735) continue;
+      const zapper = zapperPubkeyFromKind9735(e);
+      if (zapper) pks.push(zapper);
+      const Ptag = e.tags?.find(t => t[0] === "P")?.[1];
+      if (Ptag) pks.push(Ptag);
+    }
+    return pks;
+  }, [profileEvents]);
+  const { profiles: zapperProfiles } = useProfiles({ pubkeys: zapperPks });
+  const profiles = useMemo(() => ({ ...zapperProfiles, ...profilesProp }), [profilesProp, zapperProfiles]);
 
   const p    = profiles?.[pubkey] || {};
   const name = displayName(pubkey, profiles);
@@ -372,7 +387,7 @@ export default function ProfilePage({
     activeSubs.push(notesSub);
 
     // Phase 2 — reposts, polls, calendar events, and goals in parallel; merges into same byId
-    const otherSub = pool.request(relayUrls, [{ kinds: [6, 1068, 6969, 31922, 31923, 30311, 9041], authors: [pubkey], limit: 100 }]).subscribe({
+    const otherSub = pool.request(relayUrls, [{ kinds: [6, 1068, 6969, 31922, 31923, 30311, 9041, 9735], authors: [pubkey], limit: 100 }]).subscribe({
       next: raw => { eventStore.add(raw); byId.set(raw.id, raw); },
       complete: flush,
     });
@@ -422,16 +437,17 @@ export default function ProfilePage({
   }, [events, profileEvents, repostExtras]);
 
   const theirEvents = useMemo(
-    () => isMuted?.(pubkey) ? [] : mergedEvents.filter(e => e.pubkey === pubkey && (e.kind === 1 || e.kind === 6 || e.kind === 9802 || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311 || e.kind === 9041)),
+    () => isMuted?.(pubkey) ? [] : mergedEvents.filter(e => e.pubkey === pubkey && (e.kind === 1 || e.kind === 6 || e.kind === 9802 || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311 || e.kind === 9041 || e.kind === 9735)),
     [mergedEvents, pubkey, isMuted]
   );
 
   const topLevel = useMemo(
     () => theirEvents
-      .filter(e => e.kind === 6 || e.kind === 9802 || isQuoteRepost(e) || (e.kind === 1 && !hasNonMentionETag(e)) || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311 || e.kind === 9041)
+      .filter(e => e.kind === 6 || e.kind === 9802 || e.kind === 9735 || isQuoteRepost(e) || (e.kind === 1 && !hasNonMentionETag(e)) || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311 || e.kind === 9041)
       .sort((a, b) => b.created_at - a.created_at),
     [theirEvents]
   );
+
 
   const goals = useMemo(
     () => mergedEvents

@@ -6,6 +6,7 @@ import CalendarCard from "./CalendarCard.jsx";
 import StreamCard from "./StreamCard.jsx";
 import HighlightCard from "./HighlightCard.jsx";
 import ZapGoalCard from "./ZapGoalCard.jsx";
+import PodcastZapCard from "./PodcastZapCard.jsx";
 import { replyCount, repostAndQuoteCount } from "../utils.js";
 
 /**
@@ -172,6 +173,18 @@ export default function FeedItem({
         onLike={onLike}
         onBookmark={onBookmark}
         onOpen={onOpenStream}
+        onOpenProfile={onOpenProfile}
+        delay={delay}
+      />
+    );
+  }
+
+  if (event.kind === 9735) {
+    return (
+      <PodcastZapCard
+        key={event.id}
+        event={event}
+        profiles={profiles}
         onOpenProfile={onOpenProfile}
         delay={delay}
       />

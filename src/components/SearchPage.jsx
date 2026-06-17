@@ -17,9 +17,9 @@ const SUGGEST_DEBOUNCE_MS = 350;
 function ProfileSuggestion({ ev, onOpenProfile }) {
   let meta = {};
   try { meta = JSON.parse(ev.content); } catch {}
-  const name = meta.display_name || meta.name || "";
+  const name = (typeof meta.display_name === "string" ? meta.display_name : "") || (typeof meta.name === "string" ? meta.name : "");
   const pk   = ev.pubkey;
-  const sub  = meta.nip05 || (() => {
+  const sub  = (typeof meta.nip05 === "string" ? meta.nip05 : "") || (() => {
     try { const n = nip19.npubEncode(pk); return n.slice(0, 8) + "…" + n.slice(-4); } catch { return ""; }
   })();
 
