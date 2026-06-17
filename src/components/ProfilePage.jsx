@@ -28,6 +28,8 @@ import useActiveStream from "../hooks/useActiveStream.js";
 import ListingCard from "./ListingCard.jsx";
 import ListingDetail from "./ListingDetail.jsx";
 import CreateListingSheet from "./CreateListingSheet.jsx";
+import BadgeCard from "./BadgeCard.jsx";
+import BadgeDetail from "./BadgeDetail.jsx";
 
 // Persists across component mounts so returning to a profile doesn't refetch
 const mediaCache = new Map(); // pubkey → { items, until, exhausted }
@@ -181,6 +183,48 @@ export default function ProfilePage({
   const [listingsSearch,   setListingsSearch]   = useState("");
   const [createListingOpen, setCreateListingOpen] = useState(false);
   const [selectedListing,  setSelectedListing]  = useState(null);
+
+  const [profileBadges10008, setProfileBadges10008] = useState(null);
+  const [acceptedPairs,      setAcceptedPairs]      = useState([]);   // [{aTag, eTag}]
+  const [badgeDefMap,        setBadgeDefMap]        = useState(new Map());
+  const [badgeAwardMap,      setBadgeAwardMap]      = useState(new Map()); // id → event
+  const [allAwardEvents,     setAllAwardEvents]     = useState([]);   // all kind 8 received (own only)
+  const [badgesLoading,      setBadgesLoading]      = useState(false);
+  const [selectedBadge,      setSelectedBadge]      = useState(null);
+
+  const handleBadgeAccept = async (awardEvent) => {
+    const aTag = awardEvent.tags?.find(t => t[0] === "a")?.[1];
+    if (!aTag) return;
+    const pairTags = [];
+    let i = 0;
+    const existing = profileBadges10008?.tags || [];
+    while (i < existing.length) {
+      if (existing[i]?.[0] === "a" && existing[i + 1]?.[0] === "e") { pairTags.push(existing[i], existing[i + 1]); i += 2; }
+      else { i++; }
+    }
+    const newEv = await publishEvent({ kind: 10008, content: "", tags: [...pairTags, ["a", aTag], ["e", awardEvent.id]] });
+    if (!newEv) return;
+    setProfileBadges10008(newEv);
+    setAcceptedPairs(prev => [...prev, { aTag, eTag: awardEvent.id }]);
+  };
+
+  const handleBadgeRemove = async (awardId) => {
+    const existing = profileBadges10008?.tags || [];
+    const newTags = [];
+    let i = 0;
+    while (i < existing.length) {
+      if (existing[i]?.[0] === "a" && existing[i + 1]?.[0] === "e") {
+        if (existing[i + 1][1] !== awardId) newTags.push(existing[i], existing[i + 1]);
+        i += 2;
+      } else { i++; }
+    }
+    const newEv = await publishEvent({ kind: 10008, content: "", tags: newTags });
+    if (!newEv) return;
+    setProfileBadges10008(newEv);
+    setAcceptedPairs(prev => prev.filter(p => p.eTag !== awardId));
+    setSelectedBadge(null);
+  };
+
   const scrollRef = useRef(null);
   useEffect(() => {
     if (scrollToTopTrigger > 0) scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
@@ -235,6 +279,13 @@ export default function ProfilePage({
     setListingsSearch("");
     setCreateListingOpen(false);
     setSelectedListing(null);
+    setProfileBadges10008(null);
+    setAcceptedPairs([]);
+    setBadgeDefMap(new Map());
+    setBadgeAwardMap(new Map());
+    setAllAwardEvents([]);
+    setBadgesLoading(false);
+    setSelectedBadge(null);
   }, [pubkey]);
 
   useEffect(() => {
@@ -386,8 +437,8 @@ export default function ProfilePage({
     });
     activeSubs.push(notesSub);
 
-    // Phase 2 — reposts, polls, calendar events, and goals in parallel; merges into same byId
-    const otherSub = pool.request(relayUrls, [{ kinds: [6, 1068, 6969, 31922, 31923, 30311, 9041, 9735], authors: [pubkey], limit: 100 }]).subscribe({
+    // Phase 2 — reposts, polls, calendar events, and streams in parallel; merges into same byId
+    const otherSub = pool.request(relayUrls, [{ kinds: [6, 1068, 6969, 31922, 31923, 30311, 9735], authors: [pubkey], limit: 100 }]).subscribe({
       next: raw => { eventStore.add(raw); byId.set(raw.id, raw); },
       complete: flush,
     });
@@ -421,6 +472,103 @@ export default function ProfilePage({
       complete: flush,
     });
     activeSubs.push(highlightsSub);
+
+    // Phase 6 — badges via kind 10008 (accepted list), then resolve defs + award events.
+    // On own profile also fetch all received kind 8 awards so unaccepted ones can be shown.
+    setBadgesLoading(true);
+    const badges10008Sub = pool.request(relayUrls, [{ kinds: [10008], authors: [pubkey], limit: 1 }]).subscribe({
+      next: raw => {
+        if (cancelled) return;
+        eventStore.add(raw);
+        setProfileBadges10008(raw);
+
+        // Parse consecutive (a, e) pairs from the kind 10008 tags
+        const tags = raw.tags || [];
+        const pairs = [];
+        let idx = 0;
+        while (idx < tags.length) {
+          if (tags[idx]?.[0] === "a" && tags[idx + 1]?.[0] === "e") {
+            pairs.push({ aTag: tags[idx][1], eTag: tags[idx + 1][1] });
+            idx += 2;
+          } else {
+            idx++;
+          }
+        }
+        setAcceptedPairs(pairs);
+
+        if (!pairs.length) return;
+
+        // Fetch badge definitions for accepted a-tags
+        const issuers = [...new Set(pairs.map(p => p.aTag.split(":")[1]).filter(Boolean))];
+        if (issuers.length) {
+          pool.request(relayUrls, [{ kinds: [30009], authors: issuers, limit: 200 }]).subscribe({
+            next: def => {
+              if (cancelled) return;
+              eventStore.add(def);
+              const d = def.tags?.find(t => t[0] === "d")?.[1] || "";
+              setBadgeDefMap(m => new Map(m).set(`30009:${def.pubkey}:${d}`, def));
+            },
+            error: () => {},
+          });
+        }
+
+        // Fetch the specific kind 8 award events referenced by accepted e-tags
+        const awardIds = pairs.map(p => p.eTag).filter(Boolean);
+        if (awardIds.length) {
+          pool.request(relayUrls, [{ kinds: [8], ids: awardIds }]).subscribe({
+            next: raw2 => {
+              if (cancelled) return;
+              eventStore.add(raw2);
+              setBadgeAwardMap(m => new Map(m).set(raw2.id, raw2));
+            },
+            error: () => {},
+          });
+        }
+      },
+      complete: () => {
+        if (cancelled) return;
+        if (isOwn) {
+          // Also fetch every kind 8 where we are a recipient so unaccepted awards are visible
+          const allAccum = [];
+          pool.request(relayUrls, [{ kinds: [8], '#p': [pubkey], limit: 100 }]).subscribe({
+            next: raw => {
+              if (cancelled) return;
+              eventStore.add(raw);
+              if (!allAccum.some(e => e.id === raw.id)) allAccum.push(raw);
+              setBadgeAwardMap(m => new Map(m).set(raw.id, raw));
+              setAllAwardEvents(prev => prev.some(e => e.id === raw.id) ? prev : [...prev, raw]);
+            },
+            complete: () => {
+              if (cancelled) return;
+              const issuers = [...new Set(allAccum.map(e => e.pubkey))];
+              if (!issuers.length) { setBadgesLoading(false); return; }
+              pool.request(relayUrls, [{ kinds: [30009], authors: issuers, limit: 200 }]).subscribe({
+                next: def => {
+                  if (cancelled) return;
+                  eventStore.add(def);
+                  const d = def.tags?.find(t => t[0] === "d")?.[1] || "";
+                  setBadgeDefMap(m => new Map(m).set(`30009:${def.pubkey}:${d}`, def));
+                },
+                complete: () => { if (!cancelled) setBadgesLoading(false); },
+                error:    () => { if (!cancelled) setBadgesLoading(false); },
+              });
+            },
+            error: () => { if (!cancelled) setBadgesLoading(false); },
+          });
+        } else {
+          setBadgesLoading(false);
+        }
+      },
+      error: () => { if (!cancelled) setBadgesLoading(false); },
+    });
+    activeSubs.push(badges10008Sub);
+
+    // Phase 7 — goals (kind 9041), fetched last
+    const goalsSub = pool.request(relayUrls, [{ kinds: [9041], authors: [pubkey], limit: 100 }]).subscribe({
+      next: raw => { eventStore.add(raw); byId.set(raw.id, raw); },
+      complete: flush,
+    });
+    activeSubs.push(goalsSub);
 
     return () => {
       cancelled = true;
@@ -665,6 +813,9 @@ export default function ProfilePage({
         </div>
         <div className={`profile-stat ${tab === "highlights" ? "active" : ""}`} onClick={() => switchTab("highlights")}>
           <div className="profile-stat-label">Highlights</div>
+        </div>
+        <div className={`profile-stat ${tab === "badges" ? "active" : ""}`} onClick={() => switchTab("badges")}>
+          <div className="profile-stat-label">Badges</div>
         </div>
         <div className={`profile-stat ${tab === "goals" ? "active" : ""}`} onClick={() => switchTab("goals")}>
           <div className="profile-stat-label">Goals</div>
@@ -946,6 +1097,87 @@ export default function ProfilePage({
           )}
         </>
       )}
+
+      {/* Badges tab */}
+      {renderedTab === "badges" && (() => {
+        if (selectedBadge) {
+          const aTag = selectedBadge.tags?.find(t => t[0] === "a")?.[1] || "";
+          const parts = aTag.split(":");
+          const defEvent = badgeDefMap.get(`30009:${parts[1] || selectedBadge.pubkey}:${parts[2] || ""}`);
+          const isAccepted = acceptedPairs.some(p => p.eTag === selectedBadge.id);
+          return (
+            <BadgeDetail
+              awardEvent={selectedBadge}
+              defEvent={defEvent}
+              profiles={profiles}
+              isAccepted={isAccepted}
+              onAccept={isOwn && !isAccepted ? handleBadgeAccept : null}
+              onRemove={isOwn && isAccepted ? handleBadgeRemove : null}
+              onOpenProfile={onOpenProfile}
+              onBack={() => setSelectedBadge(null)}
+            />
+          );
+        }
+
+        const acceptedIds = new Set(acceptedPairs.map(p => p.eTag));
+        const unaccepted  = isOwn ? allAwardEvents.filter(e => !acceptedIds.has(e.id)) : [];
+        const hasAny      = acceptedPairs.length > 0 || unaccepted.length > 0;
+
+        if (badgesLoading && !hasAny) return [0, 1, 2].map(i => <SkelCard key={i} />);
+        if (!hasAny) return (
+          <div className="empty-state">
+            <div className="empty-state-title">No badges yet</div>
+            <div className="empty-state-sub">{isOwn ? "Badges you accept will appear here" : "Accepted badges will appear here"}</div>
+          </div>
+        );
+
+        return (
+          <>
+            {acceptedPairs.length > 0 && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: "12px 12px 20px" }}>
+                {acceptedPairs.map((pair, i) => {
+                  const awardEvent = badgeAwardMap.get(pair.eTag);
+                  const [, issuerPk, dTag] = pair.aTag.split(":");
+                  const defEvent = badgeDefMap.get(`30009:${issuerPk}:${dTag}`);
+                  return (
+                    <BadgeCard
+                      key={pair.eTag}
+                      awardEvent={awardEvent}
+                      defEvent={defEvent}
+                      onClick={awardEvent ? setSelectedBadge : null}
+                      delay={i * 0.03}
+                    />
+                  );
+                })}
+              </div>
+            )}
+            {unaccepted.length > 0 && (
+              <>
+                <div style={{ padding: "4px 16px 6px", fontSize: 11, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", borderTop: acceptedPairs.length > 0 ? "1px solid var(--border)" : "none" }}>
+                  Received
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: "0 12px 20px" }}>
+                  {unaccepted.map((award, i) => {
+                    const aTag = award.tags?.find(t => t[0] === "a")?.[1] || "";
+                    const [, issuerPk, dTag] = aTag.split(":");
+                    const defEvent = badgeDefMap.get(`30009:${issuerPk}:${dTag}`);
+                    return (
+                      <BadgeCard
+                        key={award.id}
+                        awardEvent={award}
+                        defEvent={defEvent}
+                        onClick={setSelectedBadge}
+                        onAccept={() => handleBadgeAccept(award)}
+                        delay={i * 0.03}
+                      />
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </>
+        );
+      })()}
 
       {/* Media tab — always mounted so thumbnail images stay in DOM across tab switches */}
       <ProfileMediaGrid

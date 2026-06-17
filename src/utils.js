@@ -36,6 +36,7 @@ export const nip19 = {
   npubEncode:   pk    => nip19Lib.npubEncode(pk),
   noteEncode:   id    => nip19Lib.noteEncode(id),
   neventEncode: event => nip19Lib.neventEncode(event),
+  naddrEncode:  addr  => nip19Lib.naddrEncode(addr),
   decode:       str   => nip19Lib.decode(str),
 };
 
