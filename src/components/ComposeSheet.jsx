@@ -41,13 +41,21 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   const [emojiTags,       setEmojiTags]       = useState([]);
   const [isDragOver,      setIsDragOver]      = useState(false);
   const [excludedMentions, setExcludedMentions] = useState(new Set());
+  const [showTagList,      setShowTagList]      = useState(false);
   const fileRef   = useRef(null);
   const editorRef = useRef(null);
+
+  const TAGS_VISIBLE = 3;
 
   const isNip22Reply = replyTo?.kind === 1068 || replyTo?.kind === 6969 || replyTo?.kind === 1111 || replyTo?.kind === 30023;
   const mentionedPubkeys = (replyTo && !isNip22Reply)
     ? [...new Set(replyTagsForPublish(replyTo, events).filter(t => t[0] === "p").map(t => t[1]))]
     : [];
+  const quotedMentionPubkeys = quotedEvent
+    ? [...new Set([quotedEvent.pubkey, ...(quotedEvent.tags || []).filter(t => t[0] === "p" && t[1]).map(t => t[1])])]
+    : [];
+
+  const allTaggedPubkeys = mentionedPubkeys.length ? mentionedPubkeys : quotedMentionPubkeys;
 
   const toggleMention = pk => {
     setExcludedMentions(prev => {
@@ -148,7 +156,9 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
       if (quotedEvent) {
         tags.push(["q", quotedEvent.id]);
         tags.push(["e", quotedEvent.id, "", "mention"]);
-        tags.push(["p", quotedEvent.pubkey, "", "mention"]);
+        for (const pk of quotedMentionPubkeys) {
+          if (!excludedMentions.has(pk)) tags.push(["p", pk, "", "mention"]);
+        }
         const noteUri = `nostr:${nip19.noteEncode(quotedEvent.id)}`;
         finalContent = finalContent ? `${finalContent}\n${noteUri}` : noteUri;
       }
@@ -446,7 +456,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
               <div style={{ marginTop: 10 }}>
                 <div className="compose-sheet-context-label">Tagging</div>
                 <div className="compose-tagged-list">
-                  {mentionedPubkeys.map(pk => {
+                  {mentionedPubkeys.slice(0, TAGS_VISIBLE).map(pk => {
                     const removed = excludedMentions.has(pk);
                     return (
                       <button
@@ -461,6 +471,11 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
                       </button>
                     );
                   })}
+                  {mentionedPubkeys.length > TAGS_VISIBLE && (
+                    <button type="button" className="tagged-chip tagged-chip-more" onClick={() => setShowTagList(true)}>
+                      +{mentionedPubkeys.length - TAGS_VISIBLE} more
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -522,6 +537,30 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
 
           {quotedEvent && (
             <div style={{ padding: "0 16px 12px" }}>
+              {quotedMentionPubkeys.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div className="compose-sheet-context-label">Tagging</div>
+                  <div className="compose-tagged-list">
+                    {quotedMentionPubkeys.slice(0, TAGS_VISIBLE).map(pk => (
+                      <button
+                        key={pk}
+                        type="button"
+                        className={`tagged-chip${excludedMentions.has(pk) ? " removed" : ""}`}
+                        onClick={() => toggleMention(pk)}
+                        title={excludedMentions.has(pk) ? "Tap to tag again" : "Tap to remove tag"}
+                      >
+                        @{displayName(pk, profiles)}
+                        <span className="tagged-chip-x">{excludedMentions.has(pk) ? "+" : "✕"}</span>
+                      </button>
+                    ))}
+                    {quotedMentionPubkeys.length > TAGS_VISIBLE && (
+                      <button type="button" className="tagged-chip tagged-chip-more" onClick={() => setShowTagList(true)}>
+                        +{quotedMentionPubkeys.length - TAGS_VISIBLE} more
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
               <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px", background: "var(--surface)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
                   <Avatar pk={quotedEvent.pubkey} profiles={profiles} size={20} />
@@ -572,6 +611,36 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
 
         {showEmoji && (
           <EmojiPicker customEmojis={customEmojis} onSelect={emoji => { insertEmoji(emoji); setShowEmoji(false); }} />
+        )}
+
+        {showTagList && (
+          <div style={{ borderTop: "1px solid var(--border)", background: "var(--bg)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px 6px" }}>
+              <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 600, color: "var(--text)" }}>Tagging</span>
+              <button type="button" onClick={() => setShowTagList(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: 16, lineHeight: 1, padding: 4 }}>✕</button>
+            </div>
+            <div style={{ maxHeight: 240, overflowY: "auto" }}>
+              {allTaggedPubkeys.map(pk => {
+                const included = !excludedMentions.has(pk);
+                return (
+                  <button
+                    key={pk}
+                    type="button"
+                    onClick={() => toggleMention(pk)}
+                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 16px", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}
+                  >
+                    <Avatar pk={pk} profiles={profiles} size={30} />
+                    <span style={{ flex: 1, fontFamily: "'DM Sans',sans-serif", fontSize: 14, color: included ? "var(--text)" : "var(--text-faint)", textDecoration: included ? "none" : "line-through" }}>
+                      {displayName(pk, profiles)}
+                    </span>
+                    <span style={{ width: 20, textAlign: "center", color: "var(--primary)", fontSize: 16 }}>
+                      {included ? "✓" : ""}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         )}
 
         {showGif && (
