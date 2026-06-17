@@ -48,7 +48,7 @@ export default function BadgeDetail({ awardEvent, defEvent, profiles, isAccepted
 
   const issuerPubkey = awardEvent.pubkey;
   const issuerName   = displayName(issuerPubkey, profiles);
-  const awardedAt    = relativeTime(awardEvent.created_at);
+  const awardedAt    = awardEvent.created_at ? relativeTime(awardEvent.created_at) : null;
 
   const handleAccept = onAccept
     ? async () => {
@@ -132,7 +132,7 @@ export default function BadgeDetail({ awardEvent, defEvent, profiles, isAccepted
           </div>
         </div>
 
-        <div style={{ fontSize: 12, color: "var(--text-faint)" }}>{awardedAt}</div>
+        {awardedAt && <div style={{ fontSize: 12, color: "var(--text-faint)" }}>{awardedAt}</div>}
       </div>
 
       {jsonOpen && createPortal(

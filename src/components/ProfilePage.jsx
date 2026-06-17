@@ -473,60 +473,77 @@ export default function ProfilePage({
     });
     activeSubs.push(highlightsSub);
 
-    // Phase 6 — badges via kind 10008 (accepted list), then resolve defs + award events.
+    // Phase 6 — badges: fetch kind 10008 and deprecated kind 30008 (d=profile_badges) together.
+    // Prefer kind 10008; fall back to 30008 for backwards compatibility.
     // On own profile also fetch all received kind 8 awards so unaccepted ones can be shown.
     setBadgesLoading(true);
-    const badges10008Sub = pool.request(relayUrls, [{ kinds: [10008], authors: [pubkey], limit: 1 }]).subscribe({
+    const badgesAccum = [];
+    const badgesSub = pool.request(relayUrls, [
+      { kinds: [10008], authors: [pubkey], limit: 1 },
+      { kinds: [30008], authors: [pubkey], '#d': ['profile_badges'], limit: 1 },
+    ]).subscribe({
       next: raw => {
         if (cancelled) return;
         eventStore.add(raw);
-        setProfileBadges10008(raw);
-
-        // Parse consecutive (a, e) pairs from the kind 10008 tags
-        const tags = raw.tags || [];
-        const pairs = [];
-        let idx = 0;
-        while (idx < tags.length) {
-          if (tags[idx]?.[0] === "a" && tags[idx + 1]?.[0] === "e") {
-            pairs.push({ aTag: tags[idx][1], eTag: tags[idx + 1][1] });
-            idx += 2;
-          } else {
-            idx++;
-          }
-        }
-        setAcceptedPairs(pairs);
-
-        if (!pairs.length) return;
-
-        // Fetch badge definitions for accepted a-tags
-        const issuers = [...new Set(pairs.map(p => p.aTag.split(":")[1]).filter(Boolean))];
-        if (issuers.length) {
-          pool.request(relayUrls, [{ kinds: [30009], authors: issuers, limit: 200 }]).subscribe({
-            next: def => {
-              if (cancelled) return;
-              eventStore.add(def);
-              const d = def.tags?.find(t => t[0] === "d")?.[1] || "";
-              setBadgeDefMap(m => new Map(m).set(`30009:${def.pubkey}:${d}`, def));
-            },
-            error: () => {},
-          });
-        }
-
-        // Fetch the specific kind 8 award events referenced by accepted e-tags
-        const awardIds = pairs.map(p => p.eTag).filter(Boolean);
-        if (awardIds.length) {
-          pool.request(relayUrls, [{ kinds: [8], ids: awardIds }]).subscribe({
-            next: raw2 => {
-              if (cancelled) return;
-              eventStore.add(raw2);
-              setBadgeAwardMap(m => new Map(m).set(raw2.id, raw2));
-            },
-            error: () => {},
-          });
-        }
+        if (!badgesAccum.some(e => e.id === raw.id)) badgesAccum.push(raw);
       },
       complete: () => {
         if (cancelled) return;
+
+        // Prefer kind 10008; fall back to deprecated kind 30008 with d=profile_badges
+        const chosen = badgesAccum.find(e => e.kind === 10008)
+          || badgesAccum.find(e => e.kind === 30008 && e.tags?.find(t => t[0] === "d")?.[1] === "profile_badges");
+
+        if (chosen) {
+          setProfileBadges10008(chosen);
+
+          // Parse consecutive (a, e) pairs
+          const tags = chosen.tags || [];
+          const pairs = [];
+          let idx = 0;
+          while (idx < tags.length) {
+            if (tags[idx]?.[0] === "a" && tags[idx + 1]?.[0] === "e") {
+              pairs.push({ aTag: tags[idx][1], eTag: tags[idx + 1][1] });
+              idx += 2;
+            } else {
+              idx++;
+            }
+          }
+          setAcceptedPairs(pairs);
+
+          if (pairs.length) {
+            // Fetch badge definitions for accepted a-tags
+            const issuers = [...new Set(pairs.map(p => p.aTag.split(":")[1]).filter(Boolean))];
+            if (issuers.length) {
+              pool.request(relayUrls, [{ kinds: [30009], authors: issuers, limit: 200 }]).subscribe({
+                next: def => {
+                  if (cancelled) return;
+                  eventStore.add(def);
+                  const d = def.tags?.find(t => t[0] === "d")?.[1] || "";
+                  setBadgeDefMap(m => new Map(m).set(`30009:${def.pubkey}:${d}`, def));
+                },
+                error: () => {},
+              });
+            }
+
+            // Fetch the specific kind 8 award events referenced by accepted e-tags.
+            // Also populate allAwardEvents (own profile) so that removing a badge from
+            // the accepted list immediately surfaces it in the Received section.
+            const awardIds = pairs.map(p => p.eTag).filter(Boolean);
+            if (awardIds.length) {
+              pool.request(relayUrls, [{ kinds: [8], ids: awardIds }]).subscribe({
+                next: raw2 => {
+                  if (cancelled) return;
+                  eventStore.add(raw2);
+                  setBadgeAwardMap(m => new Map(m).set(raw2.id, raw2));
+                  if (isOwn) setAllAwardEvents(prev => prev.some(e => e.id === raw2.id) ? prev : [...prev, raw2]);
+                },
+                error: () => {},
+              });
+            }
+          }
+        }
+
         if (isOwn) {
           // Also fetch every kind 8 where we are a recipient so unaccepted awards are visible
           const allAccum = [];
@@ -561,7 +578,7 @@ export default function ProfilePage({
       },
       error: () => { if (!cancelled) setBadgesLoading(false); },
     });
-    activeSubs.push(badges10008Sub);
+    activeSubs.push(badgesSub);
 
     // Phase 7 — goals (kind 9041), fetched last
     const goalsSub = pool.request(relayUrls, [{ kinds: [9041], authors: [pubkey], limit: 100 }]).subscribe({
@@ -1136,15 +1153,18 @@ export default function ProfilePage({
             {acceptedPairs.length > 0 && (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: "12px 12px 20px" }}>
                 {acceptedPairs.map((pair, i) => {
-                  const awardEvent = badgeAwardMap.get(pair.eTag);
                   const [, issuerPk, dTag] = pair.aTag.split(":");
-                  const defEvent = badgeDefMap.get(`30009:${issuerPk}:${dTag}`);
+                  const defEvent  = badgeDefMap.get(`30009:${issuerPk}:${dTag}`);
+                  // Use the full award event if loaded; otherwise a minimal placeholder so the
+                  // card stays clickable and BadgeDetail can still show issuer + context menu.
+                  const awardEvent = badgeAwardMap.get(pair.eTag)
+                    ?? { id: pair.eTag, tags: [["a", pair.aTag]], pubkey: issuerPk || "", created_at: 0 };
                   return (
                     <BadgeCard
                       key={pair.eTag}
                       awardEvent={awardEvent}
                       defEvent={defEvent}
-                      onClick={awardEvent ? setSelectedBadge : null}
+                      onClick={setSelectedBadge}
                       delay={i * 0.03}
                     />
                   );
