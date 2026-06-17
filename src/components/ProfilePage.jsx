@@ -191,6 +191,7 @@ export default function ProfilePage({
   const [allAwardEvents,     setAllAwardEvents]     = useState([]);   // all kind 8 received (own only)
   const [badgesLoading,      setBadgesLoading]      = useState(false);
   const [selectedBadge,      setSelectedBadge]      = useState(null);
+  const [notAcceptedOpen,    setNotAcceptedOpen]    = useState(false);
 
   const handleBadgeAccept = async (awardEvent) => {
     const aTag = awardEvent.tags?.find(t => t[0] === "a")?.[1];
@@ -286,6 +287,7 @@ export default function ProfilePage({
     setAllAwardEvents([]);
     setBadgesLoading(false);
     setSelectedBadge(null);
+    setNotAcceptedOpen(false);
   }, [pubkey]);
 
   useEffect(() => {
@@ -1137,7 +1139,7 @@ export default function ProfilePage({
         }
 
         const acceptedIds = new Set(acceptedPairs.map(p => p.eTag));
-        const unaccepted  = isOwn ? allAwardEvents.filter(e => !acceptedIds.has(e.id)) : [];
+        const unaccepted  = isOwn ? allAwardEvents.filter(e => !acceptedIds.has(e.id)).sort((a, b) => b.created_at - a.created_at) : [];
         const hasAny      = acceptedPairs.length > 0 || unaccepted.length > 0;
 
         if (badgesLoading && !hasAny) return [0, 1, 2].map(i => <SkelCard key={i} />);
@@ -1173,26 +1175,34 @@ export default function ProfilePage({
             )}
             {unaccepted.length > 0 && (
               <>
-                <div style={{ padding: "4px 16px 6px", fontSize: 11, fontWeight: 700, color: "var(--text-faint)", textTransform: "uppercase", letterSpacing: "0.05em", borderTop: acceptedPairs.length > 0 ? "1px solid var(--border)" : "none" }}>
-                  Received
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: "0 12px 20px" }}>
-                  {unaccepted.map((award, i) => {
-                    const aTag = award.tags?.find(t => t[0] === "a")?.[1] || "";
-                    const [, issuerPk, dTag] = aTag.split(":");
-                    const defEvent = badgeDefMap.get(`30009:${issuerPk}:${dTag}`);
-                    return (
-                      <BadgeCard
-                        key={award.id}
-                        awardEvent={award}
-                        defEvent={defEvent}
-                        onClick={setSelectedBadge}
-                        onAccept={() => handleBadgeAccept(award)}
-                        delay={i * 0.03}
-                      />
-                    );
-                  })}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setNotAcceptedOpen(v => !v)}
+                  style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "8px 16px", background: "none", border: "none", borderTop: acceptedPairs.length > 0 ? "1px solid var(--border)" : "none", cursor: "pointer", color: "var(--text-faint)", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}
+                >
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{ transition: "transform .2s", transform: notAcceptedOpen ? "rotate(90deg)" : "rotate(0deg)" }}><polyline points="9 18 15 12 9 6" /></svg>
+                  Not accepted
+                  <span style={{ marginLeft: "auto", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>{unaccepted.length}</span>
+                </button>
+                {notAcceptedOpen && (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: "4px 12px 20px" }}>
+                    {unaccepted.map((award, i) => {
+                      const aTag = award.tags?.find(t => t[0] === "a")?.[1] || "";
+                      const [, issuerPk, dTag] = aTag.split(":");
+                      const defEvent = badgeDefMap.get(`30009:${issuerPk}:${dTag}`);
+                      return (
+                        <BadgeCard
+                          key={award.id}
+                          awardEvent={award}
+                          defEvent={defEvent}
+                          onClick={setSelectedBadge}
+                          onAccept={() => handleBadgeAccept(award)}
+                          delay={i * 0.03}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
               </>
             )}
           </>
