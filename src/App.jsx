@@ -52,6 +52,7 @@ import FeedItem from "./components/FeedItem.jsx";
 import StreamCard from "./components/StreamCard.jsx";
 import StreamDetailView from "./components/StreamDetailView.jsx";
 import ComposeSheet from "./components/ComposeSheet.jsx";
+import { DraftsProvider } from "./contexts/DraftsContext.jsx";
 import ProfilePage from "./components/ProfilePage.jsx";
 import RelaysCard from "./components/RelaysCard.jsx";
 import ParticipantsCard from "./components/ParticipantsCard.jsx";
@@ -452,6 +453,7 @@ export default function App() {
   }
 
   return (
+    <DraftsProvider pubkey={pubkey} signAndPublish={signAndPublish}>
     <NavigationContext.Provider value={{
       onOpenThread: handleOpenThread,
       onOpenProfile: handleOpenProfile,
@@ -1441,5 +1443,6 @@ export default function App() {
       <div className={`toast ${toast.show ? "show" : ""}`}>{toast.msg}</div>
     </>
     </NavigationContext.Provider>
+    </DraftsProvider>
   );
 }

@@ -1,4 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { draftId as computeDraftId } from "../hooks/useDrafts.js";
+import { useDraftsContext } from "../contexts/DraftsContext.jsx";
 import Overlay from "./Overlay.jsx";
 import Avatar from "./Avatar.jsx";
 import { displayName, avatarInitial, replyTagsForPublish, kind1111TagsForPublish, nip19 } from "../utils.js";
@@ -10,6 +12,7 @@ import GoalCompose from "./GoalCompose.jsx";
 import { uploadToBlossom } from "../utils/blossom.js";
 
 export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey, myProfile, onPost, onDismiss, publishEvent, onPrepend, events = [], circles = [], initialCircle = null, customEmojis = [], blossomServers = [] }) {
+  const { getDraft, saveDraft, deleteDraft } = useDraftsContext();
   const [hasText,        setHasText]        = useState(false);
   const [media,          setMedia]          = useState([]);
   const [uploading,      setUploading]      = useState(false);
@@ -45,6 +48,27 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   const fileRef   = useRef(null);
   const editorRef = useRef(null);
 
+  const thisDraftId = computeDraftId(replyTo, quotedEvent);
+  const draft = getDraft(thisDraftId);
+
+  const restoredRef = useRef(false);
+  // Restore draft content into editor when draft becomes available
+  useEffect(() => {
+    if (!draft || restoredRef.current) return;
+    restoredRef.current = true;
+    if (draft.content && editorRef.current) {
+      editorRef.current.textContent = draft.content;
+      setHasText(true);
+    }
+    if (draft.media?.length) setMedia(draft.media);
+    if (draft.emojiTags?.length) setEmojiTags(draft.emojiTags);
+    if (draft.excludedMentions?.length) setExcludedMentions(new Set(draft.excludedMentions));
+    if (draft.selectedCircleId) {
+      const c = circles.find(c => c.id === draft.selectedCircleId);
+      if (c) setSelectedCircle(c);
+    }
+  }, [draft, circles]);
+
   const TAGS_VISIBLE = 3;
 
   const isNip22Reply = replyTo?.kind === 1068 || replyTo?.kind === 6969 || replyTo?.kind === 1111 || replyTo?.kind === 30023;
@@ -64,6 +88,21 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
       return next;
     });
   };
+
+  const collectDraftState = useCallback(() => ({
+    content: getContent(),
+    media,
+    emojiTags,
+    excludedMentions,
+    selectedCircleId: selectedCircle?.id ?? null,
+  }), [media, emojiTags, excludedMentions, selectedCircle]);
+
+  const handleDismiss = useCallback(() => {
+    const content = getContent();
+    const hasDraftContent = content.trim().length > 0 || media.length > 0;
+    if (hasDraftContent) saveDraft(thisDraftId, collectDraftState());
+    onDismiss?.();
+  }, [saveDraft, onDismiss, thisDraftId, collectDraftState, media]);
 
   const title   = quotedEvent ? "Quote repost" : replyTo ? "Reply" : goalMode ? "New Goal" : pollMode ? "New Poll" : "New note";
   const pollValid = pollMode && pollOptions.filter(o => o.trim()).length >= 2;
@@ -117,6 +156,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
 
       const published = await publishEvent({ kind: isZap ? 6969 : 1068, content: question, tags });
       if (published) onPrepend?.(published);
+      deleteDraft(thisDraftId);
       onDismiss?.();
       return;
     }
@@ -133,6 +173,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
       const published = await publishEvent({ kind: 9041, content: goalTitle.trim(), tags });
       if (!published) { setUploadErr("Failed to publish — please try again."); setPublishing(false); return; }
       onPrepend?.(published);
+      deleteDraft(thisDraftId);
       onDismiss?.();
       return;
     }
@@ -174,7 +215,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
       for (const et of emojiTags) tags.push(et);
       if (replyTo && replyTo.pubkey !== myPubkey) broadcastEvent(replyTo);
       const published = await publishEvent({ kind: isNip22Reply ? 1111 : 1, content: finalContent, tags });
-      if (published) onPrepend?.(published);
+      if (published) { onPrepend?.(published); deleteDraft(thisDraftId); }
     } else {
       onPost?.(full);
     }
@@ -381,6 +422,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
       if (e.key === "Enter" || e.key === "Tab")   { e.preventDefault(); selectMention(mentionResults[mentionIndex]); return; }
       if (e.key === "Escape")                     { setMentionResults([]); return; }
     }
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && canPost && !publishing) { e.preventDefault(); handlePost(); }
   };
 
   const handlePaste = e => {
@@ -432,10 +474,10 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   };
 
   return (
-    <Overlay onDismiss={onDismiss} compose>
+    <Overlay onDismiss={handleDismiss} compose>
       <div className="compose-sheet" onClick={e => e.stopPropagation()}>
         <div className="compose-sheet-bar">
-          <button className="compose-sheet-cancel" onClick={onDismiss}>Cancel</button>
+          <button className="compose-sheet-cancel" onClick={handleDismiss}>Cancel</button>
           <span className="compose-sheet-title">{title}</span>
           <button className="compose-sheet-post" disabled={!canPost || publishing} onClick={handlePost}>{publishing ? "Publishing…" : "Publish"}</button>
         </div>
