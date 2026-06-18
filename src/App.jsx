@@ -164,7 +164,7 @@ export default function App() {
           if (done || !ev?.id) return;
           done = true;
           sub.unsubscribe();
-          prependEvent(ev);
+          eventStore.add(ev);
           resolve(ev);
         },
         error: () => { if (!done) { done = true; resolve(null); } },
@@ -172,7 +172,7 @@ export default function App() {
       });
       setTimeout(() => { if (!done) { done = true; sub.unsubscribe(); resolve(null); } }, 8000);
     });
-  }, [mergedFeedMap, prependEvent]);
+  }, [mergedFeedMap]);
 
   const allPks = useMemo(() => {
     const seen = new Set();
