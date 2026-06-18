@@ -6,7 +6,7 @@ import PollPreview from "./PollPreview.jsx";
 import CalendarInlineCard from "./CalendarInlineCard.jsx";
 import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
 import LightningCard from "./LightningCard.jsx";
-import { parseNoteMediaSegments, groupNoteMediaSegments, displayName, relativeTime, nip19, isHexPubkey, normPubkey, fmtSats, parseBolt11Msats, zapCommentFromKind9735, zapperPubkeyFromKind9735, firstLinkPreviewUrl } from "../utils.js";
+import { parseNoteMediaSegments, groupNoteMediaSegments, displayName, relativeTime, nip19, isHexPubkey, normPubkey, fmtSats, parseBolt11Msats, zapCommentFromKind9735, zapperPubkeyFromKind9735, firstLinkPreviewUrl, parseArticle } from "../utils.js";
 import LinkPreviewCard from "./LinkPreviewCard.jsx";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
@@ -38,12 +38,14 @@ function fetchMentionedProfiles(content) {
 
 function splitNostrEventRefs(text) {
   const out = [];
-  const re = /nostr:(nevent1[023456789acdefghjklmnpqrstuvwxyz]+|note1[023456789acdefghjklmnpqrstuvwxyz]+)/ig;
+  const re = /nostr:(naddr1[023456789acdefghjklmnpqrstuvwxyz]+|nevent1[023456789acdefghjklmnpqrstuvwxyz]+|note1[023456789acdefghjklmnpqrstuvwxyz]+)/ig;
   let last = 0;
   let m;
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) out.push({ type: "text", value: text.slice(last, m.index) });
-    out.push({ type: "nevent", value: m[1] });
+    const val = m[1];
+    const type = val.startsWith("naddr1") ? "naddr" : "nevent";
+    out.push({ type, value: val });
     last = m.index + m[0].length;
   }
   if (last < text.length) out.push({ type: "text", value: text.slice(last) });
@@ -68,13 +70,52 @@ function decodeNevent(nevent) {
   return null;
 }
 
+function decodeNaddr(naddr) {
+  try {
+    const d = nip19.decode(naddr);
+    if (d?.type === "naddr") return d.data; // { kind, pubkey, identifier, relays }
+  } catch {}
+  return null;
+}
+
 function EmbeddedEvent({ event, profiles, onOpenProfile }) {
-  const { onOpenThread, onOpenCalendarEvent, onOpenPoll, onOpenGoal } = useNavigation();
+  const { onOpenThread, onOpenCalendarEvent, onOpenPoll, onOpenGoal, onOpenArticle } = useNavigation();
   if (!event) return null;
   const isPoll = event.kind === 1068 || event.kind === 6969;
   const isCalendar = event.kind === 31922 || event.kind === 31923;
   const isGoal = event.kind === 9041;
   const isZapPoll = event.kind === 6969;
+
+  if (event.kind === 30023) {
+    const art = parseArticle(event);
+    return (
+      <div
+        className="lf-inner"
+        style={{ cursor: "pointer", marginTop: 8 }}
+        onClick={e => { e.stopPropagation(); onOpenArticle?.(event); }}
+        role="presentation"
+      >
+        {art.image ? (
+          <img className="lf-image" src={art.image} alt={art.title} loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+        ) : (
+          <div className="lf-placeholder">✦</div>
+        )}
+        <div className="lf-body">
+          <div className="note-embed-head" style={{ marginBottom: 4 }}>
+            <div onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }} role="presentation">
+              <Avatar pk={event.pubkey} profiles={profiles} size={16} />
+            </div>
+            <span className="note-embed-name" onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }} role="presentation">
+              {displayName(event.pubkey, profiles)}
+            </span>
+            <span className="note-embed-time">{relativeTime(event.created_at)}</span>
+          </div>
+          <div className="lf-title">{art.title}</div>
+          {art.summary && <div className="lf-summary">{art.summary}</div>}
+        </div>
+      </div>
+    );
+  }
 
   if (isCalendar) {
     return <CalendarInlineCard event={event} onOpen={onOpenCalendarEvent ?? onOpenThread} />;
@@ -192,6 +233,20 @@ function EmbeddedEventRef({ nevent }) {
         <div>id: {shortId}</div>
         {author && <div>author: {author}</div>}
       </div>
+    </div>
+  );
+}
+
+function EmbeddedNaddrRef({ naddr }) {
+  const data = decodeNaddr(naddr);
+  if (!data) return null;
+  const kindLabel = data.kind === 30023 ? "Article" : data.kind === 30030 ? "Emoji Pack" : `Kind ${data.kind}`;
+  return (
+    <div className="note-embed note-embed-ref" role="presentation">
+      <div className="note-embed-head">
+        <span className="note-embed-name">Referenced {kindLabel}</span>
+      </div>
+      {data.identifier && <div className="note-embed-text">{data.identifier}</div>}
     </div>
   );
 }
@@ -348,6 +403,7 @@ export default function NoteContent({
 
   const [lightbox, setLightbox] = useState(null);
   const [resolvedRefs, setResolvedRefs] = useState({});
+  const [resolvedNaddrRefs, setResolvedNaddrRefs] = useState({});
   const [expanded, setExpanded] = useState(false);
 
   // Fetch profiles for any nprofile/npub mentions so display names resolve
@@ -356,7 +412,7 @@ export default function NoteContent({
   const textLength = normalizedSegments
     .filter(s => s.type === "text")
     .reduce((n, s) => {
-      const stripped = (s.value || "").replace(/nostr:(nevent1|note1)[023456789acdefghjklmnpqrstuvwxyz]+/ig, "");
+      const stripped = (s.value || "").replace(/nostr:(naddr1|nevent1|note1)[023456789acdefghjklmnpqrstuvwxyz]+/ig, "");
       return n + stripped.length;
     }, 0);
   const shouldCollapse = collapsible && textLength > COLLAPSE_THRESHOLD;
@@ -382,7 +438,31 @@ export default function NoteContent({
     return () => { cancelled = true; };
   }, [content, allEvents, resolveEventById, resolvedRefs, allowEmbeds]);
 
-  // Collect all nevent/note1 refs from text segments — rendered at the bottom,
+  useEffect(() => {
+    if (!allowEmbeds || typeof content !== "string" || !/nostr:naddr1/i.test(content)) return;
+    const refs = [...content.matchAll(/nostr:(naddr1[023456789acdefghjklmnpqrstuvwxyz]+)/ig)].map(m => m[1]);
+    if (!refs.length) return;
+    let cancelled = false;
+    const connected = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    for (const naddr of refs) {
+      if (resolvedNaddrRefs[naddr]) continue;
+      const data = decodeNaddr(naddr);
+      if (!data) continue;
+      const filter = { kinds: [data.kind], authors: [data.pubkey], limit: 1 };
+      if (data.identifier) filter["#d"] = [data.identifier];
+      const relayUrls = data.relays?.length ? [...new Set([...data.relays, ...connected])] : connected;
+      pool.request(relayUrls, [filter]).subscribe({
+        next: ev => {
+          if (cancelled || !ev?.id) return;
+          eventStore.add(ev);
+          setResolvedNaddrRefs(prev => (prev[naddr] ? prev : { ...prev, [naddr]: ev }));
+        },
+      });
+    }
+    return () => { cancelled = true; };
+  }, [content, resolvedNaddrRefs, allowEmbeds]);
+
+  // Collect all nevent/note1/naddr1 refs from text segments — rendered at the bottom,
   // outside the collapse and after media, so they never block text or images.
   const embeddedRefs = useMemo(() => {
     if (!allowEmbeds) return [];
@@ -391,9 +471,9 @@ export default function NoteContent({
     for (const seg of normalizedSegments) {
       if (seg.type !== "text" || !seg.value) continue;
       for (const part of splitNostrEventRefs(seg.value)) {
-        if (part.type === "nevent" && !seen.has(part.value)) {
+        if ((part.type === "nevent" || part.type === "naddr") && !seen.has(part.value)) {
           seen.add(part.value);
-          refs.push(part.value);
+          refs.push(part);
         }
       }
     }
@@ -402,7 +482,7 @@ export default function NoteContent({
 
   const renderTextSegment = (seg, i) => {
     if (!seg.value || seg.value.trim() === "") return null;
-    // Only render plain-text parts; nevent refs are lifted to bottom
+    // Only render plain-text parts; nevent/naddr refs are lifted to bottom
     const textParts = splitNostrEventRefs(seg.value).filter(p => p.type === "text");
     return textParts.map((part, idx) => {
       if (!part.value || !part.value.trim()) return null;
@@ -476,10 +556,15 @@ export default function NoteContent({
       })
     )}
 
-    {embeddedRefs.map((nevent, i) => {
-      const id = resolveNeventToId(nevent);
+    {embeddedRefs.map((ref, i) => {
+      if (ref.type === "naddr") {
+        const refEvent = resolvedNaddrRefs[ref.value];
+        if (!refEvent) return <EmbeddedNaddrRef key={`bot-${i}`} naddr={ref.value} />;
+        return <EmbeddedEvent key={`bot-${i}`} event={refEvent} profiles={profiles} onOpenProfile={onOpenProfile} />;
+      }
+      const id = resolveNeventToId(ref.value);
       const refEvent = id ? (allEvents.find(e => e.id === id) || resolvedRefs[id]) : null;
-      if (!refEvent) return <EmbeddedEventRef key={`bot-${i}`} nevent={nevent} />;
+      if (!refEvent) return <EmbeddedEventRef key={`bot-${i}`} nevent={ref.value} />;
       return (
         <EmbeddedEvent
           key={`bot-${i}`}
