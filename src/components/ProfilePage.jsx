@@ -751,14 +751,16 @@ export default function ProfilePage({
 
       <div className="profile-identity" style={{ paddingBottom: 16 }}>
         <div className="profile-av-wrap">
-          <div
-            className={`profile-av${activeStream ? " profile-av-live" : ""}`}
-            onClick={activeStream ? () => onOpenStream?.(activeStream) : (p.picture ? () => setLightboxUrl(p.picture) : undefined)}
-            style={(activeStream || p.picture) ? { cursor: "pointer" } : undefined}
-          >
-            {p.picture
-              ? <img src={p.picture} alt={name} onError={e => { e.target.style.display = "none"; }} />
-              : name[0]?.toUpperCase()}
+          <div style={{ position: "relative", display: "inline-block" }}>
+            <div
+              className={`profile-av${activeStream ? " profile-av-live" : ""}`}
+              onClick={activeStream ? () => onOpenStream?.(activeStream) : (p.picture ? () => setLightboxUrl(p.picture) : undefined)}
+              style={(activeStream || p.picture) ? { cursor: "pointer" } : undefined}
+            >
+              {p.picture
+                ? <img src={p.picture} alt={name} onError={e => { e.target.style.display = "none"; }} />
+                : name[0]?.toUpperCase()}
+            </div>
             {activeStream && <div className="profile-av-live-badge">LIVE</div>}
           </div>
           {isOwn && <button className="profile-edit-btn" onClick={onEditProfile}>Edit profile</button>}
