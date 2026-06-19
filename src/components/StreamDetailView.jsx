@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import Avatar from "./Avatar.jsx";
 import { Bk } from "./icons.jsx";
-import { displayName, nip05OrNpub, relativeTime, parseStreamEvent } from "../utils.js";
+import NoteContextMenu from "./NoteContextMenu.jsx";
+import NoteJsonModal from "./NoteJsonModal.jsx";
+import { displayName, relativeTime, parseStreamEvent } from "../utils.js";
 import useStreamChat from "../hooks/useStreamChat.js";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
@@ -43,29 +45,26 @@ function StreamPlayer({ urls }) {
 
 export default function StreamDetailView({ event, profiles, pubkey, onBack, onOpenProfile }) {
   const ref = useRef(null);
-  const [progress, setProgress] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [jsonOpen, setJsonOpen] = useState(false);
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
   const stream = parseStreamEvent(event);
   const { messages } = useStreamChat(event);
   const chatRef = useRef(null);
 
-  const hostPk = stream.host?.pubkey ?? event.pubkey;
+  const hostPks = (() => {
+    const tagged = event.tags.filter(t => t[0] === "p" && t[3]?.toLowerCase() === "host").map(t => t[1]);
+    return tagged.length > 0 ? tagged : [stream.host?.pubkey ?? event.pubkey];
+  })();
 
-  // Fetch host profile if not already loaded
+  // Fetch all host profiles
   useEffect(() => {
-    if (!hostPk) return;
+    if (!hostPks.length) return;
     const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
-    pool.request(relayUrls, [{ kinds: [0], authors: [hostPk] }]).subscribe({
+    pool.request(relayUrls, [{ kinds: [0], authors: hostPks }]).subscribe({
       next: ev => eventStore.add(ev),
     });
-  }, [hostPk]);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const fn = () => setProgress(Math.min((el.scrollTop / (el.scrollHeight - el.clientHeight)) * 100 || 0, 100));
-    el.addEventListener("scroll", fn);
-    return () => el.removeEventListener("scroll", fn);
-  }, []);
+  }, [hostPks.join(",")]);
 
   // Auto-scroll chat to bottom when new messages arrive
   useEffect(() => {
@@ -75,12 +74,24 @@ export default function StreamDetailView({ event, profiles, pubkey, onBack, onOp
   }, [messages.length]);
 
   return (
+    <>
     <div ref={ref} className="slide-panel-scroll">
-      <div className="read-progress" style={{ width: `${progress}%` }} />
       <div className="panel-bar">
         <button className="back-btn" onClick={onBack}><Bk s={16} /></button>
-        <span className="panel-bar-logo">Circl</span>
-        <div style={{ display: "flex", gap: 3 }} />
+        <span className="panel-bar-logo">Stream</span>
+        <div style={{ position: "relative" }}>
+          <button
+            type="button"
+            className="note-card-menu-btn"
+            onClick={e => { e.stopPropagation(); setMenuOpen(v => !v); }}
+            aria-label="More options"
+          >
+            <span /><span /><span />
+          </button>
+          {menuOpen && (
+            <NoteContextMenu event={event} onClose={() => setMenuOpen(false)} onViewJson={() => { setJsonOpen(true); setMenuOpen(false); }} />
+          )}
+        </div>
       </div>
 
       {stream.streamingURLs.length > 0 ? (
@@ -92,7 +103,7 @@ export default function StreamDetailView({ event, profiles, pubkey, onBack, onOp
       ) : null}
 
       <div className="reader-content">
-        <div className="reader-header">
+        <div className="reader-header" style={{ borderBottom: "none", marginBottom: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <StatusBadge status={stream.status} />
             {stream.status === "live" && stream.viewers != null && (
@@ -101,7 +112,31 @@ export default function StreamDetailView({ event, profiles, pubkey, onBack, onOp
           </div>
 
           <div className="reader-title">{stream.title || "Untitled Stream"}</div>
-          {stream.summary && <div className="reader-summary">{stream.summary}</div>}
+          {stream.summary && (() => {
+            const text = stream.summary.replace(/\\\n/g, "\n");
+            const long = text.length > 200;
+            return (
+              <>
+                <div style={{ position: "relative" }}>
+                  <div
+                    className="reader-summary"
+                    style={{ whiteSpace: "pre-wrap", ...(long && !summaryExpanded ? { maxHeight: 72, overflow: "hidden" } : {}) }}
+                  >
+                    {text}
+                  </div>
+                  {long && !summaryExpanded && <div className="note-content-fade" />}
+                </div>
+                {long && (
+                  <button type="button" className="note-content-more-btn" onClick={() => setSummaryExpanded(v => !v)}>
+                    {summaryExpanded ? "Show less" : "Show more"}
+                    <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{ transform: summaryExpanded ? "rotate(180deg)" : undefined, transition: "transform .2s" }}>
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+                )}
+              </>
+            );
+          })()}
 
           {stream.hashtags?.length ? (
             <div className="reader-hashtags">
@@ -109,16 +144,28 @@ export default function StreamDetailView({ event, profiles, pubkey, onBack, onOp
             </div>
           ) : null}
 
-          <div className="reader-meta">
-            <div className="r-author-row" onClick={() => onOpenProfile?.(hostPk)} style={{ cursor: "pointer" }}>
-              <div className="r-av"><Avatar pk={hostPk} profiles={profiles} size={34} /></div>
-              <div>
-                <div className="r-author-name">{displayName(hostPk, profiles)}</div>
-                <div className="r-author-npub">{nip05OrNpub(hostPk, profiles)}</div>
-              </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+            <div className="host-avatars">
+              {hostPks.map((pk, i) => (
+                <div key={pk} className="host-av-wrap" style={{ zIndex: hostPks.length - i }} onClick={() => onOpenProfile?.(pk)}>
+                  <Avatar pk={pk} profiles={profiles} size={34} />
+                </div>
+              ))}
             </div>
-            <div className="meta-sep" />
-            <span className="meta-pill">{relativeTime(event.created_at)} ago</span>
+            <div className="r-author-name">
+              {hostPks.map((pk, i) => (
+                <span key={pk}>
+                  {i > 0 && ", "}
+                  <span style={{ cursor: "pointer" }} onClick={() => onOpenProfile?.(pk)}>{displayName(pk, profiles)}</span>
+                </span>
+              ))}
+            </div>
+            {stream.startTime && (
+              <>
+                <div className="meta-sep" />
+                <span className="meta-pill">started {relativeTime(stream.startTime)} ago</span>
+              </>
+            )}
           </div>
         </div>
 
@@ -146,5 +193,7 @@ export default function StreamDetailView({ event, profiles, pubkey, onBack, onOp
         )}
       </div>
     </div>
+    {jsonOpen && <NoteJsonModal event={event} onClose={() => setJsonOpen(false)} />}
+    </>
   );
 }

@@ -14,7 +14,8 @@ import { RELAYS } from "../constants.js";
 import { useNavigation } from "../context/NavigationContext.jsx";
 
 function ZapEmbed({ event, profiles, onOpenProfile }) {
-  const [liveEvent, setLiveEvent] = useState(null);
+  const [liveEvent, setLiveEvent]     = useState(null);
+  const [podcastMeta, setPodcastMeta] = useState(null);
 
   const zapperPk    = zapperPubkeyFromKind9735(event) ?? event.tags?.find(t => t[0] === "P")?.[1] ?? null;
   const recipientPk = event.tags?.find(t => t[0] === "p")?.[1] ?? null;
@@ -27,7 +28,6 @@ function ZapEmbed({ event, profiles, onOpenProfile }) {
   const isPodcast   = !!(episode || show || publisher);
   const linkUrl     = episode?.[2] ?? show?.[2] ?? publisher?.[2] ?? null;
   const podLabel    = episode ? "episode" : show ? "podcast" : "publisher";
-  const showRecip   = recipientPk && recipientPk !== zapperPk;
 
   const aTagVal = event.tags?.find(t => t[0] === "a")?.[1] ?? null;
   useEffect(() => {
@@ -43,35 +43,43 @@ function ZapEmbed({ event, profiles, onOpenProfile }) {
     return () => sub.unsubscribe();
   }, [aTagVal]);
 
-  const hasExtra = isPodcast || !!liveEvent;
+  useEffect(() => {
+    if (!linkUrl) return;
+    import("../utils/linkPreview.js").then(m => m.fetchLinkPreview(linkUrl)).then(d => { if (d) setPodcastMeta(d); });
+  }, [linkUrl]);
+
+  const stripPodcastSuffix = t => t.replace(/\s*•\s*(Watch|Listen|Play|Stream) on \S+\s*$/i, "").trim();
+  const liveTitle    = liveEvent?.tags?.find(t => t[0] === "title")?.[1] ?? null;
+  const podcastTitle = podcastMeta?.title ? stripPodcastSuffix(podcastMeta.title) : null;
+  const hasTarget    = isPodcast || !!liveTitle;
+
   return (
     <div className="note-embed note-embed-ref" role="presentation">
       <div className="note-embed-head">
-        {zapperPk && <div role="presentation" onClick={e => { e.stopPropagation(); onOpenProfile?.(zapperPk); }}><Avatar pk={zapperPk} profiles={profiles} size={20} /></div>}
-        <span className="note-embed-name" role="presentation" onClick={e => { e.stopPropagation(); zapperPk && onOpenProfile?.(zapperPk); }}>
-          {zapperPk ? displayName(zapperPk, profiles) : "Anonymous"}
+        <div role="presentation" onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }}><Avatar pk={event.pubkey} profiles={profiles} size={20} /></div>
+        <span className="note-embed-name" role="presentation" onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }}>
+          {displayName(event.pubkey, profiles)}
         </span>
         <span className="note-embed-time">{relativeTime(event.created_at)}</span>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", fontSize: 13, marginBottom: (comment || hasExtra) ? 6 : 0 }}>
-        <span style={{ color: "var(--text-faint)" }}>zapped</span>
+      <div style={{ fontSize: 13, lineHeight: 1.4, marginBottom: (comment || isPodcast) ? 6 : 0 }}>
+        <span className="ix-mention" style={{ cursor: zapperPk ? "pointer" : "default" }} role="presentation" onClick={e => { e.stopPropagation(); zapperPk && onOpenProfile?.(zapperPk); }}>
+          @{zapperPk ? displayName(zapperPk, profiles) : "Anonymous"}
+        </span>
+        {" "}<span style={{ color: "var(--text-faint)" }}>zapped</span>{" "}
         <span style={{ fontWeight: 600, color: "#f59e0b" }}>⚡ {fmtSats(msats)}</span>
-        {showRecip && (
-          <>
-            <span style={{ color: "var(--text-faint)" }}>to</span>
-            <span style={{ fontWeight: 500, cursor: "pointer" }} role="presentation" onClick={e => { e.stopPropagation(); onOpenProfile?.(recipientPk); }}>
-              {displayName(recipientPk, profiles)}
-            </span>
+        {hasTarget && (
+          <>{" "}<span style={{ color: "var(--text-faint)" }}>to</span>{" "}
+          {liveTitle ? (
+            <span style={{ fontWeight: 500 }}><span className="live-badge">Live</span>{liveTitle}</span>
+          ) : (
+            <span style={{ fontWeight: 500 }}>{podcastTitle ?? podLabel}</span>
+          )}
           </>
         )}
       </div>
-      {comment && <div style={{ fontSize: 13, color: "var(--text-muted)", fontStyle: "italic", marginBottom: hasExtra ? 6 : 0 }}>"{comment}"</div>}
+      {comment && <NoteText content={`"${comment}"`} profiles={profiles} onOpenProfile={onOpenProfile} style={{ fontSize: 13, color: "var(--text-muted)", fontStyle: "italic", marginBottom: isPodcast ? 6 : 0 }} />}
       {isPodcast && <PodcastPreviewChip url={linkUrl} fallbackLabel={podLabel} />}
-      {liveEvent && (
-        <span className="highlight-source-chip highlight-source-unknown" style={{ cursor: "default" }}>
-          📡 {liveEvent.tags?.find(t => t[0] === "title")?.[1] || "Live Event"}
-        </span>
-      )}
     </div>
   );
 }
