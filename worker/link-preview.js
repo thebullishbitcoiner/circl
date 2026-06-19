@@ -47,7 +47,8 @@ export default {
       const ct = res.headers.get("content-type") || "";
       if (!ct.includes("html")) return json(null);
 
-      // Only read up to 100KB — OG tags are always in <head>
+      // Read up to 200KB — most OG tags are in <head> but some SSR frameworks
+      // (e.g. Next.js streaming) inject them later in the response body.
       const reader = res.body.getReader();
       const chunks = [];
       let total = 0;
@@ -56,13 +57,13 @@ export default {
         if (done || !value) break;
         chunks.push(value);
         total += value.length;
-        if (total >= 100_000) { reader.cancel(); break; }
+        if (total >= 200_000) { reader.cancel(); break; }
       }
       const html = new TextDecoder().decode(
         chunks.reduce((acc, c) => { const merged = new Uint8Array(acc.length + c.length); merged.set(acc); merged.set(c, acc.length); return merged; }, new Uint8Array(0))
       );
 
-      const data = parseOG(html, parsed);
+      const data = parseOG(html, parsed) ?? parseRSC(html, parsed);
       return json(data, 200, { "Cache-Control": "public, max-age=86400" });
     } catch {
       return json(null);
@@ -96,6 +97,32 @@ function resolveUrl(base, url) {
   try { return new URL(url, base).href; } catch { return null; }
 }
 
+// Fallback for Next.js App Router, which streams OG data as escaped JSON inside
+// self.__next_f.push() blocks rather than as real <meta> elements.
+// In the raw HTML these appear as: \"property\":\"og:title\",\"content\":\"VALUE\"
+function parseRSC(html, base) {
+  function get(prop) {
+    const re = new RegExp(`\\\\"property\\\\":\\\\"${prop}\\\\"[^}]*\\\\"content\\\\":\\\\"([^"\\\\]*)`);
+    const m = re.exec(html);
+    // RSC lazy refs look like "$16" — skip them
+    return (m && !m[1].startsWith("$")) ? m[1] : null;
+  }
+  const title = get("og:title");
+  if (!title) return null;
+  const image = get("og:image");
+  return {
+    title:       htmlDecode(title),
+    description: htmlDecode(get("og:description")),
+    image:       image ? resolveUrl(base, image) : null,
+    siteName:    htmlDecode(get("og:site_name")),
+  };
+}
+
+function htmlDecode(s) {
+  if (!s) return null;
+  return s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+}
+
 function parseOG(html, base) {
   const titleTag = /<title[^>]*>([^<]{1,300})<\/title>/i.exec(html);
   const title       = meta(html, "og:title", "twitter:title") || titleTag?.[1]?.trim() || null;
@@ -105,8 +132,8 @@ function parseOG(html, base) {
 
   if (!title) return null;
   return {
-    title:       title.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;/g, "'").replace(/&quot;/g, '"'),
-    description: description?.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;/g, "'").replace(/&quot;/g, '"') || null,
+    title:       htmlDecode(title),
+    description: htmlDecode(description),
     image,
     siteName,
   };

@@ -8,9 +8,73 @@ import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
 import LightningCard from "./LightningCard.jsx";
 import { parseNoteMediaSegments, groupNoteMediaSegments, displayName, relativeTime, nip19, isHexPubkey, normPubkey, fmtSats, parseBolt11Msats, zapCommentFromKind9735, zapperPubkeyFromKind9735, firstLinkPreviewUrl, parseArticle } from "../utils.js";
 import LinkPreviewCard from "./LinkPreviewCard.jsx";
+import PodcastPreviewChip from "./PodcastPreviewChip.jsx";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 import { useNavigation } from "../context/NavigationContext.jsx";
+
+function ZapEmbed({ event, profiles, onOpenProfile }) {
+  const [liveEvent, setLiveEvent] = useState(null);
+
+  const zapperPk    = zapperPubkeyFromKind9735(event) ?? event.tags?.find(t => t[0] === "P")?.[1] ?? null;
+  const recipientPk = event.tags?.find(t => t[0] === "p")?.[1] ?? null;
+  const msats       = parseBolt11Msats(event.tags?.find(t => t[0] === "bolt11")?.[1]);
+  const comment     = zapCommentFromKind9735(event);
+  const items       = event.tags?.filter(t => t[0] === "i" && typeof t[1] === "string") ?? [];
+  const episode     = items.find(t => t[1]?.startsWith("podcast:item:guid:"));
+  const show        = items.find(t => t[1]?.startsWith("podcast:guid:"));
+  const publisher   = items.find(t => t[1]?.startsWith("podcast:publisher:guid:"));
+  const isPodcast   = !!(episode || show || publisher);
+  const linkUrl     = episode?.[2] ?? show?.[2] ?? publisher?.[2] ?? null;
+  const podLabel    = episode ? "episode" : show ? "podcast" : "publisher";
+  const showRecip   = recipientPk && recipientPk !== zapperPk;
+
+  const aTagVal = event.tags?.find(t => t[0] === "a")?.[1] ?? null;
+  useEffect(() => {
+    if (!aTagVal) return;
+    const [kindStr, evPubkey, dTag] = aTagVal.split(":");
+    if (kindStr !== "30311" || !evPubkey || !dTag) return;
+    const cached = eventStore.getTimeline([{ kinds: [30311], authors: [evPubkey], "#d": [dTag], limit: 1 }])?.[0];
+    if (cached) { setLiveEvent(cached); return; }
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const sub = pool.request(relayUrls, [{ kinds: [30311], authors: [evPubkey], "#d": [dTag], limit: 1 }]).subscribe({
+      next: ev => { eventStore.add(ev); setLiveEvent(ev); },
+    });
+    return () => sub.unsubscribe();
+  }, [aTagVal]);
+
+  const hasExtra = isPodcast || !!liveEvent;
+  return (
+    <div className="note-embed note-embed-ref" role="presentation">
+      <div className="note-embed-head">
+        {zapperPk && <div role="presentation" onClick={e => { e.stopPropagation(); onOpenProfile?.(zapperPk); }}><Avatar pk={zapperPk} profiles={profiles} size={20} /></div>}
+        <span className="note-embed-name" role="presentation" onClick={e => { e.stopPropagation(); zapperPk && onOpenProfile?.(zapperPk); }}>
+          {zapperPk ? displayName(zapperPk, profiles) : "Anonymous"}
+        </span>
+        <span className="note-embed-time">{relativeTime(event.created_at)}</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", fontSize: 13, marginBottom: (comment || hasExtra) ? 6 : 0 }}>
+        <span style={{ color: "var(--text-faint)" }}>zapped</span>
+        <span style={{ fontWeight: 600, color: "#f59e0b" }}>⚡ {fmtSats(msats)}</span>
+        {showRecip && (
+          <>
+            <span style={{ color: "var(--text-faint)" }}>to</span>
+            <span style={{ fontWeight: 500, cursor: "pointer" }} role="presentation" onClick={e => { e.stopPropagation(); onOpenProfile?.(recipientPk); }}>
+              {displayName(recipientPk, profiles)}
+            </span>
+          </>
+        )}
+      </div>
+      {comment && <div style={{ fontSize: 13, color: "var(--text-muted)", fontStyle: "italic", marginBottom: hasExtra ? 6 : 0 }}>"{comment}"</div>}
+      {isPodcast && <PodcastPreviewChip url={linkUrl} fallbackLabel={podLabel} />}
+      {liveEvent && (
+        <span className="highlight-source-chip highlight-source-unknown" style={{ cursor: "default" }}>
+          📡 {liveEvent.tags?.find(t => t[0] === "title")?.[1] || "Live Event"}
+        </span>
+      )}
+    </div>
+  );
+}
 
 // Deduplicate mention-profile fetches across all NoteContent instances
 const _mentionFetched = new Set();
@@ -140,47 +204,7 @@ function EmbeddedEvent({ event, profiles, onOpenProfile }) {
   }
 
   if (event.kind === 9735) {
-    const zapperPk    = zapperPubkeyFromKind9735(event) ?? event.tags?.find(t => t[0] === "P")?.[1] ?? null;
-    const recipientPk = event.tags?.find(t => t[0] === "p")?.[1] ?? null;
-    const msats       = parseBolt11Msats(event.tags?.find(t => t[0] === "bolt11")?.[1]);
-    const comment     = zapCommentFromKind9735(event);
-    const episodeTag  = event.tags?.find(t => t[0] === "i" && t[1]?.startsWith("podcast:item:guid:"));
-    const showTag     = event.tags?.find(t => t[0] === "i" && t[1]?.startsWith("podcast:guid:"));
-    const episodeUrl  = episodeTag?.[2] ?? null;
-    const showUrl     = showTag?.[2] ?? null;
-    const isPodcast   = !!(episodeUrl || showUrl);
-    const showRecip   = recipientPk && recipientPk !== zapperPk;
-    function linkLabel(url) { try { return new URL(url).hostname; } catch { return url; } }
-    return (
-      <div className="note-embed note-embed-ref" role="presentation">
-        <div className="note-embed-head">
-          {zapperPk && <div role="presentation" onClick={e => { e.stopPropagation(); onOpenProfile?.(zapperPk); }}><Avatar pk={zapperPk} profiles={profiles} size={20} /></div>}
-          <span className="note-embed-name" role="presentation" onClick={e => { e.stopPropagation(); zapperPk && onOpenProfile?.(zapperPk); }}>
-            {zapperPk ? displayName(zapperPk, profiles) : "Anonymous"}
-          </span>
-          <span className="note-embed-time">{relativeTime(event.created_at)}</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 5, flexWrap: "wrap", fontSize: 13, marginBottom: (comment || isPodcast) ? 6 : 0 }}>
-          <span style={{ color: "var(--text-faint)" }}>zapped</span>
-          <span style={{ fontWeight: 600, color: "#f59e0b" }}>⚡ {fmtSats(msats)}</span>
-          {showRecip && (
-            <>
-              <span style={{ color: "var(--text-faint)" }}>to</span>
-              <span style={{ fontWeight: 500, cursor: "pointer" }} role="presentation" onClick={e => { e.stopPropagation(); onOpenProfile?.(recipientPk); }}>
-                {displayName(recipientPk, profiles)}
-              </span>
-            </>
-          )}
-        </div>
-        {comment && <div style={{ fontSize: 13, color: "var(--text-muted)", fontStyle: "italic", marginBottom: isPodcast ? 6 : 0 }}>"{comment}"</div>}
-        {isPodcast && (
-          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-            {episodeUrl && <a className="highlight-source-chip" href={episodeUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}><svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>{linkLabel(episodeUrl)}</a>}
-            {showUrl && <a className="highlight-source-chip" href={showUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}><svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ flexShrink: 0 }}><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>{linkLabel(showUrl)}</a>}
-          </div>
-        )}
-      </div>
-    );
+    return <ZapEmbed event={event} profiles={profiles} onOpenProfile={onOpenProfile} />;
   }
 
   return (

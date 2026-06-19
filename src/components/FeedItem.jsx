@@ -186,6 +186,7 @@ export default function FeedItem({
         event={event}
         profiles={profiles}
         onOpenProfile={onOpenProfile}
+        onOpenStream={onOpenStream}
         delay={delay}
       />
     );
