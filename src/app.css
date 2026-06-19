@@ -701,9 +701,9 @@
     color:var(--primary);display:flex;align-items:center;gap:3px;line-height:1.2;
   }
   .zap-badge-top-comment{
-    font-family:'DM Sans',sans-serif;font-size:10.5px;font-style:italic;
-    color:var(--text-muted);line-height:1.3;margin-top:2px;
-    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+    font-family:'DM Sans',sans-serif;font-size:10px;
+    color:var(--text-muted);line-height:1.2;margin-top:1px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;
   }
   .zap-lightning{font-size:11px;}
   .between-header{padding:16px 20px 4px;}
