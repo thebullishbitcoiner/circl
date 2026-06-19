@@ -215,7 +215,7 @@ function ThreadNoteRow({
               zaps={zaps} reactions={reactions}
               onOpenZaps={onOpenZaps} onOpenReactions={onOpenReactions} onOpenReposts={onOpenReposts} />
           )}
-          {(focused || isReply || isSelf) && (
+          {(focused || isParent || isReply || isSelf) && (
             <NoteActions
               event={event} profiles={profiles}
               myPubkey={myPubkey} myProfile={myProfile} events={allEvents}
