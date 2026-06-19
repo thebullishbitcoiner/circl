@@ -28,13 +28,14 @@ async function fetchLnurlData(lnAddr) {
 }
 
 export default function useZap(wallet) {
-  const sendZap = useCallback(async ({ amountSats, recipientLnAddr, recipientPubkey, eventId, eventKind = 1, msg = "", pollOption = null }) => {
+  const sendZap = useCallback(async ({ amountSats, recipientLnAddr, recipientPubkey, eventId, eventKind = 1, aTag = null, extraRelays = [], msg = "", pollOption = null }) => {
     if (!wallet?.nwc_uri) return { ok: false, reason: "no_wallet" };
     if (!recipientLnAddr) return { ok: false, reason: "no_lud16" };
 
     let client;
     try {
       const msats = amountSats * 1000;
+      const allRelays = [...new Set([...RELAYS, ...extraRelays])];
 
       // Fetch LNURL data directly (bypasses any proxy that might strip allowsNostr)
       const lnurlData = await fetchLnurlData(recipientLnAddr);
@@ -47,11 +48,17 @@ export default function useZap(wallet) {
       let signed = null;
       if (allowsNostr !== false && window.nostr) {
         try {
-          const zapParams = eventId
-            ? { event: { id: eventId, pubkey: recipientPubkey, kind: eventKind, tags: [], content: "", created_at: 0, sig: "" }, amount: msats, comment: msg, relays: RELAYS }
-            : { pubkey: recipientPubkey, amount: msats, comment: msg, relays: RELAYS };
+          let zapRequestTemplate;
+          if (aTag) {
+            // Addressable event (e.g. kind 30311): use "a" tag, not "e" tag
+            zapRequestTemplate = makeZapRequest({ pubkey: recipientPubkey, amount: msats, comment: msg, relays: allRelays });
+            zapRequestTemplate.tags.push(["a", aTag]);
+          } else if (eventId) {
+            zapRequestTemplate = makeZapRequest({ event: { id: eventId, pubkey: recipientPubkey, kind: eventKind, tags: [], content: "", created_at: 0, sig: "" }, amount: msats, comment: msg, relays: allRelays });
+          } else {
+            zapRequestTemplate = makeZapRequest({ pubkey: recipientPubkey, amount: msats, comment: msg, relays: allRelays });
+          }
 
-          const zapRequestTemplate = makeZapRequest(zapParams);
           if (pollOption) zapRequestTemplate.tags.push(["poll_option", pollOption]);
           signed = await window.nostr.signEvent(zapRequestTemplate);
 

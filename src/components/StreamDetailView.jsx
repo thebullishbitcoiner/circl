@@ -79,7 +79,7 @@ function StreamPlayer({ urls }) {
 export default function StreamDetailView({
   event, profiles, pubkey, myPubkey, onBack, onOpenProfile,
   sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail,
-  getLocalZaps, addLocalZap, onRequestModal, onDismissModal,
+  getLocalZaps, addLocalZap, onRequestModal, onDismissModal, publishEvent,
 }) {
   const ref = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -87,9 +87,11 @@ export default function StreamDetailView({
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [showZapModal, setShowZapModal] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [sendingComment, setSendingComment] = useState(false);
   const zapBtnRef = useRef(null);
   const stream = parseStreamEvent(event);
-  const { messages } = useStreamChat(event);
+  const { messages, addMessage } = useStreamChat(event);
   const chatRef = useRef(null);
 
   const hostPks = (() => {
@@ -111,12 +113,18 @@ export default function StreamDetailView({
 
   const dismiss = useCallback(() => { onDismissModal?.(); }, [onDismissModal]);
 
+  const streamRelays = event.tags
+    .filter(t => t[0] === "relays")
+    .flatMap(t => t.slice(1))
+    .filter(Boolean);
+  const streamATag = `30311:${event.pubkey}:${stream.d ?? ""}`;
+
   const doSendZap = useCallback(async ({ amount, msg }) => {
     if (!sendZap) { onZapFail?.("no_wallet"); return; }
     if (!recipientLnAddr) { onZapFail?.("no_lud16"); return; }
-    const result = await sendZap({ amountSats: amount, recipientLnAddr, recipientPubkey: event.pubkey, eventId: event.id, eventKind: event.kind, msg });
+    const result = await sendZap({ amountSats: amount, recipientLnAddr, recipientPubkey: event.pubkey, aTag: streamATag, extraRelays: streamRelays, msg });
     if (!result.ok) onZapFail?.(result.reason);
-  }, [sendZap, recipientLnAddr, event.pubkey, event.id, event.kind, onZapFail]);
+  }, [sendZap, recipientLnAddr, event.pubkey, streamATag, streamRelays, onZapFail]);
 
   const handleZapFromModal = useCallback(({ amount, msg }) => {
     setShowZapModal(false);
@@ -129,6 +137,26 @@ export default function StreamDetailView({
       doSendZap({ amount, msg });
     }, 680);
   }, [doSendZap, addLocalZap, event.id, myPubkey, onRequestModal, dismiss]);
+
+  const handleSendComment = useCallback(async () => {
+    const text = commentText.trim();
+    if (!text || sendingComment || !publishEvent) return;
+    setSendingComment(true);
+    try {
+      const relayHint = streamRelays[0] ?? "";
+      const signed = await publishEvent({ kind: 1311, content: text, tags: [["a", streamATag, relayHint, "root"]] });
+      if (signed) {
+        // Also publish directly to the stream's relay (user's outbox may not include it)
+        if (streamRelays.length) pool.publish(streamRelays, signed);
+        addMessage(signed);
+      }
+      setCommentText("");
+    } catch (err) {
+      console.error("chat send failed:", err);
+    } finally {
+      setSendingComment(false);
+    }
+  }, [commentText, sendingComment, publishEvent, streamATag, streamRelays, addMessage]);
 
   // Fetch all host profiles
   useEffect(() => {
@@ -324,6 +352,26 @@ export default function StreamDetailView({
                     </div>
                   );
                 })}
+              </div>
+            )}
+            {myPubkey && (
+              <div className="stream-chat-compose">
+                <input
+                  className="stream-chat-compose-input"
+                  placeholder="Say something..."
+                  value={commentText}
+                  onChange={e => setCommentText(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendComment(); } }}
+                  disabled={sendingComment}
+                />
+                <button
+                  type="button"
+                  className="stream-chat-compose-btn"
+                  onClick={handleSendComment}
+                  disabled={!commentText.trim() || sendingComment}
+                >
+                  Send
+                </button>
               </div>
             )}
           </div>

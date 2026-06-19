@@ -730,6 +730,7 @@ export default function App() {
                     addLocalZap={addLocalZap}
                     onRequestModal={setPanelModal}
                     onDismissModal={() => setPanelModal(null)}
+                    publishEvent={publishEvent}
                   />
                 )}
               </div>
