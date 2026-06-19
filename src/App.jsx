@@ -715,8 +715,21 @@ export default function App() {
                     event={openStreamEvent}
                     profiles={profiles}
                     pubkey={pubkey}
+                    myPubkey={pubkey}
                     onBack={() => setOpenStreamEvent(null)}
                     onOpenProfile={pk => { setOpenStreamEvent(null); handleOpenProfile(pk); }}
+                    sendZap={sendZap}
+                    defaultZapAmount={zapSettings.amount}
+                    defaultZapMsg={zapSettings.msg}
+                    onZapFail={reason => showToast(
+                      reason === "no_lud16"  ? "⚡ No lightning address" :
+                      reason === "no_wallet" ? "⚡ No wallet connected" :
+                      `⚡ Zap failed: ${reason}`
+                    )}
+                    getLocalZaps={getLocalZaps}
+                    addLocalZap={addLocalZap}
+                    onRequestModal={setPanelModal}
+                    onDismissModal={() => setPanelModal(null)}
                   />
                 )}
               </div>

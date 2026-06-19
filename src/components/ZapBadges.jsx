@@ -32,14 +32,8 @@ export default function ZapBadges({ zaps, eventId, profiles, onOpenProfile, onOp
                 : avatarInitial(top.zapper, profiles)}
             </div>
             <div className="zap-badge-top-body">
-              <div className="zap-badge-top-amt">
-                {fmtSats(top.amount)}
-                {top.comment && (
-                  <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 5, fontFamily: "'DM Sans',sans-serif", fontSize: 10.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200, display: "inline-block", verticalAlign: "middle" }}>
-                    {top.comment}
-                  </span>
-                )}
-              </div>
+              <div className="zap-badge-top-amt">{fmtSats(top.amount)}</div>
+              {top.comment && <div className="zap-badge-top-comment">"{top.comment}"</div>}
             </div>
           </div>
         </div>

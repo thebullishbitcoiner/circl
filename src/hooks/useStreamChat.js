@@ -16,7 +16,7 @@ export default function useStreamChat(streamEvent) {
     const aTag = `30311:${pubkey}:${d}`;
     const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
 
-    const sub = pool.subscription(relayUrls, [{ kinds: [1311], "#a": [aTag], limit: 200 }]).subscribe({
+    const sub = pool.subscription(relayUrls, [{ kinds: [1311], "#a": [aTag], limit: 200 }, { kinds: [9735], "#a": [aTag], limit: 100 }]).subscribe({
       next: ev => {
         eventStore.add(ev);
         if (seen.current.has(ev.id)) return;
