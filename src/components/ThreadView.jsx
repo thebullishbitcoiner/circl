@@ -99,7 +99,7 @@ function ThreadNoteRow({
             const quotedId  = isQuote ? event.tags.find(t => t[0] === "q")?.[1] : null;
             const quotedEv  = quotedId ? allEvents.find(e => e.id === quotedId) : null;
             const displayContent = isQuote
-              ? event.content.replace(/\nnostr:\S+/g, "").replace(/nostr:\S+/g, "").trim()
+              ? event.content.replace(/\nnostr:(?:note1|nevent1|naddr1)\S*/gi, "").replace(/nostr:(?:note1|nevent1|naddr1)\S*/gi, "").trim()
               : event.content;
             const goalClosed = isGoal && (() => {
               const ts = event.tags?.find(t => t[0] === "closed_at")?.[1];

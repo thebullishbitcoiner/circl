@@ -120,7 +120,7 @@ function NoteCard({
               />
             )}
             <NoteContent
-              content={quotedSpecialEvent ? event.content.replace(/nostr:\S+/g, "").trim() : event.content}
+              content={quotedSpecialEvent ? event.content.replace(/nostr:(?:note1|nevent1|naddr1)\S*/gi, "").trim() : event.content}
               tags={event.tags}
               profiles={profiles}
               onOpenProfile={onOpenProfile}

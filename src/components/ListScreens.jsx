@@ -256,7 +256,7 @@ export function RepostsScreen({ eventId, reposts, profiles: propProfiles, onBack
                 </div>
                 {item.event?.content && (
                   <NoteContent
-                    content={item.event.content.replace(/\nnostr:\S+/g, "").replace(/nostr:\S+/g, "").trim()}
+                    content={item.event.content.replace(/\nnostr:(?:note1|nevent1|naddr1)\S*/gi, "").replace(/nostr:(?:note1|nevent1|naddr1)\S*/gi, "").trim()}
                     tags={item.event.tags}
                     profiles={profiles}
                     onOpenProfile={onOpenProfile}

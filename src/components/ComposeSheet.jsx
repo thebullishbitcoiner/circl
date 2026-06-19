@@ -212,6 +212,17 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
         [...finalContent.matchAll(/#([a-zA-Z][a-zA-Z0-9_]+)/g)].map(m => m[1].toLowerCase())
       )];
       for (const ht of hashtags) tags.push(["t", ht]);
+      const taggedPubkeys = new Set(tags.filter(t => t[0] === "p").map(t => t[1]));
+      for (const m of finalContent.matchAll(/nostr:(npub1[a-z0-9]+|nprofile1[a-z0-9]+)/g)) {
+        try {
+          const decoded = nip19.decode(m[1]);
+          const pk = decoded.type === "npub" ? decoded.data : decoded.type === "nprofile" ? decoded.data.pubkey : null;
+          if (pk && !taggedPubkeys.has(pk) && !excludedMentions.has(pk)) {
+            tags.push(["p", pk, "", "mention"]);
+            taggedPubkeys.add(pk);
+          }
+        } catch { /* invalid bech32, skip */ }
+      }
       for (const et of emojiTags) tags.push(et);
       if (replyTo && replyTo.pubkey !== myPubkey) broadcastEvent(replyTo);
       const published = await publishEvent({ kind: isNip22Reply ? 1111 : 1, content: finalContent, tags });

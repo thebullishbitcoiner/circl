@@ -1142,7 +1142,7 @@ export default function App() {
                                 </div>
                                 {isQ && ev.content && (
                                   <NoteContent
-                                    content={ev.content.replace(/\nnostr:\S+/g, "").trim()}
+                                    content={ev.content.replace(/\nnostr:(?:note1|nevent1|naddr1)\S*/gi, "").trim()}
                                     tags={ev.tags}
                                     profiles={profiles}
                                     onOpenProfile={handleOpenProfile}
