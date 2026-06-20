@@ -90,7 +90,7 @@ function NotePreview({ ev, profiles }) {
     const text = (title || summary || "").trim();
     return text ? <div className="notif-preview">{text}</div> : null;
   }
-  const text = (ev.content || "").replace(/nostr:\S+/g, "").trim();
+  const text = (ev.content || "").trim();
   if (!text) return null;
   return (
     <div className="notif-preview">
