@@ -1,4 +1,5 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
+import useProfiles from "../hooks/useProfiles.js";
 import { pool, eventStore } from "../nostr.js";
 import { displayName, relativeTime, nip19, normPubkey, isHexPubkey } from "../utils.js";
 import Avatar from "./Avatar.jsx";
@@ -149,6 +150,14 @@ export default function SearchPage({ profiles, onOpenProfile, onOpenThread, onOp
   const [loadingSuggest, setLoadingSuggest] = useState(false);
   const [loadingNotes,   setLoadingNotes]   = useState(false);
   const [recentSearches, setRecentSearches] = useState(() => loadRecent());
+
+  const resultPks = useMemo(() => {
+    const pks = new Set(noteResults.map(ev => ev.pubkey));
+    for (const ev of suggestions) if (ev.pubkey) pks.add(ev.pubkey);
+    return [...pks];
+  }, [noteResults, suggestions]);
+  const { profiles: resultProfiles } = useProfiles({ pubkeys: resultPks });
+  const mergedProfiles = useMemo(() => ({ ...profiles, ...resultProfiles }), [profiles, resultProfiles]);
 
   const suggestSubRef  = useRef(null);
   const noteSubRef     = useRef(null);
@@ -324,7 +333,7 @@ export default function SearchPage({ profiles, onOpenProfile, onOpenThread, onOp
               </button>
             </div>
             {recentSearches.map((item, i) => (
-              <RecentSearchItem key={`${item.type}:${item.pubkey ?? item.query}:${i}`} item={item} profiles={profiles} onSelect={handleSelectRecent} />
+              <RecentSearchItem key={`${item.type}:${item.pubkey ?? item.query}:${i}`} item={item} profiles={mergedProfiles} onSelect={handleSelectRecent} />
             ))}
           </>
         )}
@@ -349,7 +358,7 @@ export default function SearchPage({ profiles, onOpenProfile, onOpenThread, onOp
         {!(mode === "suggest" && query.trim().startsWith("#")) && results.map(ev =>
           mode === "suggest"
             ? <ProfileSuggestion key={ev.pubkey} ev={ev} onOpenProfile={pk => { addRecent({ type: "people", pubkey: pk }); onOpenProfile?.(pk); }} />
-            : <NoteResult key={ev.id} ev={ev} profiles={profiles} onOpenProfile={onOpenProfile} onOpenThread={onOpenThread} />
+            : <NoteResult key={ev.id} ev={ev} profiles={mergedProfiles} onOpenProfile={onOpenProfile} onOpenThread={onOpenThread} />
         )}
       </div>
     </div>
