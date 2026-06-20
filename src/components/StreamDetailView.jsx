@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import Avatar from "./Avatar.jsx";
 import { Bk, Zi } from "./icons.jsx";
@@ -7,7 +7,9 @@ import NoteJsonModal from "./NoteJsonModal.jsx";
 import ZapModal from "./ZapModal.jsx";
 import ZapAnimation from "./ZapAnimation.jsx";
 import { displayName, relativeTime, parseStreamEvent, fmtSats, fmtSatsVal, parseBolt11Msats, zapCommentFromKind9735, zapperPubkeyFromKind9735, nip19 } from "../utils.js";
+import NoteText from "./NoteText.jsx";
 import useStreamChat from "../hooks/useStreamChat.js";
+import useProfiles from "../hooks/useProfiles.js";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 
@@ -89,6 +91,8 @@ export default function StreamDetailView({
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [sendingComment, setSendingComment] = useState(false);
+  const [chatMenuMsg, setChatMenuMsg] = useState(null);
+  const [chatJsonMsg, setChatJsonMsg] = useState(null);
   const zapBtnRef = useRef(null);
   const stream = parseStreamEvent(event);
   const { messages, addMessage } = useStreamChat(event);
@@ -167,35 +171,39 @@ export default function StreamDetailView({
     });
   }, [hostPks.join(",")]);
 
-  // Fetch profiles for all chat participants (authors, zappers, npub mentions)
-  const _fetchedChatPks = useRef(new Set());
+  // Accumulate all pubkeys seen in chat (authors, zappers, npub mentions)
+  const [chatPks, setChatPks] = useState([]);
   useEffect(() => {
     if (!messages.length) return;
-    const needed = new Set();
+    const pks = new Set();
+    const scanText = text => {
+      if (!text) return;
+      for (const match of text.matchAll(/nostr:(?:npub1|nprofile1)[023456789acdefghjklmnpqrstuvwxyz]+/ig)) {
+        try {
+          const d = nip19.decode(match[0].slice(6));
+          const pk = d?.type === "npub" ? d.data : d?.type === "nprofile" ? d.data?.pubkey : null;
+          if (pk) pks.add(pk);
+        } catch {}
+      }
+    };
     for (const m of messages) {
-      needed.add(m.pubkey);
+      pks.add(m.pubkey);
       if (m.kind === 9735) {
         const zk = zapperPubkeyFromKind9735(m) ?? m.tags?.find(t => t[0] === "P")?.[1];
-        if (zk) needed.add(zk);
-      }
-      if (m.content) {
-        for (const match of m.content.matchAll(/nostr:(?:npub1|nprofile1)[023456789acdefghjklmnpqrstuvwxyz]+/ig)) {
-          try {
-            const d = nip19.decode(match[0].slice(6));
-            const pk = d?.type === "npub" ? d.data : d?.type === "nprofile" ? d.data?.pubkey : null;
-            if (pk) needed.add(pk);
-          } catch {}
-        }
+        if (zk) pks.add(zk);
+        scanText(zapCommentFromKind9735(m));
+      } else {
+        scanText(m.content);
       }
     }
-    const toFetch = [...needed].filter(pk => !_fetchedChatPks.current.has(pk));
-    if (!toFetch.length) return;
-    toFetch.forEach(pk => _fetchedChatPks.current.add(pk));
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
-    pool.request(relayUrls, [{ kinds: [0], authors: toFetch }]).subscribe({
-      next: ev => eventStore.add(ev),
+    setChatPks(prev => {
+      const next = [...pks].filter(pk => !prev.includes(pk));
+      return next.length ? [...prev, ...next] : prev;
     });
   }, [messages.length]);
+
+  const { profiles: chatProfiles } = useProfiles({ pubkeys: chatPks });
+  const mergedProfiles = useMemo(() => ({ ...profiles, ...chatProfiles }), [profiles, chatProfiles]);
 
   // Auto-scroll chat to bottom when new messages arrive
   useEffect(() => {
@@ -233,7 +241,7 @@ export default function StreamDetailView({
         </div>
       ) : null}
 
-      <div className="reader-content">
+      <div className="reader-content" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>
         <div className="reader-header" style={{ borderBottom: "none", marginBottom: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <StatusBadge status={stream.status} />
@@ -302,14 +310,28 @@ export default function StreamDetailView({
 
         <div className="stream-zap-section">
           <div className="stream-zap-header">
-            <button
-              type="button"
-              className="stream-zap-leaders-btn"
-              onClick={() => setShowLeaderboard(true)}
-              disabled={allZaps.length === 0}
-            >
-              ⚡ {allZaps.length > 0 ? `${fmtSatsVal(allZaps.reduce((s, z) => s + Math.round(z.amount / 1000), 0))} · Top Zappers` : "Top Zappers"}
-            </button>
+            {(() => {
+              const byZapper = new Map();
+              for (const z of allZaps) byZapper.set(z.zapper, (byZapper.get(z.zapper) ?? 0) + Math.round(z.amount / 1000));
+              const top3 = [...byZapper.entries()].sort(([, a], [, b]) => b - a).slice(0, 3).map(([pk]) => pk);
+              const totalSats = allZaps.reduce((s, z) => s + Math.round(z.amount / 1000), 0);
+              return (
+                <button type="button" className="stream-zap-leaders-btn" onClick={() => setShowLeaderboard(true)} disabled={allZaps.length === 0}>
+                  {top3.length > 0 ? (
+                    <>
+                      <div className="stream-zap-leader-avs">
+                        {top3.map((pk, i) => (
+                          <div key={pk} className="stream-zap-leader-av" style={{ zIndex: top3.length - i }}>
+                            <Avatar pk={pk} profiles={mergedProfiles} size={22} />
+                          </div>
+                        ))}
+                      </div>
+                      <span>{fmtSatsVal(totalSats)} sats</span>
+                    </>
+                  ) : "Top Zappers"}
+                </button>
+              );
+            })()}
             <button ref={zapBtnRef} type="button" className="stream-zap-btn" onClick={() => setShowZapModal(true)}>
               <Zi /> Zap
             </button>
@@ -326,28 +348,53 @@ export default function StreamDetailView({
                 {messages.map(msg => {
                   if (msg.kind === 9735) {
                     const zapperPk = zapperPubkeyFromKind9735(msg) ?? msg.tags?.find(t => t[0] === "P")?.[1];
-                    const msats = parseBolt11Msats(msg.tags?.find(t => t[0] === "bolt11")?.[1]);
+                    const msats = parseBolt11Msats(msg.tags?.find(t => t[0] === "bolt11")?.[1]) ?? 0;
                     const comment = zapCommentFromKind9735(msg);
                     return (
-                      <div key={msg.id} className="stream-zap-msg">
-                        <div className="stream-zap-badge">⚡ {fmtSats(msats)}</div>
-                        <div className="stream-zap-body">
-                          <span className="stream-chat-name" style={{ cursor: zapperPk ? "pointer" : "default" }} onClick={() => zapperPk && onOpenProfile?.(zapperPk)}>
-                            {displayName(zapperPk ?? msg.pubkey, profiles)}
-                          </span>
-                          {comment && <span className="stream-zap-comment">"{comment}"</span>}
+                      <div key={msg.id} className="stream-chat-msg">
+                        <Avatar pk={zapperPk ?? msg.pubkey} profiles={mergedProfiles} size={36} />
+                        <div className="stream-chat-msg-body">
+                          <div className="stream-chat-msg-meta">
+                            <span className="stream-chat-name" style={{ cursor: zapperPk ? "pointer" : "default" }} onClick={() => zapperPk && onOpenProfile?.(zapperPk)}>
+                              {displayName(zapperPk ?? msg.pubkey, mergedProfiles)}
+                            </span>
+                            <span className="stream-chat-time">{relativeTime(msg.created_at)}</span>
+                            <div style={{ position: "relative", marginLeft: "auto" }}>
+                              <button type="button" className="note-card-menu-btn" onClick={e => { e.stopPropagation(); setChatMenuMsg(m => m?.id === msg.id ? null : msg); }}>
+                                <span /><span /><span />
+                              </button>
+                              {chatMenuMsg?.id === msg.id && (
+                                <NoteContextMenu event={msg} onClose={() => setChatMenuMsg(null)} onViewJson={ev => { setChatMenuMsg(null); setChatJsonMsg(ev); }} />
+                              )}
+                            </div>
+                          </div>
+                          <div className="stream-zap-content">
+                            <span className="stream-zap-amount">⚡ {fmtSatsVal(Math.round(msats / 1000))} sats</span>
+                            {comment && <NoteText content={`"${comment}"`} profiles={mergedProfiles} onOpenProfile={onOpenProfile} className="stream-zap-comment" />}
+                          </div>
                         </div>
                       </div>
                     );
                   }
                   return (
                     <div key={msg.id} className="stream-chat-msg">
-                      <Avatar pk={msg.pubkey} profiles={profiles} size={20} />
+                      <Avatar pk={msg.pubkey} profiles={mergedProfiles} size={36} />
                       <div className="stream-chat-msg-body">
-                        <span className="stream-chat-name" onClick={() => onOpenProfile?.(msg.pubkey)} style={{ cursor: "pointer" }}>
-                          {displayName(msg.pubkey, profiles)}
-                        </span>
-                        <span className="stream-chat-text">{msg.content}</span>
+                        <div className="stream-chat-msg-meta">
+                          <span className="stream-chat-name" onClick={() => onOpenProfile?.(msg.pubkey)} style={{ cursor: "pointer" }}>
+                            {displayName(msg.pubkey, mergedProfiles)}
+                          </span>
+                          <span className="stream-chat-time">{relativeTime(msg.created_at)}</span>
+                          <div style={{ position: "relative", marginLeft: "auto" }}>
+                            <button type="button" className="note-card-menu-btn" onClick={e => { e.stopPropagation(); setChatMenuMsg(m => m?.id === msg.id ? null : msg); }}>
+                              <span /><span /><span />
+                            </button>
+                            {chatMenuMsg?.id === msg.id && (
+                              <NoteContextMenu event={msg} onClose={() => setChatMenuMsg(null)} onViewJson={ev => { setChatMenuMsg(null); setChatJsonMsg(ev); }} />
+                            )}
+                          </div>
+                        </div>
+                        <NoteText content={msg.content} profiles={mergedProfiles} onOpenProfile={onOpenProfile} className="stream-chat-text" />
                       </div>
                     </div>
                   );
@@ -379,12 +426,13 @@ export default function StreamDetailView({
       </div>
     </div>
     {jsonOpen && <NoteJsonModal event={event} onClose={() => setJsonOpen(false)} />}
+    {chatJsonMsg && <NoteJsonModal event={chatJsonMsg} onClose={() => setChatJsonMsg(null)} />}
     {showZapModal && createPortal(<ZapModal event={event} profiles={profiles} defaultAmount={defaultZapAmount} defaultMsg={defaultZapMsg} onZap={handleZapFromModal} onDismiss={() => setShowZapModal(false)} />, document.body)}
     {showLeaderboard && createPortal(
       <div className="overlay" onClick={() => setShowLeaderboard(false)}>
         <StreamZapLeaderboard
           zaps={allZaps}
-          profiles={profiles}
+          profiles={mergedProfiles}
           onOpenProfile={pk => { setShowLeaderboard(false); onOpenProfile?.(pk); }}
           onClose={() => setShowLeaderboard(false)}
         />

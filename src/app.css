@@ -1134,7 +1134,10 @@
   .stream-hls-note a{color:rgba(255,255,255,.85);}
   .stream-zap-section{padding:16px 0 4px;border-top:1px solid var(--border);margin-top:12px;}
   .stream-zap-header{display:flex;align-items:center;justify-content:space-between;gap:8px;}
-  .stream-zap-leaders-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:7px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;}
+  .stream-zap-leaders-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:7px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;}
+  .stream-zap-leader-avs{display:flex;align-items:center;}
+  .stream-zap-leader-av{border-radius:50%;box-shadow:0 0 0 2px var(--surface);flex-shrink:0;}
+  .stream-zap-leader-av+.stream-zap-leader-av{margin-left:-7px;}
   .stream-zap-leaders-btn:disabled{cursor:default;opacity:.5;}
   .stream-zap-leaders-btn:not(:disabled):active{background:var(--surface2);}
   .stream-zap-btn{display:flex;align-items:center;gap:5px;padding:7px 18px;border-radius:999px;border:1px solid var(--primary);background:var(--primary-soft);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--primary);cursor:pointer;flex-shrink:0;}
@@ -1150,19 +1153,20 @@
   .stream-chat-section{padding-top:20px;border-top:1px solid var(--border);margin-top:12px;}
   .stream-chat-title{font-size:13px;font-weight:600;color:var(--text-faint);text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px;}
   .stream-chat-empty{font-size:13px;color:var(--text-faint);text-align:center;padding:20px 0;}
-  .stream-chat{display:flex;flex-direction:column;gap:10px;max-height:360px;overflow-y:auto;padding-right:4px;}
+  .stream-chat{display:flex;flex-direction:column;gap:14px;max-height:360px;overflow-y:auto;padding-right:4px;}
   .stream-chat-compose{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
   .stream-chat-compose-input{flex:1;min-width:0;padding:8px 12px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;font-family:inherit;outline:none;}
   .stream-chat-compose-input:focus{border-color:var(--primary);}
   .stream-chat-compose-btn{flex-shrink:0;padding:7px 14px;border-radius:20px;border:1px solid var(--primary);background:var(--primary-soft);color:var(--primary);font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;}
   .stream-chat-compose-btn:disabled{opacity:.4;cursor:default;}
-  .stream-chat-msg{display:flex;align-items:flex-start;gap:8px;}
-  .stream-chat-msg-body{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px;flex:1;min-width:0;}
+  .stream-chat-msg{display:flex;align-items:flex-start;gap:10px;}
+  .stream-chat-msg-body{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0;}
+  .stream-chat-msg-meta{display:flex;align-items:center;gap:6px;width:100%;}
   .stream-chat-name{font-size:13px;font-weight:600;color:var(--primary);white-space:nowrap;flex-shrink:0;}
+  .stream-chat-time{font-size:11px;color:var(--text-faint);flex-shrink:0;}
   .stream-chat-text{font-size:13px;color:var(--text);word-break:break-word;}
-  .stream-zap-msg{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:10px;background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.25);}
-  .stream-zap-badge{flex-shrink:0;font-size:12px;font-weight:700;color:#f59e0b;background:rgba(245,158,11,.18);border-radius:6px;padding:2px 7px;letter-spacing:.01em;}
-  .stream-zap-body{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px;flex:1;min-width:0;}
+  .stream-zap-content{display:inline-flex;flex-direction:column;gap:2px;padding:5px 10px;border-radius:10px;background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.25);}
+  .stream-zap-amount{font-size:13px;font-weight:600;color:#f59e0b;}
   .stream-zap-comment{font-size:12px;color:var(--text-muted);font-style:italic;word-break:break-word;}
 
   /* Live ring on profile avatar */
