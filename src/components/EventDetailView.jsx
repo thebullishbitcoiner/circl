@@ -128,7 +128,7 @@ export default function EventDetailView({
             </div>
           ) : null}
 
-          <div className="reader-meta">
+          <div className="reader-meta" style={{ flexDirection: "row", alignItems: "center" }}>
             <div className="r-author-row" onClick={() => onOpenProfile?.(event.pubkey)} style={{ cursor: "pointer" }}>
               <div className="r-av"><Avatar pk={event.pubkey} profiles={profiles} size={34} /></div>
               <div>

@@ -12,6 +12,23 @@ function toPlainText(children) {
   return "";
 }
 
+function preprocessBullets(content) {
+  if (!content) return content;
+  const lines = content.split('\n');
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const isBullet = /^\s*•/.test(line);
+    const prevLine = i > 0 ? lines[i - 1] : null;
+    const prevIsBullet = prevLine !== null && /^\s*•/.test(prevLine);
+    if (isBullet && !prevIsBullet && prevLine !== null && prevLine !== '') {
+      out.push('');
+    }
+    out.push(isBullet ? line.replace(/^\s*•\s*/, '- ') : line);
+  }
+  return out.join('\n');
+}
+
 export default function ArticleBody({
   content,
   profiles,
@@ -61,7 +78,7 @@ export default function ArticleBody({
           hr: () => <div className="section-div">· · ·</div>,
         }}
       >
-        {content || ""}
+        {preprocessBullets(content) || ""}
       </ReactMarkdown>
     </div>
   );

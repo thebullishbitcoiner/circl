@@ -432,7 +432,7 @@
   .reader-summary{font-family:'DM Sans',sans-serif;font-size:15px;line-height:1.6;color:var(--text-muted);margin-bottom:10px;}
   .reader-hashtags{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px;}
   .reader-hashtags span{font-size:11px;color:var(--primary);background:rgba(109,40,217,.08);padding:3px 8px;border-radius:999px;}
-  .reader-meta{display:flex;flex-direction:column;gap:8px;}
+  .reader-meta{display:flex;flex-direction:row;align-items:center;gap:8px;}
   .r-article-dateline{font-size:11.5px;color:var(--text-faint);margin-bottom:10px;}
   .r-author-row{display:flex;align-items:center;gap:7px;}
   .host-avatars{display:flex;align-items:center;}
