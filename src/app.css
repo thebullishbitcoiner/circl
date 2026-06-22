@@ -427,7 +427,8 @@
 
   /* Reader content */
   .reader-content{max-width:640px;margin:0 auto;padding:0 20px 80px;}
-  .reader-header{padding:20px 0 20px;border-bottom:1px solid var(--border);margin-bottom:26px;animation:fadeUp .4s ease both;}
+  .reader-header{padding:20px 0 0;border-bottom:1px solid var(--border);margin-bottom:20px;animation:fadeUp .4s ease both;}
+  .reader-header-actions{padding:2px 0 10px;}
   .reader-title{font-family:'DM Sans',sans-serif;font-size:28px;font-weight:700;line-height:1.15;letter-spacing:-.6px;margin-bottom:10px;}
   .reader-summary{font-family:'DM Sans',sans-serif;font-size:15px;line-height:1.6;color:var(--text-muted);margin-bottom:10px;}
   .reader-hashtags{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px;}
@@ -614,7 +615,7 @@
 
   /* ── Note stats row ── */
   .note-stats{display:flex;align-items:center;gap:0;margin-bottom:8px;}
-  .note-stats.focused{border:none;}
+  .note-stats.focused{border:none;margin-top:12px;margin-bottom:2px;}
   .note-stat-btn{
     display:flex;align-items:center;gap:4px;
     padding:4px 12px 4px 0;
@@ -1099,7 +1100,7 @@
   .cal-hero-glyph{color:var(--primary);opacity:.5;}
   .cal-detail-meta{display:flex;flex-direction:column;gap:6px;margin:12px 0;}
   .cal-detail-row{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--text-muted);}
-  .cal-detail-actions{margin-top:16px;padding-top:4px;border-top:1px solid var(--border);}
+  .cal-detail-actions{}
   .cal-rsvp-section{margin-top:24px;padding-top:20px;border-top:1px solid var(--border);}
   .cal-rsvp-counts{display:flex;gap:14px;margin-bottom:14px;}
   .cal-rsvp-count{font-size:12px;color:var(--text-muted);font-weight:500;}
@@ -1118,6 +1119,35 @@
   .cal-attendee-row{display:flex;align-items:center;gap:10px;padding:6px 0;cursor:pointer;border-radius:8px;transition:background .12s;}
   .cal-attendee-row:hover{background:var(--surface2);padding-left:6px;margin-left:-6px;}
   .cal-attendee-name{font-size:14px;font-weight:500;color:var(--text);}
+  .cal-comments-section{margin-top:28px;}
+  .cal-comments-header{display:flex;align-items:center;gap:10px;padding:14px 0 14px;border-top:2px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:0;}
+  .cal-comments-title{font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;color:var(--text);letter-spacing:-.2px;}
+  .cal-comments-badge{background:var(--primary);color:#fff;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;line-height:1.4;}
+  .cal-comments-feed .note-card{border-radius:0;}
+  .cal-inline-compose{display:flex;align-items:flex-start;gap:10px;padding:12px 0 20px;border-top:1px solid var(--border);}
+  .cal-inline-compose-right{flex:1;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;overflow:hidden;transition:border-color .15s;}
+  .cal-inline-compose-right:focus-within{border-color:var(--primary);}
+  .cal-inline-compose-input{display:block;width:100%;min-height:38px;max-height:180px;resize:none;background:transparent;border:none;padding:10px 12px 4px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);line-height:1.5;outline:none;}
+  .cal-inline-compose-input::placeholder{color:var(--text-faint);}
+  .cal-inline-compose-footer{display:flex;align-items:center;justify-content:space-between;padding:4px 8px 8px;}
+  .cal-inline-compose-submit{background:var(--primary);color:#fff;border:none;border-radius:20px;padding:6px 16px;font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;transition:opacity .15s;}
+  .cal-inline-compose-submit:disabled{opacity:.35;cursor:not-allowed;}
+  .cal-inline-toolbar{display:flex;align-items:center;gap:2px;}
+  .cal-inline-toolbar-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:none;background:none;border-radius:7px;cursor:pointer;color:var(--text-muted);transition:background .12s,color .12s;}
+  .cal-inline-toolbar-btn:hover{background:var(--surface2);color:var(--text);}
+  .cal-inline-uploading{font-size:11px;color:var(--text-faint);margin-left:4px;}
+  .cal-inline-media-strip{display:flex;gap:6px;padding:6px 10px 2px;flex-wrap:wrap;}
+  .cal-inline-media-thumb{position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;border:1px solid var(--border);flex-shrink:0;}
+  .cal-inline-media-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .cal-inline-media-remove{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;border:none;cursor:pointer;font-size:9px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;}
+  .cal-inline-emoji-wrap{border-top:1px solid var(--border);}
+  .cal-inline-emoji-wrap .ep-shell{border-top:none;height:220px;}
+  .cal-inline-gif-picker{border-top:1px solid var(--border);max-height:210px;overflow-y:auto;}
+  .cal-inline-gif-search{padding:8px 10px;position:sticky;top:0;background:var(--surface);z-index:1;}
+  .cal-inline-gif-input{width:100%;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;transition:border-color .15s;box-sizing:border-box;}
+  .cal-inline-gif-input:focus{border-color:var(--primary);}
+  .cal-inline-gif-status{padding:16px;text-align:center;font-size:12px;color:var(--text-faint);}
+  .cal-inline-gif-picker .gif-grid{padding:0 8px 8px;}
 
   /* ── NIP-53 Streaming Events ─────────────────────────────────────────────── */
   .stream-card .cal-inner{position:relative;}

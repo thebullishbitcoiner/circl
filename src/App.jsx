@@ -930,6 +930,7 @@ export default function App() {
                         onOpenZaps={handleOpenZaps}
                         onOpenReactions={handleOpenReactions}
                         onOpenReposts={handleOpenReposts}
+                        onOpenPollVotes={handleOpenPollVotes}
                         resolveEventById={resolveEventById}
                         publishHighlight={publishHighlight}
                         myPubkey={pubkey}
@@ -939,10 +940,14 @@ export default function App() {
                         onPrepend={prependEvent}
                         onBookmark={handleBookmark}
                         isBookmarked={isBookmarked}
+                        getLike={getLike}
+                        onLike={handleLike}
                         getLocalZaps={getLocalZaps}
                         addLocalZap={addLocalZap}
                         getLocalReactions={getLocalReactions}
                         setLocalReaction={setLocalReaction}
+                        onRequestModal={setPanelModal}
+                        onDismissModal={() => setPanelModal(null)}
                         sendZap={sendZap}
                         defaultZapAmount={zapSettings.amount}
                         defaultZapMsg={zapSettings.msg}
@@ -1050,13 +1055,18 @@ export default function App() {
                         onBack={handleBack}
                         onOpenProfile={handleOpenProfile}
                         onOpenThread={handleOpenThread}
+                        onOpenHashtag={handleOpenHashtag}
                         onOpenZaps={handleOpenZaps}
                         onOpenReactions={handleOpenReactions}
                         onOpenReposts={handleOpenReposts}
+                        onOpenPollVotes={handleOpenPollVotes}
+                        resolveEventById={resolveEventById}
                         onPublish={prependEvent}
                         onPrepend={prependEvent}
                         onBookmark={handleBookmark}
                         isBookmarked={isBookmarked}
+                        getLike={getLike}
+                        onLike={handleLike}
                         getLocalZaps={getLocalZaps}
                         addLocalZap={addLocalZap}
                         getLocalReactions={getLocalReactions}
