@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback, useTransition } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteCard from "./NoteCard.jsx";
@@ -13,8 +13,9 @@ import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
 import useInteractions from "../hooks/useInteractions.js";
 import { useNavigation } from "../context/NavigationContext.jsx";
-import { pool, eventStore } from "../nostr.js";
+import { pool, eventStore, validRelays } from "../nostr.js";
 import { RELAYS } from "../constants.js";
+import useMailboxes from "../hooks/useMailboxes.js";
 import SkelCard from "./SkelCard.jsx";
 import ProfileMediaGrid from "./ProfileMediaGrid.jsx";
 import MediaLightbox from "./MediaLightbox.jsx";
@@ -153,13 +154,10 @@ export default function ProfilePage({
 }) {
   const { isMuted } = useNavigation();
 
-  const [tab, setTab] = useState("notes");             // drives indicator immediately
-  const [renderedTab, setRenderedTab] = useState("notes"); // drives content (deferred)
-  const [, startTransition] = useTransition();
+  const [tab, setTab] = useState("notes");
 
   const switchTab = useCallback((newTab) => {
-    setTab(newTab);                                    // instant: tab highlight
-    startTransition(() => setRenderedTab(newTab));     // deferred: render content
+    setTab(newTab);
   }, []);
 
   const [visibleNotes, setVisibleNotes] = useState(20);
@@ -174,6 +172,11 @@ export default function ProfilePage({
   const [profileNotesMenuId, setProfileNotesMenuId] = useState(null);
   const [profileNotesJsonEvent, setProfileNotesJsonEvent] = useState(null);
   const [lightboxUrl, setLightboxUrl] = useState(null);
+
+  const [articlesLoading, setArticlesLoading] = useState(true);
+  const [highlightsLoading, setHighlightsLoading] = useState(true);
+  const [articleEvents, setArticleEvents] = useState([]);
+  const [highlightEventsList, setHighlightEventsList] = useState([]);
 
   const [mediaItems, setMediaItems] = useState([]);
   const [mediaLoading, setMediaLoading] = useState(false);
@@ -237,6 +240,16 @@ export default function ProfilePage({
   const mediaStartedRef = useRef(false);
   const { stream: activeStream } = useActiveStream(pubkey);
 
+  // NIP-65: fetch the profile's relay list so articles/highlights/listings can be
+  // queried from the author's outbox relays, not just the user's connected relays.
+  const { outboxes: profileOutboxes } = useMailboxes(pubkey);
+  const contentRelayUrls = useMemo(() => {
+    const base = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    if (!profileOutboxes?.length) return base;
+    return [...new Set([...base, ...validRelays(profileOutboxes)])];
+  }, [profileOutboxes]);
+  const contentRelayKey = useMemo(() => contentRelayUrls.join(","), [contentRelayUrls]);
+
   const zapperPks = useMemo(() => {
     const pks = [];
     for (const e of profileEvents) {
@@ -266,16 +279,19 @@ export default function ProfilePage({
   useEffect(() => {
     setProfileNotesMenuId(null);
     setProfileNotesJsonEvent(null);
-  }, [renderedTab, pubkey]);
+  }, [tab, pubkey]);
 
   useEffect(() => {
     setVisibleNotes(20);
     setVisibleReplies(20);
     setVisibleArticles(10);
     setVisibleHighlights(10);
-    setRenderedTab("notes");
     setTab("notes");
-    setListingsLoading(false);
+    setArticlesLoading(true);
+    setHighlightsLoading(true);
+    setArticleEvents([]);
+    setHighlightEventsList([]);
+    setListingsLoading(true);
     setListingEvents([]);
     setListingsSearch("");
     setCreateListingOpen(false);
@@ -358,10 +374,10 @@ export default function ProfilePage({
   }, [pubkey]);
 
   useEffect(() => {
-    if (renderedTab !== "media" || mediaStartedRef.current) return;
+    if (tab !== "media" || mediaStartedRef.current) return;
     mediaStartedRef.current = true;
     fetchMediaBatch();
-  }, [renderedTab, fetchMediaBatch]);
+  }, [tab, fetchMediaBatch]);
 
   // Scroll the tab bar into view when switching between text tabs.
   // Skipped for any transition involving the media tab because the grid's
@@ -378,11 +394,11 @@ export default function ProfilePage({
   }, [tab]);
 
   // Stable refs so the scroll handler never needs to be recreated
-  const renderedTabRef = useRef(renderedTab);
+  const renderedTabRef = useRef(tab);
   const topLevelLenRef = useRef(0);
   const repliesLenRef  = useRef(0);
   const articlesLenRef = useRef(0);
-  useEffect(() => { renderedTabRef.current = renderedTab; }, [renderedTab]);
+  useEffect(() => { renderedTabRef.current = tab; }, [tab]);
 
   const handleProfileScroll = useCallback(e => {
     const el = e.currentTarget;
@@ -446,36 +462,7 @@ export default function ProfilePage({
     });
     activeSubs.push(otherSub);
 
-    // Phase 3 — listings (30402 active + 30403 drafts for own profile only)
-    // Uses dedicated state updated in next so events appear even if complete never fires
-    setListingsLoading(true);
-    const listingKinds = isOwn ? [30402, 30403] : [30402];
-    const listingsSub = pool.request(relayUrls, [{ kinds: listingKinds, authors: [pubkey], limit: 100 }]).subscribe({
-      next: raw => {
-        if (cancelled) return;
-        eventStore.add(raw);
-        setListingEvents(prev => prev.some(e => e.id === raw.id) ? prev : [...prev, raw]);
-      },
-      complete: () => { if (!cancelled) setListingsLoading(false); },
-      error:    () => { if (!cancelled) setListingsLoading(false); },
-    });
-    activeSubs.push(listingsSub);
-
-    // Phase 4 — articles get their own budget so a large repost count can't crowd them out
-    const articlesSub = pool.request(relayUrls, [{ kinds: [30023], authors: [pubkey], limit: 100 }]).subscribe({
-      next: raw => { eventStore.add(raw); byId.set(raw.id, raw); },
-      complete: flush,
-    });
-    activeSubs.push(articlesSub);
-
-    // Phase 5 — highlights (kind 9802)
-    const highlightsSub = pool.request(relayUrls, [{ kinds: [9802], authors: [pubkey], limit: 100 }]).subscribe({
-      next: raw => { eventStore.add(raw); byId.set(raw.id, raw); },
-      complete: flush,
-    });
-    activeSubs.push(highlightsSub);
-
-    // Phase 6 — badges: fetch kind 10008 and deprecated kind 30008 (d=profile_badges) together.
+    // Phase 3 — badges: fetch kind 10008 and deprecated kind 30008 (d=profile_badges) together.
     // Prefer kind 10008; fall back to 30008 for backwards compatibility.
     // On own profile also fetch all received kind 8 awards so unaccepted ones can be shown.
     setBadgesLoading(true);
@@ -595,13 +582,70 @@ export default function ProfilePage({
     };
   }, [pubkey, isOwn]);
 
+  // Content subscriptions — articles, highlights, listings — re-run when the
+  // profile's outbox relays become known so data from the author's preferred
+  // relays is included even if those relays aren't in the user's pool.
+  useEffect(() => {
+    if (!pubkey) return;
+    let cancelled = false;
+    const subs = [];
+
+    // Use pool.group(urls, false) to bypass ignoreOffline so newly-discovered
+    // outbox relays are queried even before their WebSocket handshake completes.
+    const req = (filters) => pool.group(contentRelayUrls, false).request(filters);
+
+    setArticlesLoading(true);
+    const articlesSub = req([{ kinds: [30023], authors: [pubkey], limit: 100 }]).subscribe({
+      next: raw => {
+        if (cancelled) return;
+        eventStore.add(raw);
+        setArticleEvents(prev => prev.some(e => e.id === raw.id) ? prev : [...prev, raw]);
+      },
+      complete: () => { if (!cancelled) setArticlesLoading(false); },
+      error:    () => { if (!cancelled) setArticlesLoading(false); },
+    });
+    subs.push(articlesSub);
+
+    setHighlightsLoading(true);
+    const highlightsSub = req([{ kinds: [9802], authors: [pubkey], limit: 100 }]).subscribe({
+      next: raw => {
+        if (cancelled) return;
+        eventStore.add(raw);
+        setHighlightEventsList(prev => prev.some(e => e.id === raw.id) ? prev : [...prev, raw]);
+      },
+      complete: () => { if (!cancelled) setHighlightsLoading(false); },
+      error:    () => { if (!cancelled) setHighlightsLoading(false); },
+    });
+    subs.push(highlightsSub);
+
+    setListingsLoading(true);
+    const listingKinds = isOwn ? [30402, 30403] : [30402];
+    const listingsSub = req([{ kinds: listingKinds, authors: [pubkey], limit: 100 }]).subscribe({
+      next: raw => {
+        if (cancelled) return;
+        eventStore.add(raw);
+        setListingEvents(prev => prev.some(e => e.id === raw.id) ? prev : [...prev, raw]);
+      },
+      complete: () => { if (!cancelled) setListingsLoading(false); },
+      error:    () => { if (!cancelled) setListingsLoading(false); },
+    });
+    subs.push(listingsSub);
+
+    return () => {
+      cancelled = true;
+      for (const sub of subs) { try { sub.unsubscribe(); } catch {} }
+    };
+  }, [pubkey, isOwn, contentRelayKey]);
+
   const mergedEvents = useMemo(() => {
     const byId = new Map();
     for (const e of events || []) byId.set(e.id, e);
     for (const e of profileEvents || []) byId.set(e.id, e);
+    for (const e of articleEvents) byId.set(e.id, e);
+    for (const e of highlightEventsList) byId.set(e.id, e);
     for (const e of Object.values(repostExtras)) byId.set(e.id, e);
     return Array.from(byId.values());
-  }, [events, profileEvents, repostExtras]);
+  }, [events, profileEvents, articleEvents, highlightEventsList, repostExtras]);
 
   const theirEvents = useMemo(
     () => isMuted?.(pubkey) ? [] : mergedEvents.filter(e => e.pubkey === pubkey && (e.kind === 1 || e.kind === 6 || e.kind === 9802 || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311 || e.kind === 9041 || e.kind === 9735)),
@@ -844,7 +888,7 @@ export default function ProfilePage({
       </div>
 
       {/* Notes tab */}
-      {renderedTab === "notes" && (
+      {tab === "notes" && (
         profileLoading && topLevel.length === 0
           ? [0, 1, 2].map(i => <SkelCard key={i} />)
           : topLevel.length === 0
@@ -889,7 +933,7 @@ export default function ProfilePage({
       )}
 
       {/* Replies tab */}
-      {renderedTab === "replies" && (
+      {tab === "replies" && (
         profileLoading && replies.length === 0
           ? [0, 1, 2].map(i => <SkelCard key={i} />)
           : replies.length === 0
@@ -924,8 +968,8 @@ export default function ProfilePage({
       )}
 
       {/* Articles tab */}
-      {renderedTab === "articles" && (
-        profileLoading && articles.length === 0
+      {tab === "articles" && (
+        (articlesLoading || profileLoading) && articles.length === 0
           ? [0, 1, 2].map(i => <SkelCard key={i} />)
           : articles.length === 0
             ? <div className="empty-state"><div className="empty-state-title">No articles yet</div><div className="empty-state-sub">Long-form posts will appear here</div></div>
@@ -947,8 +991,8 @@ export default function ProfilePage({
       )}
 
       {/* Highlights tab */}
-      {renderedTab === "highlights" && (
-        profileLoading && highlights.length === 0
+      {tab === "highlights" && (
+        (highlightsLoading || profileLoading) && highlights.length === 0
           ? [0, 1, 2].map(i => <SkelCard key={i} />)
           : highlights.length === 0
             ? <div className="empty-state"><div className="empty-state-title">No highlights yet</div><div className="empty-state-sub">Highlighted passages from notes and articles will appear here</div></div>
@@ -992,7 +1036,7 @@ export default function ProfilePage({
       )}
 
       {/* Goals tab */}
-      {renderedTab === "goals" && (
+      {tab === "goals" && (
         profileLoading && goals.length === 0
           ? [0, 1, 2].map(i => <SkelCard key={i} />)
           : goals.length === 0
@@ -1035,7 +1079,7 @@ export default function ProfilePage({
       )}
 
       {/* Listings tab */}
-      {renderedTab === "listings" && (
+      {tab === "listings" && (
         <>
           {selectedListing ? (
             <ListingDetail
@@ -1120,7 +1164,7 @@ export default function ProfilePage({
       )}
 
       {/* Badges tab */}
-      {renderedTab === "badges" && (() => {
+      {tab === "badges" && (() => {
         if (selectedBadge) {
           const aTag = selectedBadge.tags?.find(t => t[0] === "a")?.[1] || "";
           const parts = aTag.split(":");
@@ -1213,7 +1257,7 @@ export default function ProfilePage({
 
       {/* Media tab — always mounted so thumbnail images stay in DOM across tab switches */}
       <ProfileMediaGrid
-        visible={renderedTab === "media"}
+        visible={tab === "media"}
         items={mediaItems}
         loading={mediaLoading}
         exhausted={mediaExhausted}
@@ -1232,7 +1276,7 @@ export default function ProfilePage({
       )}
 
       {/* Between us tab */}
-      {renderedTab === "between" && !isOwn && (
+      {tab === "between" && !isOwn && (
         ixLoading && betweenUs.length === 0
           ? <div className="empty-state"><div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: "var(--text-faint)", fontSize: 13 }}><div style={{ width: 14, height: 14, border: "2px solid var(--border)", borderTopColor: "var(--primary)", borderRadius: "50%", animation: "spin .7s linear infinite" }} />Loading exchanges…</div></div>
           : betweenUs.length === 0
