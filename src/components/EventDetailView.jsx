@@ -2,8 +2,13 @@ import { useState, useEffect, useRef } from "react";
 import Avatar from "./Avatar.jsx";
 import ArticleBody from "./ArticleBody.jsx";
 import NoteActions from "./NoteActions.jsx";
+import NoteCard from "./NoteCard.jsx";
+import NoteContextMenu from "./NoteContextMenu.jsx";
+import NoteJsonModal from "./NoteJsonModal.jsx";
+import FocusedStatsRow from "./FocusedStatsRow.jsx";
+import InlineCompose from "./InlineCompose.jsx";
 import { Bk } from "./icons.jsx";
-import { displayName, nip05OrNpub, relativeTime, parseCalendarEvent, formatCalendarDate } from "../utils.js";
+import { displayName, nip05OrNpub, parseCalendarEvent, formatCalendarDate } from "../utils.js";
 import useCalendarRSVPs from "../hooks/useCalendarRSVPs.js";
 import { CalendarEventRSVPFactory } from "applesauce-common/factories/calendar-rsvp";
 import { pool, eventStore } from "../nostr.js";
@@ -35,13 +40,18 @@ export default function EventDetailView({
   onBack,
   onOpenProfile,
   onOpenThread,
+  onOpenHashtag,
   onOpenZaps,
   onOpenReactions,
   onOpenReposts,
+  onOpenPollVotes,
+  resolveEventById,
   onPublish,
   onPrepend,
   onBookmark,
   isBookmarked,
+  getLike,
+  onLike,
   getLocalZaps,
   addLocalZap,
   getLocalReactions,
@@ -57,12 +67,15 @@ export default function EventDetailView({
   const ref = useRef(null);
   const [rsvping, setRsvping] = useState(false);
   const [localMyRsvp, setLocalMyRsvp] = useState(null);
+  const [comments, setComments] = useState([]);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [jsonOpen, setJsonOpen] = useState(false);
 
   const cal = parseCalendarEvent(event);
-  const { counts, grouped, myRsvp, loading: rsvpLoading } = useCalendarRSVPs({ event, pubkey });
+  const { grouped, myRsvp } = useCalendarRSVPs({ event, pubkey });
   const resolvedMyRsvp = localMyRsvp ?? myRsvp;
 
-  // Fetch profiles for RSVP attendees that aren't already loaded
+  // Fetch profiles for RSVP attendees
   useEffect(() => {
     const allPks = [...grouped.accepted, ...grouped.tentative, ...grouped.declined];
     if (!allPks.length) return;
@@ -71,6 +84,42 @@ export default function EventDetailView({
       next: ev => eventStore.add(ev),
     });
   }, [grouped.accepted.join(","), grouped.tentative.join(","), grouped.declined.join(",")]);
+
+  // Subscribe to replies/comments
+  useEffect(() => {
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const dTag = event.tags?.find(t => t[0] === "d")?.[1] ?? "";
+    const addr = `${event.kind}:${event.pubkey}:${dTag}`;
+    const known = new Map();
+    const sub = pool.subscription(relayUrls, [
+      { kinds: [1, 1111], "#e": [event.id] },
+      { kinds: [1111], "#a": [addr] },
+    ]).subscribe({
+      next: ev => {
+        if (known.has(ev.id)) return;
+        if (ev.tags?.some(t => t[0] === "q")) return;
+        known.set(ev.id, ev);
+        eventStore.add(ev);
+        setComments(prev => [...prev, ev].sort((a, b) => a.created_at - b.created_at));
+      },
+    });
+    return () => sub.unsubscribe();
+  }, [event.id]);
+
+  // Fetch profiles for comment authors
+  useEffect(() => {
+    if (!comments.length) return;
+    const pks = [...new Set(comments.map(c => c.pubkey))];
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    pool.request(relayUrls, [{ kinds: [0], authors: pks }]).subscribe({
+      next: ev => eventStore.add(ev),
+    });
+  }, [comments.length]);
+
+  function addComment(ev) {
+    if (ev) setComments(prev => [...prev, ev].sort((a, b) => a.created_at - b.created_at));
+    onPrepend?.(ev);
+  }
 
   async function handleRsvp(status) {
     if (rsvping) return;
@@ -85,13 +134,61 @@ export default function EventDetailView({
 
   const dateStr = formatCalendarDate(cal.start, cal.end, cal.isDateBased);
 
+  const sharedNoteProps = {
+    profiles,
+    myPubkey: pubkey,
+    myProfile,
+    events: [...events, ...comments],
+    resolveEventById,
+    onOpenProfile,
+    onOpenThread,
+    onOpenHashtag,
+    onOpenZaps,
+    onOpenReactions,
+    onOpenReposts,
+    onOpenPollVotes,
+    onPublish,
+    publishEvent,
+    onPrepend,
+    onBookmark,
+    isBookmarked,
+    getLocalZaps,
+    addLocalZap,
+    getLocalReactions,
+    setLocalReaction,
+    onRequestModal,
+    onDismissModal,
+    sendZap,
+    defaultZapAmount,
+    defaultZapMsg,
+    onZapFail,
+    customEmojis,
+  };
+
   return (
     <div ref={ref} className="slide-panel-scroll">
       <div className="panel-bar">
         <button className="back-btn" onClick={onBack}><Bk s={16} /></button>
         <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 15, fontWeight: 600, color: "var(--text)" }}>Event</span>
-        <div style={{ display: "flex", gap: 3 }} />
+        <div style={{ position: "relative", marginLeft: "auto" }}>
+          <button
+            type="button"
+            className="note-card-menu-btn"
+            onClick={e => { e.stopPropagation(); setMenuOpen(v => !v); }}
+            aria-label="More options"
+          >
+            <span /><span /><span />
+          </button>
+          {menuOpen && (
+            <NoteContextMenu
+              event={event}
+              onClose={() => setMenuOpen(false)}
+              onViewJson={() => { setMenuOpen(false); setJsonOpen(true); }}
+            />
+          )}
+        </div>
       </div>
+      {jsonOpen && <NoteJsonModal event={event} onClose={() => setJsonOpen(false)} />}
 
       <div className="reader-hero">
         {cal.image ? (
@@ -105,6 +202,10 @@ export default function EventDetailView({
 
       <div className="reader-content">
         <div className="reader-header">
+          <div className="r-article-dateline">
+            {new Date(event.created_at * 1000).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+            {(() => { const c = event.tags?.find(t => t[0] === "client")?.[1]; return c ? <><span className="meta-dot"> · </span>via {c}</> : null; })()}
+          </div>
           <div className="reader-title">{cal.title || "Untitled Event"}</div>
 
           <div className="cal-detail-meta">
@@ -136,44 +237,53 @@ export default function EventDetailView({
                 <div className="r-author-npub">{nip05OrNpub(event.pubkey, profiles)}</div>
               </div>
             </div>
-            <div className="meta-sep" />
-            <span className="meta-pill">{relativeTime(event.created_at)} ago</span>
+          </div>
+
+          <FocusedStatsRow
+            eventId={event.id}
+            rCount={comments.length}
+            allEvents={events}
+            zaps={getLocalZaps?.(event.id) ?? []}
+            reactions={getLocalReactions?.(event.id) ?? []}
+            onOpenZaps={onOpenZaps}
+            onOpenReactions={onOpenReactions}
+            onOpenReposts={onOpenReposts}
+          />
+
+          <div className="reader-header-actions">
+            <NoteActions
+              event={event}
+              profiles={profiles}
+              myPubkey={pubkey}
+              myProfile={myProfile}
+              events={events}
+              onOpenThread={onOpenThread}
+              onOpenZaps={onOpenZaps}
+              onOpenReactions={onOpenReactions}
+              onOpenReposts={onOpenReposts}
+              onPublish={onPublish}
+              publishEvent={publishEvent}
+              onPrepend={onPrepend}
+              onBookmark={onBookmark}
+              isBookmarked={isBookmarked}
+              getLocalZaps={getLocalZaps}
+              addLocalZap={addLocalZap}
+              getLocalReactions={getLocalReactions}
+              setLocalReaction={setLocalReaction}
+              onRequestModal={onRequestModal}
+              onDismissModal={onDismissModal}
+              sendZap={sendZap}
+              defaultZapAmount={defaultZapAmount}
+              defaultZapMsg={defaultZapMsg}
+              onZapFail={onZapFail}
+              customEmojis={customEmojis}
+            />
           </div>
         </div>
 
         {event.content?.trim() ? (
           <ArticleBody content={event.content} profiles={profiles} onOpenProfile={onOpenProfile} />
         ) : null}
-
-        <div className="cal-detail-actions">
-          <NoteActions
-            event={event}
-            profiles={profiles}
-            myPubkey={pubkey}
-            myProfile={myProfile}
-            events={events}
-            onOpenThread={onOpenThread}
-            onOpenZaps={onOpenZaps}
-            onOpenReactions={onOpenReactions}
-            onOpenReposts={onOpenReposts}
-            onPublish={onPublish}
-            publishEvent={publishEvent}
-            onPrepend={onPrepend}
-            onBookmark={onBookmark}
-            isBookmarked={isBookmarked}
-            getLocalZaps={getLocalZaps}
-            addLocalZap={addLocalZap}
-            getLocalReactions={getLocalReactions}
-            setLocalReaction={setLocalReaction}
-            onRequestModal={onRequestModal}
-            onDismissModal={onDismissModal}
-            sendZap={sendZap}
-            defaultZapAmount={defaultZapAmount}
-            defaultZapMsg={defaultZapMsg}
-            onZapFail={onZapFail}
-            customEmojis={customEmojis}
-          />
-        </div>
 
         <div className="cal-rsvp-section">
           <div className="cal-rsvp-buttons">
@@ -203,6 +313,43 @@ export default function EventDetailView({
           {grouped.declined.length > 0 && (
             <AttendeeList label="Can't go" pubkeys={grouped.declined} profiles={profiles} onOpenProfile={onOpenProfile} />
           )}
+        </div>
+
+        <div className="cal-comments-section">
+          <div className="cal-comments-header">
+            <span className="cal-comments-title">Comments</span>
+            {comments.length > 0 && (
+              <span className="cal-comments-badge">{comments.length}</span>
+            )}
+          </div>
+
+          <div className="cal-comments-feed">
+            {comments.map(c => {
+              const like = getLike?.(c.id) ?? { liked: false, count: 0 };
+              return (
+                <NoteCard
+                  key={c.id}
+                  event={c}
+                  liked={like.liked}
+                  likeCount={like.count}
+                  bookmarked={isBookmarked?.(c) || false}
+                  onLike={onLike}
+                  {...sharedNoteProps}
+                />
+              );
+            })}
+          </div>
+
+          <InlineCompose
+            replyTo={event}
+            myPubkey={pubkey}
+            myProfile={myProfile}
+            profiles={profiles}
+            events={[...events, ...comments]}
+            publishEvent={publishEvent}
+            onSuccess={addComment}
+            customEmojis={customEmojis}
+          />
         </div>
       </div>
     </div>
