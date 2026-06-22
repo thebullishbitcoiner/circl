@@ -32,9 +32,10 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
     return isHexPubkey(pk) ? (readCache(pk)?.pubkeys ?? []) : [];
   });
   const [muteEvent, setMuteEvent] = useState(null);
-  const mutesRef = useRef([]);
+  const mutesRef = useRef(mutes);
   useEffect(() => { mutesRef.current = mutes; }, [mutes]);
   const unreadableRef = useRef(false);
+  const settledRef = useRef(!!readCache(normPubkey(pubkey)));
 
   useEffect(() => {
     const pk = normPubkey(pubkey);
@@ -97,11 +98,13 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
       if (!cancelled && generation === gen) {
         unreadableRef.current = decryptFailed;
         setMutes(pubkeys);
+        mutesRef.current = pubkeys;
         setMuteEvent(ev);
         if (!decryptFailed) {
           writeCache(pk, pubkeys, ev.created_at);
           knownCreatedAt = ev.created_at;
         }
+        settledRef.current = true;
       }
     };
 
@@ -117,7 +120,7 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
       error: () => { if (!cancelled && !cached) setMutes([]); },
     });
 
-    const cutoffTimer = setTimeout(() => { sub.unsubscribe(); process(); }, 8000);
+    const cutoffTimer = setTimeout(() => { sub.unsubscribe(); settledRef.current = true; process(); }, 8000);
 
     return () => {
       cancelled = true;
@@ -132,6 +135,7 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
       const pk = normPubkey(pubkey);
       if (!signAndPublish || !isHexPubkey(pk)) throw new Error("Sign in to update mute list");
       if (!hasNip44()) throw new Error("Your wallet does not support NIP-44 (update the extension)");
+      if (!settledRef.current) throw new Error("Mute list is still syncing from relays, please try again in a moment");
       if (unreadableRef.current) throw new Error("Existing mute list was created by a different signer and cannot be safely modified");
       const ciphertext = await window.nostr.nip44.encrypt(pk, JSON.stringify(nextMutes));
       await signAndPublish({ kind: MUTE_LIST_KIND, content: ciphertext, tags: [] });

@@ -47,8 +47,9 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
     const cached = readCache(pk);
     return cached ? cacheToCircles(cached) : [];
   });
-  const circlesRef = useRef([]);
+  const circlesRef = useRef(circles);
   useEffect(() => { circlesRef.current = circles; }, [circles]);
+  const settledRef = useRef(!!readCache(normPubkey(pubkey)));
 
   useEffect(() => {
     const pk = normPubkey(pubkey);
@@ -122,7 +123,10 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
 
       if (!cancelled && generation === gen) {
         if (changed) writeCache(pk, byId);
-        setCircles(cacheToCircles(byId));
+        const next = cacheToCircles(byId);
+        setCircles(next);
+        circlesRef.current = next;
+        settledRef.current = true;
       }
     };
 
@@ -147,7 +151,7 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
       error: () => { if (!cancelled && !cached) setCircles([]); },
     });
 
-    const cutoffTimer = setTimeout(() => { sub.unsubscribe(); process(); }, 8000);
+    const cutoffTimer = setTimeout(() => { sub.unsubscribe(); settledRef.current = true; process(); }, 8000);
 
     return () => {
       cancelled = true;
@@ -162,6 +166,7 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
       const pk = normPubkey(pubkey);
       if (!signAndPublish || !isHexPubkey(pk)) throw new Error("Sign in to manage circles");
       if (!hasNip44()) throw new Error("Your signer does not support NIP-44 (update the extension)");
+      if (!settledRef.current) throw new Error("Circles are still syncing from relays, please try again in a moment");
       const tags = [["d", id], ["title", title]];
       if (deleted) tags.push(["deleted"]);
       const ciphertext = deleted

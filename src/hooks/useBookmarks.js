@@ -63,8 +63,9 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
     const pk = normPubkey(pubkey);
     return isHexPubkey(pk) ? (readCache(pk)?.items ?? []) : [];
   });
-  const itemsRef = useRef([]);
+  const itemsRef = useRef(items);
   useEffect(() => { itemsRef.current = items; }, [items]);
+  const settledRef = useRef(!!readCache(normPubkey(pubkey)));
 
   useEffect(() => {
     const pk = normPubkey(pubkey);
@@ -112,8 +113,10 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
       if (!cancelled && generation === gen) {
         const merged = mergeBookmarkTags(decrypted, ev.tags);
         setItems(merged);
+        itemsRef.current = merged;
         writeCache(pk, merged, ev.created_at);
         knownCreatedAt = ev.created_at;
+        settledRef.current = true;
       }
     };
 
@@ -129,7 +132,7 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
       error: () => { if (!cancelled && !cached) setItems([]); },
     });
 
-    const cutoffTimer = setTimeout(() => { sub.unsubscribe(); process(); }, 8000);
+    const cutoffTimer = setTimeout(() => { sub.unsubscribe(); settledRef.current = true; process(); }, 8000);
 
     return () => {
       cancelled = true;
@@ -144,6 +147,7 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
       const pk = normPubkey(pubkey);
       if (!signAndPublish || !isHexPubkey(pk)) throw new Error("Sign in to sync bookmarks");
       if (!hasNip44()) throw new Error("Your wallet does not support NIP-44 (update the extension)");
+      if (!settledRef.current) throw new Error("Bookmarks are still syncing from relays, please try again in a moment");
       const ciphertext = await window.nostr.nip44.encrypt(pk, JSON.stringify(nextItems));
       await signAndPublish({ kind: BOOKMARK_LIST_KIND, content: ciphertext, tags: [] });
     },
