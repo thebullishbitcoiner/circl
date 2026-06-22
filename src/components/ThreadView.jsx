@@ -360,7 +360,7 @@ export default function ThreadView({
       "#e": [focusedEvent.id],
     }]).subscribe({
       next: raw => {
-        if (!raw.content) return;
+        if (raw.kind !== 7 || !raw.content) return;
         setLocalReaction?.(focusedEvent.id, raw.pubkey, raw.content === "+" ? "💜" : raw.content, { id: raw.id, tags: raw.tags });
       },
     });
