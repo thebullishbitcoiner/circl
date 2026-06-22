@@ -181,7 +181,7 @@ export default function ProfilePage({
   const [mediaItems, setMediaItems] = useState([]);
   const [mediaLoading, setMediaLoading] = useState(false);
   const [mediaExhausted, setMediaExhausted] = useState(false);
-  const [listingsLoading,  setListingsLoading]  = useState(false);
+  const [listingsLoading,  setListingsLoading]  = useState(true);
   const [listingEvents,    setListingEvents]    = useState([]);
   const [listingsSearch,   setListingsSearch]   = useState("");
   const [createListingOpen, setCreateListingOpen] = useState(false);
@@ -594,7 +594,9 @@ export default function ProfilePage({
     // outbox relays are queried even before their WebSocket handshake completes.
     const req = (filters) => pool.group(contentRelayUrls, false).request(filters);
 
-    setArticlesLoading(true);
+    // Do NOT set loading states to true here — they start true (useState) and are
+    // reset to true by the pubkey-change effect. Setting them here on every re-run
+    // (e.g. when outbox relays arrive) causes a loading flash over existing data.
     const articlesSub = req([{ kinds: [30023], authors: [pubkey], limit: 100 }]).subscribe({
       next: raw => {
         if (cancelled) return;
@@ -606,7 +608,6 @@ export default function ProfilePage({
     });
     subs.push(articlesSub);
 
-    setHighlightsLoading(true);
     const highlightsSub = req([{ kinds: [9802], authors: [pubkey], limit: 100 }]).subscribe({
       next: raw => {
         if (cancelled) return;
@@ -618,7 +619,6 @@ export default function ProfilePage({
     });
     subs.push(highlightsSub);
 
-    setListingsLoading(true);
     const listingKinds = isOwn ? [30402, 30403] : [30402];
     const listingsSub = req([{ kinds: listingKinds, authors: [pubkey], limit: 100 }]).subscribe({
       next: raw => {
