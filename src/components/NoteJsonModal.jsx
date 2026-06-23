@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 
-export default function NoteJsonModal({ event, onClose }) {
+export default function NoteJsonModal({ event, onClose, title = "Event JSON" }) {
   const [copied, setCopied] = useState(false);
 
   const copy = e => {
@@ -16,7 +16,7 @@ export default function NoteJsonModal({ event, onClose }) {
       <div className="note-json-modal" onClick={e => e.stopPropagation()}>
         <div className="note-json-header">
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div className="note-json-title">Event JSON</div>
+            <div className="note-json-title">{title}</div>
             <button type="button" className="note-json-copy" onClick={copy} aria-label="Copy JSON">
               {copied ? "✓" : "⧉"}
             </button>

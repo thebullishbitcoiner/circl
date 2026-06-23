@@ -175,6 +175,7 @@ export default function ProfilePage({
   const [profileNotesJsonEvent, setProfileNotesJsonEvent] = useState(null);
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [showLightningSheet, setShowLightningSheet] = useState(false);
+  const [showProfileMetadata, setShowProfileMetadata] = useState(false);
   const [zapAnimCoords, setZapAnimCoords] = useState(null);
   const avatarRef = useRef(null);
 
@@ -792,7 +793,7 @@ export default function ProfilePage({
               <span style={{ width: 2.5, height: 2.5, borderRadius: "50%", background: "currentColor", display: "block" }} />
             </button>
             {profileMenuOpen && (
-              <ProfileContextMenu pubkey={pubkey} onClose={() => setProfileMenuOpen(false)} />
+              <ProfileContextMenu pubkey={pubkey} onClose={() => setProfileMenuOpen(false)} onViewMetadata={() => setShowProfileMetadata(true)} />
             )}
           </div>
         )}
@@ -1289,6 +1290,7 @@ export default function ProfilePage({
       />
 
       {profileNotesJsonEvent && <NoteJsonModal event={profileNotesJsonEvent} onClose={() => setProfileNotesJsonEvent(null)} />}
+      {showProfileMetadata && p._raw && <NoteJsonModal event={p._raw} title="Profile Metadata" onClose={() => setShowProfileMetadata(false)} />}
       {showLightningSheet && (
         <LightningSheet
           pubkey={pubkey}

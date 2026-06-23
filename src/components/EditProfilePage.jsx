@@ -192,7 +192,7 @@ export default function EditProfilePage({ myProfile, myPubkey, publishEvent, onB
         website: website.trim() || undefined,
         nip05: nip05.trim() || undefined,
         lud16: lud16.trim() || undefined,
-        clink_noffer: clinkNoffer.trim() || undefined,
+        clink_offer: clinkNoffer.trim() || undefined,
       };
       const clean = Object.fromEntries(Object.entries(meta).filter(([, v]) => v !== undefined));
       const result = await publishEvent({ kind: 0, content: JSON.stringify(clean), tags: [] });

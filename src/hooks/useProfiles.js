@@ -56,7 +56,9 @@ function toProfileShape(k, data) {
     lud06: data.lud06 ?? null,
     website: data.website ?? data.url ?? null,
     banner: data.banner ?? data.cover ?? data.header ?? null,
-    clink_noffer: data.clink_noffer ?? null,
+    clink_noffer: data.clink_noffer ?? data.clink_offer ?? data.noffer
+      ?? Object.values(data).find(v => typeof v === "string" && v.startsWith("noffer1"))
+      ?? null,
     _raw: data,
   };
 }

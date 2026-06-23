@@ -18,6 +18,22 @@ function BoltIcon({ size = 14, color = "currentColor" }) {
   );
 }
 
+function CopyIconBtn({ copied, onClick }) {
+  return (
+    <button
+      type="button"
+      className={`lnsheet-copy-icon${copied ? " copied" : ""}`}
+      onClick={onClick}
+      aria-label={copied ? "Copied" : "Copy"}
+    >
+      {copied
+        ? <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><polyline points="20 6 9 17 4 12"/></svg>
+        : <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      }
+    </button>
+  );
+}
+
 export default function LightningSheet({
   pubkey,
   profile,
@@ -75,25 +91,15 @@ export default function LightningSheet({
                 <BoltIcon size={14} color="var(--lightning-accent)" />
                 <div>
                   <div className="lightning-sheet-label">Lightning address</div>
-                  <div className="lightning-sheet-value">{lud16}</div>
+                  <div className="lightning-sheet-value-row">
+                    <span className="lightning-sheet-value">{lud16}</span>
+                    <CopyIconBtn copied={copied === "lud16"} onClick={() => handleCopy(lud16, "lud16")} />
+                  </div>
                 </div>
               </div>
-              <div className="lightning-sheet-actions">
-                <button
-                  className={`lnsheet-btn${copied === "lud16" ? " copied" : ""}`}
-                  onClick={() => handleCopy(lud16, "lud16")}
-                >
-                  {copied === "lud16"
-                    ? <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><polyline points="20 6 9 17 4 12"/></svg>
-                    : "Copy"}
-                </button>
-                <button
-                  className="lnsheet-btn primary"
-                  onClick={() => { haptic.medium?.(); setShowZapModal(true); }}
-                >
-                  Zap ⚡
-                </button>
-              </div>
+              <button className="lnsheet-btn primary" onClick={() => { haptic.medium?.(); setShowZapModal(true); }}>
+                Zap
+              </button>
             </div>
           )}
 
@@ -103,28 +109,17 @@ export default function LightningSheet({
                 <BoltIcon size={14} color="var(--lightning-accent)" />
                 <div>
                   <div className="lightning-sheet-label">LNURL</div>
-                  <div className="lightning-sheet-value">{truncate(lud06)}</div>
+                  <div className="lightning-sheet-value-row">
+                    <span className="lightning-sheet-value">{truncate(lud06)}</span>
+                    <CopyIconBtn copied={copied === "lud06"} onClick={() => handleCopy(lud06, "lud06")} />
+                  </div>
                 </div>
               </div>
-              <div className="lightning-sheet-actions">
-                <button
-                  className={`lnsheet-btn${copied === "lud06" ? " copied" : ""}`}
-                  onClick={() => handleCopy(lud06, "lud06")}
-                >
-                  {copied === "lud06"
-                    ? <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><polyline points="20 6 9 17 4 12"/></svg>
-                    : "Copy"}
+              {!lud16 && (
+                <button className="lnsheet-btn primary" onClick={() => { haptic.medium?.(); setShowZapModal(true); }}>
+                  Zap
                 </button>
-                {/* Only show Zap on lud06 row if there's no lud16 to avoid duplicate buttons */}
-                {!lud16 && (
-                  <button
-                    className="lnsheet-btn primary"
-                    onClick={() => { haptic.medium?.(); setShowZapModal(true); }}
-                  >
-                    Zap ⚡
-                  </button>
-                )}
-              </div>
+              )}
             </div>
           )}
 
@@ -133,26 +128,16 @@ export default function LightningSheet({
               <div className="lightning-sheet-row-meta">
                 <BoltIcon size={14} color="var(--lightning-accent)" />
                 <div>
-                  <div className="lightning-sheet-label">Noffer · CLINK</div>
-                  <div className="lightning-sheet-value">{truncate(nofferValue, 28)}</div>
+                  <div className="lightning-sheet-label">CLINK OFFER</div>
+                  <div className="lightning-sheet-value-row">
+                    <span className="lightning-sheet-value">{truncate(nofferValue, 28)}</span>
+                    <CopyIconBtn copied={copied === "noffer"} onClick={() => handleCopy(nofferValue, "noffer")} />
+                  </div>
                 </div>
               </div>
-              <div className="lightning-sheet-actions">
-                <button
-                  className={`lnsheet-btn${copied === "noffer" ? " copied" : ""}`}
-                  onClick={() => handleCopy(nofferValue, "noffer")}
-                >
-                  {copied === "noffer"
-                    ? <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><polyline points="20 6 9 17 4 12"/></svg>
-                    : "Copy"}
-                </button>
-                <button
-                  className="lnsheet-btn primary"
-                  onClick={() => { haptic.medium?.(); setShowNoffer(true); }}
-                >
-                  Pay
-                </button>
-              </div>
+              <button className="lnsheet-btn primary" onClick={() => { haptic.medium?.(); setShowNoffer(true); }}>
+                Pay
+              </button>
             </div>
           )}
 
