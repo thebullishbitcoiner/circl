@@ -10,7 +10,7 @@ import NoteJsonModal from "./NoteJsonModal.jsx";
 import FocusedStatsRow from "./FocusedStatsRow.jsx";
 import InlineCompose from "./InlineCompose.jsx";
 import { Bk } from "./icons.jsx";
-import { displayName, nip05OrNpub, parseArticle, nip19 } from "../utils.js";
+import { displayName, nip05OrNpub, parseArticle } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 
@@ -253,10 +253,6 @@ export default function ArticleReader({
           />
         </div>
 
-        <div style={{ padding: "0 0 24px" }}>
-          <div className="event-id-label">Nostr Event ID</div>
-          <div className="event-id">{nip19.noteEncode(event.id)}</div>
-        </div>
 
         <div className="cal-comments-section">
           <div className="cal-comments-header">
