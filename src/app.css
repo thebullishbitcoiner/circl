@@ -291,7 +291,9 @@
   .note-custom-emoji{height:1.4em;width:auto;vertical-align:middle;display:inline;}
   .note-code{font-family:monospace;font-size:.9em;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;}
   .note-media{max-width:100%;border-radius:12px;overflow:hidden;border:1px solid var(--border);background:var(--surface);align-self:flex-start;margin-bottom:8px;}
-  .note-media img,.note-media video{display:block;width:100%;max-height:min(70vh,520px);object-fit:cover;background:var(--surface2);}
+  .note-media img,.note-media video{display:block;width:100%;max-height:min(70vh,520px);background:var(--surface2);}
+  .note-media img{object-fit:cover;}
+  .note-media video{object-fit:contain;}
   .note-media-video video{max-height:min(60vh,480px);}
   .note-media-broken{display:none;}
   /* Image mosaic (multiple consecutive images in a note) */
@@ -315,7 +317,7 @@
   .media-lightbox{position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:max(18px,env(safe-area-inset-top)) 0 max(18px,env(safe-area-inset-bottom));box-sizing:border-box;}
   .media-lightbox-stage{width:100%;max-height:100%;display:flex;align-items:center;justify-content:center;touch-action:pan-y;}
   .media-lightbox-stage img{width:100%;max-height:90vh;object-fit:contain;border-radius:0;}
-  .media-lightbox-stage video{width:100%;max-height:90vh;outline:none;}
+  .media-lightbox-stage video{max-width:100%;max-height:90vh;outline:none;object-fit:contain;}
   .media-lightbox-close{position:absolute;top:max(14px,env(safe-area-inset-top));right:max(14px,env(safe-area-inset-right));width:44px;height:44px;border:none;background:rgba(255,255,255,.14);color:#fff;font-size:28px;line-height:1;border-radius:50%;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center;padding:0;}
   .media-lightbox-close:hover{background:rgba(255,255,255,.22);}
   .media-lightbox-nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border:none;background:rgba(255,255,255,.14);color:#fff;font-size:26px;line-height:1;border-radius:50%;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center;padding-bottom:2px;}
