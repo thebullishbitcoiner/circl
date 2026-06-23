@@ -89,6 +89,27 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     });
   };
 
+  const lockedAuthorPk = replyTo ? replyTo.pubkey : quotedEvent ? quotedEvent.pubkey : null;
+
+  const tagLinkLabel = (pubkeys) => {
+    const active = pubkeys.filter(pk => !excludedMentions.has(pk));
+    if (active.length === 0) return "no one";
+    const shown = active.slice(0, 3).map(pk => `@${displayName(pk, profiles)}`).join(", ");
+    return active.length > 3 ? `${shown} and ${active.length - 3} other${active.length - 3 !== 1 ? "s" : ""}` : shown;
+  };
+
+  const toggleAllTags = () => {
+    const nonLocked = allTaggedPubkeys.filter(pk => pk !== lockedAuthorPk);
+    const allIncluded = nonLocked.every(pk => !excludedMentions.has(pk));
+    setExcludedMentions(prev => {
+      const next = new Set(prev);
+      for (const pk of nonLocked) allIncluded ? next.add(pk) : next.delete(pk);
+      return next;
+    });
+  };
+
+  const allNonLockedIncluded = allTaggedPubkeys.filter(pk => pk !== lockedAuthorPk).every(pk => !excludedMentions.has(pk));
+
   const collectDraftState = useCallback(() => ({
     content: getContent(),
     media,
@@ -506,30 +527,11 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
               </div>
             </div>
             {mentionedPubkeys.length > 0 && (
-              <div style={{ marginTop: 10 }}>
-                <div className="compose-sheet-context-label">Tagging</div>
-                <div className="compose-tagged-list">
-                  {mentionedPubkeys.slice(0, TAGS_VISIBLE).map(pk => {
-                    const removed = excludedMentions.has(pk);
-                    return (
-                      <button
-                        key={pk}
-                        type="button"
-                        className={`tagged-chip${removed ? " removed" : ""}`}
-                        onClick={() => toggleMention(pk)}
-                        title={removed ? "Tap to tag again" : "Tap to remove tag"}
-                      >
-                        @{displayName(pk, profiles)}
-                        <span className="tagged-chip-x">{removed ? "+" : "✕"}</span>
-                      </button>
-                    );
-                  })}
-                  {mentionedPubkeys.length > TAGS_VISIBLE && (
-                    <button type="button" className="tagged-chip tagged-chip-more" onClick={() => setShowTagList(true)}>
-                      +{mentionedPubkeys.length - TAGS_VISIBLE} more
-                    </button>
-                  )}
-                </div>
+              <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                <span className="compose-sheet-context-label" style={{ margin: 0 }}>Tagging</span>
+                <button type="button" className="tagging-link" onClick={() => setShowTagList(true)}>
+                  {tagLinkLabel(mentionedPubkeys)}
+                </button>
               </div>
             )}
           </div>
@@ -591,27 +593,11 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
           {quotedEvent && (
             <div style={{ padding: "0 16px 12px" }}>
               {quotedMentionPubkeys.length > 0 && (
-                <div style={{ marginBottom: 8 }}>
-                  <div className="compose-sheet-context-label">Tagging</div>
-                  <div className="compose-tagged-list">
-                    {quotedMentionPubkeys.slice(0, TAGS_VISIBLE).map(pk => (
-                      <button
-                        key={pk}
-                        type="button"
-                        className={`tagged-chip${excludedMentions.has(pk) ? " removed" : ""}`}
-                        onClick={() => toggleMention(pk)}
-                        title={excludedMentions.has(pk) ? "Tap to tag again" : "Tap to remove tag"}
-                      >
-                        @{displayName(pk, profiles)}
-                        <span className="tagged-chip-x">{excludedMentions.has(pk) ? "+" : "✕"}</span>
-                      </button>
-                    ))}
-                    {quotedMentionPubkeys.length > TAGS_VISIBLE && (
-                      <button type="button" className="tagged-chip tagged-chip-more" onClick={() => setShowTagList(true)}>
-                        +{quotedMentionPubkeys.length - TAGS_VISIBLE} more
-                      </button>
-                    )}
-                  </div>
+                <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span className="compose-sheet-context-label" style={{ margin: 0 }}>Tagging</span>
+                  <button type="button" className="tagging-link" onClick={() => setShowTagList(true)}>
+                    {tagLinkLabel(quotedMentionPubkeys)}
+                  </button>
                 </div>
               )}
               <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px", background: "var(--surface)" }}>
@@ -670,23 +656,32 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
           <div style={{ borderTop: "1px solid var(--border)", background: "var(--bg)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px 6px" }}>
               <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 600, color: "var(--text)" }}>Tagging</span>
-              <button type="button" onClick={() => setShowTagList(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: 16, lineHeight: 1, padding: 4 }}>✕</button>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {allTaggedPubkeys.filter(pk => pk !== lockedAuthorPk).length > 0 && (
+                  <button type="button" onClick={toggleAllTags} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans',sans-serif", fontSize: 12.5, color: "var(--primary)", padding: "2px 4px" }}>
+                    {allNonLockedIncluded ? "Remove all" : "Add all"}
+                  </button>
+                )}
+                <button type="button" onClick={() => setShowTagList(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: 16, lineHeight: 1, padding: 4 }}>✕</button>
+              </div>
             </div>
             <div style={{ maxHeight: 240, overflowY: "auto" }}>
               {allTaggedPubkeys.map(pk => {
                 const included = !excludedMentions.has(pk);
+                const isLocked = pk === lockedAuthorPk;
                 return (
                   <button
                     key={pk}
                     type="button"
-                    onClick={() => toggleMention(pk)}
-                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 16px", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}
+                    onClick={() => !isLocked && toggleMention(pk)}
+                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 16px", background: "none", border: "none", cursor: isLocked ? "default" : "pointer", textAlign: "left" }}
                   >
                     <Avatar pk={pk} profiles={profiles} size={30} />
                     <span style={{ flex: 1, fontFamily: "'DM Sans',sans-serif", fontSize: 14, color: included ? "var(--text)" : "var(--text-faint)", textDecoration: included ? "none" : "line-through" }}>
                       {displayName(pk, profiles)}
+                      {isLocked && <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 11, color: "var(--text-faint)", marginLeft: 6 }}>author</span>}
                     </span>
-                    <span style={{ width: 20, textAlign: "center", color: "var(--primary)", fontSize: 16 }}>
+                    <span style={{ width: 20, textAlign: "center", color: isLocked ? "var(--text-faint)" : "var(--primary)", fontSize: 16 }}>
                       {included ? "✓" : ""}
                     </span>
                   </button>

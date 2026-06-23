@@ -799,6 +799,7 @@
   .tagged-chip.removed{background:none;color:var(--text-faint);text-decoration:line-through;}
   .tagged-chip.tagged-chip-more{background:none;color:var(--text-muted);}
   .tagged-chip-x{font-size:10px;text-decoration:none;}
+  .tagging-link{background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12.5px;color:var(--primary);padding:0;text-decoration:none;}
   .compose-sheet-footer{
     padding:8px 16px 4px;border-top:1px solid var(--border);
     display:flex;align-items:center;gap:8px;flex-shrink:0;
