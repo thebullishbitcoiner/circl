@@ -31,6 +31,8 @@ import ListingDetail from "./ListingDetail.jsx";
 import CreateListingSheet from "./CreateListingSheet.jsx";
 import BadgeCard from "./BadgeCard.jsx";
 import BadgeDetail from "./BadgeDetail.jsx";
+import LightningSheet from "./LightningSheet.jsx";
+import ZapAnimation from "./ZapAnimation.jsx";
 
 // Persists across component mounts so returning to a profile doesn't refetch
 const mediaCache = new Map(); // pubkey → { items, until, exhausted }
@@ -172,6 +174,9 @@ export default function ProfilePage({
   const [profileNotesMenuId, setProfileNotesMenuId] = useState(null);
   const [profileNotesJsonEvent, setProfileNotesJsonEvent] = useState(null);
   const [lightboxUrl, setLightboxUrl] = useState(null);
+  const [showLightningSheet, setShowLightningSheet] = useState(false);
+  const [zapAnimCoords, setZapAnimCoords] = useState(null);
+  const avatarRef = useRef(null);
 
   const [articlesLoading, setArticlesLoading] = useState(true);
   const [highlightsLoading, setHighlightsLoading] = useState(true);
@@ -797,6 +802,7 @@ export default function ProfilePage({
         <div className="profile-av-wrap">
           <div style={{ position: "relative", display: "inline-block" }}>
             <div
+              ref={avatarRef}
               className={`profile-av${activeStream ? " profile-av-live" : ""}`}
               onClick={activeStream ? () => onOpenStream?.(activeStream) : (p.picture ? () => setLightboxUrl(p.picture) : undefined)}
               style={(activeStream || p.picture) ? { cursor: "pointer" } : undefined}
@@ -807,11 +813,28 @@ export default function ProfilePage({
             </div>
             {activeStream && <div className="profile-av-live-badge">LIVE</div>}
           </div>
-          {isOwn && <button className="profile-edit-btn" onClick={onEditProfile}>Edit profile</button>}
+          {isOwn && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {(p.lud16 || p.lud06 || p.clink_noffer) && (
+                <button className="profile-lightning-btn" onClick={() => setShowLightningSheet(true)} aria-label="Lightning payment">
+                  <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                </button>
+              )}
+              <button className="profile-edit-btn" onClick={onEditProfile}>Edit profile</button>
+            </div>
+          )}
           {!isOwn && (
-            follows?.includes(pubkey)
-              ? <button className="profile-unfollow-btn" onClick={() => onUnfollow?.(pubkey)}>Unfollow</button>
-              : <button className="profile-follow-btn"  onClick={() => onFollow?.(pubkey)}>Follow</button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {(p.lud16 || p.lud06 || p.clink_noffer) && (
+                <button className="profile-lightning-btn" onClick={() => setShowLightningSheet(true)} aria-label="Lightning payment">
+                  <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                </button>
+              )}
+              {follows?.includes(pubkey)
+                ? <button className="profile-unfollow-btn" onClick={() => onUnfollow?.(pubkey)}>Unfollow</button>
+                : <button className="profile-follow-btn"  onClick={() => onFollow?.(pubkey)}>Follow</button>
+              }
+            </div>
           )}
         </div>
         <div className="profile-name">{name}</div>
@@ -1266,6 +1289,25 @@ export default function ProfilePage({
       />
 
       {profileNotesJsonEvent && <NoteJsonModal event={profileNotesJsonEvent} onClose={() => setProfileNotesJsonEvent(null)} />}
+      {showLightningSheet && (
+        <LightningSheet
+          pubkey={pubkey}
+          profile={p}
+          profiles={profiles}
+          sendZap={sendZap}
+          defaultZapAmount={defaultZapAmount}
+          defaultZapMsg={defaultZapMsg}
+          onZapFail={onZapFail}
+          onDismiss={() => setShowLightningSheet(false)}
+          onZapSuccess={() => {
+            const r = avatarRef.current?.getBoundingClientRect();
+            if (r) setZapAnimCoords({ cx: r.left + r.width / 2, cy: r.top + r.height / 2 });
+          }}
+        />
+      )}
+      {zapAnimCoords && (
+        <ZapAnimation cx={zapAnimCoords.cx} cy={zapAnimCoords.cy} onDone={() => setZapAnimCoords(null)} />
+      )}
       {lightboxUrl && (
         <MediaLightbox
           items={[{ url: lightboxUrl, type: "image" }]}

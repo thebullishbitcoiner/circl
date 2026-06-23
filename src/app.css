@@ -8,6 +8,7 @@
     --border:#E0D8EF; --shadow:rgba(30,27,46,.08); --shadow-md:rgba(30,27,46,.14);
     --bottom-nav-h: 56px;
     --font-base: 14px;
+    --lightning-accent: #f59e0b;
   }
 
   /* ── Dark mode ── */
@@ -485,9 +486,9 @@
   .profile-banner-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
   .profile-banner-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.12),rgba(0,0,0,.22));pointer-events:none;}
   .profile-banner-glyph{position:absolute;right:-20px;bottom:-30px;font-family:'DM Sans',sans-serif;font-size:160px;color:rgba(109,40,217,.11);line-height:1;user-select:none;}
-  .profile-identity{padding:0 20px 16px;margin-top:-26px;position:relative;z-index:2;}
+  .profile-identity{padding:0 20px 16px;margin-top:-32px;position:relative;z-index:2;}
   .profile-av-wrap{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:12px;}
-  .profile-av{width:64px;height:64px;border-radius:50%;background:var(--primary-soft);border:3px solid var(--bg);display:flex;align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;font-size:25px;color:var(--primary);flex-shrink:0;overflow:hidden;}
+  .profile-av{width:80px;height:80px;border-radius:50%;background:var(--primary-soft);border:3px solid var(--bg);display:flex;align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;font-size:30px;color:var(--primary);flex-shrink:0;overflow:hidden;}
   .profile-av img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
   .profile-edit-btn{padding:6px 14px;border-radius:50px;border:1.5px solid var(--border);background:none;color:var(--text-muted);font-family:'DM Sans',sans-serif;font-size:var(--font-base);cursor:pointer;transition:all .15s;}
   .profile-edit-btn:hover{border-color:var(--primary);color:var(--primary);}
@@ -496,6 +497,19 @@
   .profile-follow-btn:disabled{opacity:.4;cursor:not-allowed;}
   .profile-unfollow-btn{padding:6px 14px;border-radius:50px;border:1.5px solid var(--border);background:none;color:var(--text-muted);font-family:'DM Sans',sans-serif;font-size:var(--font-base);cursor:pointer;transition:all .15s;}
   .profile-unfollow-btn:hover{border-color:#ef4444;color:#ef4444;}
+  .profile-lightning-btn{width:34px;height:34px;border-radius:50%;border:1.5px solid var(--border);background:none;color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;flex-shrink:0;}
+  .profile-lightning-btn:hover{border-color:#f59e0b;color:#f59e0b;}
+  .lightning-sheet-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border);}
+  .lightning-sheet-row:last-of-type{border-bottom:none;}
+  .lightning-sheet-row-meta{display:flex;align-items:flex-start;gap:8px;min-width:0;flex:1;}
+  .lightning-sheet-label{font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px;}
+  .lightning-sheet-value{font-family:monospace;font-size:12px;color:var(--text-muted);word-break:break-all;line-height:1.4;}
+  .lightning-sheet-actions{display:flex;gap:6px;flex-shrink:0;}
+  .lnsheet-btn{padding:5px 11px;border-radius:50px;border:1.5px solid var(--border);background:none;color:var(--text-muted);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;min-width:44px;}
+  .lnsheet-btn:hover{border-color:var(--primary);color:var(--primary);}
+  .lnsheet-btn.copied{border-color:var(--primary);color:var(--primary);}
+  .lnsheet-btn.primary{border-color:#f59e0b;background:#f59e0b;color:#fff;font-weight:600;}
+  .lnsheet-btn.primary:hover{opacity:.85;}
   .profile-name{font-family:'DM Sans',sans-serif;font-size:22px;font-weight:700;letter-spacing:-.3px;margin-bottom:2px;}
   .profile-follows-you{display:inline-flex;align-items:center;font-family:'DM Sans',sans-serif;font-size:calc(var(--font-base) - 2px);color:var(--text-faint);background:var(--surface);border:1px solid var(--border);border-radius:50px;padding:2px 8px;}
   .profile-nip05{font-size:var(--font-base);color:var(--primary);display:flex;align-items:center;gap:3px;margin-bottom:6px;}
