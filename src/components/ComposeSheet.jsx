@@ -655,15 +655,15 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
         {showTagList && (
           <div style={{ borderTop: "1px solid var(--border)", background: "var(--bg)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px 6px" }}>
-              <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 600, color: "var(--text)" }}>Tagging</span>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 600, color: "var(--text)" }}>Tagging</span>
                 {allTaggedPubkeys.filter(pk => pk !== lockedAuthorPk).length > 0 && (
                   <button type="button" onClick={toggleAllTags} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "'DM Sans',sans-serif", fontSize: 12.5, color: "var(--primary)", padding: "2px 4px" }}>
                     {allNonLockedIncluded ? "Remove all" : "Add all"}
                   </button>
                 )}
-                <button type="button" onClick={() => setShowTagList(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: 16, lineHeight: 1, padding: 4 }}>✕</button>
               </div>
+              <button type="button" onClick={() => setShowTagList(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: 16, lineHeight: 1, padding: 4 }}>✕</button>
             </div>
             <div style={{ maxHeight: 240, overflowY: "auto" }}>
               {allTaggedPubkeys.map(pk => {
