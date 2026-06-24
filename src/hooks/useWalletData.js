@@ -24,10 +24,9 @@ export default function useWalletData(wallet) {
   const refresh = useCallback(async () => {
     if (!wallet?.nwc_uri) return;
     abortRef.current = false;
-    offsetRef.current = 0;
     setLoading(true);
     setError(null);
-    setTransactions([]);
+    setHasMore(false);
     let client;
     try {
       client = new NWCClient({ nostrWalletConnectUrl: wallet.nwc_uri });
@@ -40,9 +39,9 @@ export default function useWalletData(wallet) {
       if (abortRef.current) return;
       setBalance(balRes.balance);
       const txns = txRes.transactions ?? [];
+      offsetRef.current = txns.length;
       setTransactions(txns);
       setHasMore(txns.length === PAGE_SIZE);
-      offsetRef.current = txns.length;
       const settled24h = (flowRes.transactions ?? []).filter(tx => tx.state === "settled");
       setFlow24h(computeFlow(settled24h));
     } catch (e) {
