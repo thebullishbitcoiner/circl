@@ -98,7 +98,7 @@ function SendSheet({ onDismiss, onSuccess, recentRecipients, profiles, sendZap }
   const [invoice,   setInvoice]   = useState("");
   const [phase,     setPhase]     = useState("idle"); // idle | zap | paying | paid | error
   const [zapTarget, setZapTarget] = useState(null);
-  const [zapAmount, setZapAmount] = useState(ZAP_PRESETS[0].sats);
+  const [zapAmount, setZapAmount] = useState(() => getZapPresets()[0] ?? 21);
   const [zapCustom, setZapCustom] = useState("");
   const [zapMsg,    setZapMsg]    = useState("");
   const [error,     setError]     = useState("");
