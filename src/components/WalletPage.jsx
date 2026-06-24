@@ -6,7 +6,7 @@ import Avatar from "./Avatar.jsx";
 import { displayName, relativeTime, getZapReqFromCache } from "../utils.js";
 import { decodeInvoice } from "@getalby/lightning-tools";
 import { payWithNWC } from "../utils/nwcPay.js";
-import { ZAP_PRESETS } from "../constants.js";
+import { getZapPresets } from "../hooks/useZapSettings.js";
 
 function zapReqFromDesc(tx) {
   try {
@@ -103,6 +103,7 @@ function SendSheet({ onDismiss, onSuccess, recentRecipients, profiles, sendZap }
   const [zapMsg,    setZapMsg]    = useState("");
   const [error,     setError]     = useState("");
 
+  const zapPresets      = getZapPresets();
   const effectiveAmount = zapCustom ? (parseInt(zapCustom) || 0) : zapAmount;
 
   const handlePay = async () => {
@@ -126,7 +127,7 @@ function SendSheet({ onDismiss, onSuccess, recentRecipients, profiles, sendZap }
     else { setError(result.reason || "Payment failed"); setPhase("error"); }
   };
 
-  const selectRecipient = (pk) => { setZapTarget(pk); setZapCustom(""); setZapMsg(""); setPhase("zap"); };
+  const selectRecipient = (pk) => { setZapTarget(pk); setZapAmount(zapPresets[0] ?? 21); setZapCustom(""); setZapMsg(""); setPhase("zap"); };
   const backToIdle      = () => { setZapTarget(null); setPhase("idle"); };
 
   const col = document.querySelector(".feed-main") ?? document.body;
@@ -185,10 +186,10 @@ function SendSheet({ onDismiss, onSuccess, recentRecipients, profiles, sendZap }
               <Avatar pk={zapTarget} profiles={profiles} size={56} />
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 10 }}>
-              {ZAP_PRESETS.map(p => (
-                <button key={p.sats} onClick={() => { setZapAmount(p.sats); setZapCustom(""); }}
-                  style={{ padding: "9px 4px", borderRadius: 10, border: `1.5px solid ${!zapCustom && zapAmount === p.sats ? "var(--primary)" : "var(--border)"}`, background: !zapCustom && zapAmount === p.sats ? "var(--primary)" : "var(--surface)", color: !zapCustom && zapAmount === p.sats ? "white" : "var(--text)", fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                  {p.sats >= 1000 ? `${p.sats / 1000}k` : p.sats}
+              {zapPresets.map(sats => (
+                <button key={sats} onClick={() => { setZapAmount(sats); setZapCustom(""); }}
+                  style={{ padding: "9px 4px", borderRadius: 10, border: `1.5px solid ${!zapCustom && zapAmount === sats ? "var(--primary)" : "var(--border)"}`, background: !zapCustom && zapAmount === sats ? "var(--primary)" : "var(--surface)", color: !zapCustom && zapAmount === sats ? "white" : "var(--text)", fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                  {sats >= 1000 ? `${sats / 1000}k` : sats}
                 </button>
               ))}
             </div>

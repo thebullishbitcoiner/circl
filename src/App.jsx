@@ -1333,6 +1333,7 @@ export default function App() {
 
               <SwipePanel open={settingsOpen} onSwipeRight={() => setSettingsOpen(false)}>
                 <SettingsPage
+                  key={settingsOpen ? "open" : "closed"}
                   onBack={() => setSettingsOpen(false)}
                   dark={dark}
                   toggleDark={toggleDark}

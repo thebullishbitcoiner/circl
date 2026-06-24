@@ -1,10 +1,10 @@
 import { useState } from "react";
 import Overlay from "./Overlay.jsx";
 import { displayName, haptic } from "../utils.js";
-import { ZAP_PRESETS } from "../constants.js";
+import { getZapPresets } from "../hooks/useZapSettings.js";
 
 export default function ZapModal({ event, profiles, onZap, onDismiss, defaultAmount = 21, defaultMsg = "" }) {
-  const presetSats = ZAP_PRESETS.map(p => p.sats);
+  const presetSats = getZapPresets();
   const isPreset   = presetSats.includes(defaultAmount);
 
   const [selected, setSelected] = useState(isPreset ? defaultAmount : presetSats[0]);
@@ -19,6 +19,8 @@ export default function ZapModal({ event, profiles, onZap, onDismiss, defaultAmo
     onDismiss?.();
   };
 
+  const fmtPreset = sats => sats >= 1000 ? `${sats / 1000}k` : sats;
+
   return (
     <Overlay onDismiss={onDismiss} centered className="zap-overlay" noClickOutside>
       <div className="zap-modal" onClick={e => e.stopPropagation()}>
@@ -30,12 +32,11 @@ export default function ZapModal({ event, profiles, onZap, onDismiss, defaultAmo
           <button type="button" className="zap-modal-close" onClick={onDismiss} aria-label="Close">×</button>
         </div>
         <div className="zap-presets">
-          {ZAP_PRESETS.map(p => (
-            <button key={p.sats}
-              className={`zap-preset${selected === p.sats && !custom ? " sel" : ""}`}
-              onClick={() => { setSelected(p.sats); setCustom(""); }}>
-              {p.sats >= 1000 ? `${p.sats / 1000}k` : p.sats}
-              {p.label && <span className="zap-preset-label">{p.label}</span>}
+          {presetSats.map(sats => (
+            <button key={sats}
+              className={`zap-preset${selected === sats && !custom ? " sel" : ""}`}
+              onClick={() => { setSelected(sats); setCustom(""); }}>
+              {fmtPreset(sats)}
             </button>
           ))}
         </div>

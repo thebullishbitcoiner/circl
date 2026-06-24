@@ -332,6 +332,7 @@ function WalletSubPage({ onBack, pubkey, wallet, onWalletConnected, onWalletDisc
 function ZapsSubPage({ onBack, zapSettings, onSaveZapSettings }) {
   const [zapAmount, setZapAmount] = useState(String(zapSettings.amount));
   const [zapMsg,    setZapMsg]    = useState(zapSettings.msg);
+  const [presets,   setPresets]   = useState((zapSettings.presets ?? [21, 100, 500, 1000, 5000, 21000]).map(String));
 
   const inputStyle = {
     padding: "6px 10px", borderRadius: 8,
@@ -340,34 +341,35 @@ function ZapsSubPage({ onBack, zapSettings, onSaveZapSettings }) {
     fontSize: 13, outline: "none",
   };
 
-  const handleAmountChange = e => {
-    const raw = e.target.value;
-    setZapAmount(raw);
-    const parsed = parseInt(raw);
-    if (parsed >= 1) onSaveZapSettings?.({ amount: parsed, msg: zapMsg });
+  const saveAll = ({ amount = zapAmount, msg = zapMsg, ps = presets } = {}) => {
+    const parsedAmount  = Math.max(1, parseInt(amount) || 21);
+    const parsedPresets = ps.map(v => Math.max(1, parseInt(v) || 1));
+    onSaveZapSettings?.({ amount: parsedAmount, msg, presets: parsedPresets });
   };
 
-  const handleAmountBlur = () => {
-    const amount = Math.max(1, parseInt(zapAmount) || 21);
-    setZapAmount(String(amount));
-    onSaveZapSettings?.({ amount, msg: zapMsg });
-  };
+  const handleAmountChange = e => { setZapAmount(e.target.value); const p = parseInt(e.target.value); if (p >= 1) saveAll({ amount: e.target.value }); };
+  const handleAmountBlur   = () => { const v = String(Math.max(1, parseInt(zapAmount) || 21)); setZapAmount(v); saveAll({ amount: v }); };
+  const handleMsgChange    = e => { setZapMsg(e.target.value); saveAll({ msg: e.target.value }); };
 
-  const handleMsgChange = e => {
-    setZapMsg(e.target.value);
-    const parsed = Math.max(1, parseInt(zapAmount) || 21);
-    onSaveZapSettings?.({ amount: parsed, msg: e.target.value });
+  const handlePresetChange = (i, val) => {
+    const next = presets.map((p, idx) => idx === i ? val : p);
+    setPresets(next);
+    const p = parseInt(val);
+    if (p >= 1) saveAll({ ps: next });
+  };
+  const handlePresetBlur = (i) => {
+    const next = presets.map((p, idx) => idx === i ? String(Math.max(1, parseInt(p) || 1)) : p);
+    setPresets(next);
+    saveAll({ ps: next });
   };
 
   return (
     <SubPage title="Zaps" onBack={onBack}>
       <div style={{ margin: "12px 16px 4px", padding: "14px 16px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif" }}>Zap Defaults</div>
-        </div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif", marginBottom: 12 }}>Zap Defaults</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-            <label style={{ fontSize: 13, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", flexShrink: 0 }}>Amount (sats)</label>
+            <label style={{ fontSize: 13, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", flexShrink: 0 }}>Default amount</label>
             <input type="number" min="1" value={zapAmount} onChange={handleAmountChange} onBlur={handleAmountBlur}
               style={{ ...inputStyle, width: 90, textAlign: "right", fontFamily: "monospace" }} />
           </div>
@@ -376,6 +378,19 @@ function ZapsSubPage({ onBack, zapSettings, onSaveZapSettings }) {
             <input type="text" value={zapMsg} onChange={handleMsgChange} placeholder="optional"
               style={{ ...inputStyle, flex: 1, minWidth: 0 }} />
           </div>
+        </div>
+      </div>
+
+      <div style={{ margin: "10px 16px 4px", padding: "14px 16px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif", marginBottom: 12 }}>Preset Amounts</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+          {presets.map((val, i) => (
+            <input key={i} type="number" min="1" value={val}
+              onChange={e => handlePresetChange(i, e.target.value)}
+              onBlur={() => handlePresetBlur(i)}
+              style={{ ...inputStyle, textAlign: "right", fontFamily: "monospace", width: "100%", boxSizing: "border-box" }}
+            />
+          ))}
         </div>
       </div>
     </SubPage>
