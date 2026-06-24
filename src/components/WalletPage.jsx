@@ -91,7 +91,7 @@ function RefreshIcon({ spinning }) {
   );
 }
 
-function SendSheet({ onDismiss, onSuccess, recentRecipients, profiles, sendZap }) {
+function SendView({ onDismiss, onSuccess, recentRecipients, profiles, sendZap }) {
   const [invoice,   setInvoice]   = useState("");
   const [phase,     setPhase]     = useState("idle"); // idle | zap | paying | paid | error
   const [zapTarget, setZapTarget] = useState(null);
@@ -222,7 +222,7 @@ function SendSheet({ onDismiss, onSuccess, recentRecipients, profiles, sendZap }
   );
 }
 
-function ReceiveSheet({ nwcUri, lnAddress, onDismiss }) {
+function ReceiveView({ nwcUri, lnAddress, onDismiss }) {
   const [amount,  setAmount]  = useState("");
   const [memo,    setMemo]    = useState("");
   const [phase,   setPhase]   = useState("idle"); // idle | loading | invoice | error
@@ -398,7 +398,7 @@ export default function WalletPage({ wallet, balance, transactions, flow24h, has
 
   if (sendOpen) {
     return (
-      <SendSheet
+      <SendView
         onDismiss={() => setSendOpen(false)}
         onSuccess={() => { setSendOpen(false); onRefresh?.(); }}
         recentRecipients={recentRecipients}
@@ -409,7 +409,7 @@ export default function WalletPage({ wallet, balance, transactions, flow24h, has
   }
 
   if (receiveOpen) {
-    return <ReceiveSheet nwcUri={wallet.nwc_uri} lnAddress={wallet.lightning_address} onDismiss={() => setReceiveOpen(false)} />;
+    return <ReceiveView nwcUri={wallet.nwc_uri} lnAddress={wallet.lightning_address} onDismiss={() => setReceiveOpen(false)} />;
   }
 
   return (
