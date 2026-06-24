@@ -6,6 +6,7 @@ import Avatar from "./Avatar.jsx";
 import { displayName, relativeTime, getZapReqFromCache } from "../utils.js";
 import { decodeInvoice } from "@getalby/lightning-tools";
 import { payWithNWC } from "../utils/nwcPay.js";
+import { ZAP_PRESETS } from "../constants.js";
 
 function zapReqFromDesc(tx) {
   try {
@@ -93,63 +94,121 @@ function RefreshIcon({ spinning }) {
   );
 }
 
-function SendSheet({ onDismiss, onSuccess }) {
-  const [invoice, setInvoice] = useState("");
-  const [phase,   setPhase]   = useState("idle"); // idle | paying | paid | error
-  const [error,   setError]   = useState("");
+function SendSheet({ onDismiss, onSuccess, recentRecipients, profiles, sendZap }) {
+  const [invoice,   setInvoice]   = useState("");
+  const [phase,     setPhase]     = useState("idle"); // idle | zap | paying | paid | error
+  const [zapTarget, setZapTarget] = useState(null);
+  const [zapAmount, setZapAmount] = useState(ZAP_PRESETS[0].sats);
+  const [zapCustom, setZapCustom] = useState("");
+  const [zapMsg,    setZapMsg]    = useState("");
+  const [error,     setError]     = useState("");
+
+  const effectiveAmount = zapCustom ? (parseInt(zapCustom) || 0) : zapAmount;
 
   const handlePay = async () => {
     const inv = invoice.trim();
     if (!inv) return;
     setPhase("paying");
     const result = await payWithNWC(inv);
-    if (result.ok) {
-      setPhase("paid");
-      onSuccess?.();
-    } else {
-      setError(result.reason || "Payment failed");
-      setPhase("error");
-    }
+    if (result.ok) { setPhase("paid"); onSuccess?.(); }
+    else { setError(result.reason || "Payment failed"); setPhase("error"); }
   };
+
+  const handleZap = async () => {
+    if (!effectiveAmount || !zapTarget) return;
+    const profile = profiles?.[zapTarget];
+    const lnAddr  = profile?.lud16 || profile?.lud06;
+    if (!lnAddr) { setError("No lightning address found for this user."); setPhase("error"); return; }
+    if (!sendZap) { setError("Wallet not connected."); setPhase("error"); return; }
+    setPhase("paying");
+    const result = await sendZap({ amountSats: effectiveAmount, recipientLnAddr: lnAddr, recipientPubkey: zapTarget, msg: zapMsg });
+    if (result.ok) { setPhase("paid"); onSuccess?.(); }
+    else { setError(result.reason || "Payment failed"); setPhase("error"); }
+  };
+
+  const selectRecipient = (pk) => { setZapTarget(pk); setZapCustom(""); setZapMsg(""); setPhase("zap"); };
+  const backToIdle      = () => { setZapTarget(null); setPhase("idle"); };
 
   const col = document.querySelector(".feed-main") ?? document.body;
   return createPortal(
     <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn .15s ease" }} onClick={phase === "paying" ? undefined : onDismiss}>
       <div onClick={e => e.stopPropagation()} style={{ background: "var(--bg)", borderRadius: 20, padding: "24px 20px 20px", width: 360, maxWidth: "calc(100% - 32px)", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 0 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif", marginBottom: 14, textAlign: "center" }}>Send</div>
 
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", marginBottom: 14 }}>
+          {phase === "zap" ? (
+            <button onClick={backToIdle} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: "0 8px 0 0", fontSize: 18, lineHeight: 1 }}>‹</button>
+          ) : (
+            <div style={{ width: 24 }} />
+          )}
+          <div style={{ flex: 1, textAlign: "center", fontSize: 15, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif" }}>
+            {phase === "zap" ? `Zap ${displayName(zapTarget, profiles)}` : "Send"}
+          </div>
+          <div style={{ width: 24 }} />
+        </div>
+
+        {/* Recents row — idle only */}
+        {phase === "idle" && recentRecipients?.length > 0 && (
+          <>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Recents</div>
+            <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 4, marginBottom: 12, scrollbarWidth: "none" }}>
+              {recentRecipients.map(pk => (
+                <button key={pk} onClick={() => selectRecipient(pk)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 5, padding: 0, flexShrink: 0 }}>
+                  <Avatar pk={pk} profiles={profiles} size={46} />
+                  <span style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", maxWidth: 52, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {displayName(pk, profiles)}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div style={{ borderTop: "1px solid var(--border)", marginBottom: 12 }} />
+          </>
+        )}
+
+        {/* Invoice paste — idle only */}
         {phase === "idle" && (
           <>
             <textarea
               placeholder="Paste a BOLT-11 invoice…"
               value={invoice}
               onChange={e => setInvoice(e.target.value)}
-              autoFocus
-              style={{ width: "100%", minHeight: 90, resize: "vertical", padding: "11px 13px", background: "var(--surface)", border: "1.5px solid var(--border)", borderRadius: 10, color: "var(--text)", fontFamily: "monospace", fontSize: 12, outline: "none", boxSizing: "border-box", marginTop: 4 }}
+              style={{ width: "100%", minHeight: 80, resize: "vertical", padding: "11px 13px", background: "var(--surface)", border: "1.5px solid var(--border)", borderRadius: 10, color: "var(--text)", fontFamily: "monospace", fontSize: 12, outline: "none", boxSizing: "border-box" }}
             />
-            <button
-              className="zap-send-btn"
-              onClick={handlePay}
-              disabled={!invoice.trim()}
-              style={{ opacity: invoice.trim() ? 1 : 0.45 }}
-            >
-              Pay
+            <button className="zap-send-btn" onClick={handlePay} disabled={!invoice.trim()} style={{ opacity: invoice.trim() ? 1 : 0.45 }}>Pay</button>
+          </>
+        )}
+
+        {/* Zap amount picker */}
+        {phase === "zap" && (
+          <>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
+              <Avatar pk={zapTarget} profiles={profiles} size={56} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 10 }}>
+              {ZAP_PRESETS.map(p => (
+                <button key={p.sats} onClick={() => { setZapAmount(p.sats); setZapCustom(""); }}
+                  style={{ padding: "9px 4px", borderRadius: 10, border: `1.5px solid ${!zapCustom && zapAmount === p.sats ? "var(--primary)" : "var(--border)"}`, background: !zapCustom && zapAmount === p.sats ? "var(--primary)" : "var(--surface)", color: !zapCustom && zapAmount === p.sats ? "white" : "var(--text)", fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                  {p.sats >= 1000 ? `${p.sats / 1000}k` : p.sats}
+                </button>
+              ))}
+            </div>
+            <input type="number" placeholder="Custom amount (sats)" value={zapCustom} onChange={e => setZapCustom(e.target.value)} className="noffer-amount-input" style={{ marginBottom: 8 }} />
+            <textarea placeholder="Message (optional)" value={zapMsg} onChange={e => setZapMsg(e.target.value)}
+              style={{ width: "100%", minHeight: 60, resize: "none", padding: "11px 13px", background: "var(--surface)", border: "1.5px solid var(--border)", borderRadius: 10, color: "var(--text)", fontFamily: "'DM Sans',sans-serif", fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 2 }}
+            />
+            <button className="zap-send-btn" onClick={handleZap} disabled={!effectiveAmount} style={{ opacity: effectiveAmount ? 1 : 0.45 }}>
+              Zap {effectiveAmount ? (effectiveAmount >= 1000 ? `${(effectiveAmount/1000).toFixed(effectiveAmount >= 10000 ? 0 : 1)}k` : effectiveAmount) : "—"} sats
             </button>
           </>
         )}
 
         {phase === "paying" && (
-          <div className="noffer-loading">
-            <div className="noffer-spinner" />
-            <span>Paying…</span>
-          </div>
+          <div className="noffer-loading"><div className="noffer-spinner" /><span>Paying…</span></div>
         )}
 
         {phase === "paid" && (
           <div className="noffer-paid">
-            <svg width={48} height={48} viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth={2}>
-              <circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/>
-            </svg>
+            <svg width={48} height={48} viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth={2}><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>
             <span className="noffer-paid-label">Payment sent!</span>
             <button className="zap-send-btn" style={{ marginTop: 4 }} onClick={onDismiss}>Done</button>
           </div>
@@ -158,7 +217,7 @@ function SendSheet({ onDismiss, onSuccess }) {
         {phase === "error" && (
           <div className="noffer-error">
             <div className="noffer-error-msg">{error}</div>
-            <button className="zap-send-btn" onClick={() => { setError(""); setPhase("idle"); }}>Try again</button>
+            <button className="zap-send-btn" onClick={() => { setError(""); setPhase(zapTarget ? "zap" : "idle"); }}>Try again</button>
           </div>
         )}
       </div>
@@ -276,7 +335,7 @@ function ReceiveSheet({ nwcUri, onDismiss }) {
   );
 }
 
-export default function WalletPage({ wallet, balance, transactions, flow24h, hasMore, loadMore, loadingMore, loading, error, onRefresh, profiles, onOpenProfile, onOpenTransaction }) {
+export default function WalletPage({ wallet, balance, transactions, flow24h, hasMore, loadMore, loadingMore, loading, error, onRefresh, profiles, onOpenProfile, onOpenTransaction, sendZap }) {
   const handleRefresh = useCallback(() => { if (!loading) onRefresh?.(); }, [loading, onRefresh]);
   const [sendOpen,    setSendOpen]    = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
@@ -309,29 +368,38 @@ export default function WalletPage({ wallet, balance, transactions, flow24h, has
 
   const flow = flow24h ?? { satsIn: 0, satsOut: 0, feesPaid: 0, net: 0 };
 
+  const recentRecipients = [];
+  const seenRec = new Set();
+  for (const tx of settled) {
+    if (tx.type !== "outgoing") continue;
+    const pk = nostrPubkeyFromTx(tx);
+    if (!pk || seenRec.has(pk)) continue;
+    seenRec.add(pk);
+    recentRecipients.push(pk);
+    if (recentRecipients.length >= 21) break;
+  }
+
   return (
     <>
     <div style={{ display: "flex", flexDirection: "column" }}>
 
       {/* Balance card */}
-      <div style={{ margin: "16px 16px 4px", padding: "20px 20px 18px", background: "var(--surface)", borderRadius: 16, border: "1px solid var(--border)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>Balance</span>
-          <button onClick={handleRefresh} style={{ background: "none", border: "none", cursor: loading ? "default" : "pointer", color: "var(--text-muted)", padding: 4, display: "flex", borderRadius: 6 }}>
-            <RefreshIcon spinning={loading} />
-          </button>
-        </div>
+      <div style={{ margin: "16px 16px 4px", padding: "24px 20px 20px", background: "var(--surface)", borderRadius: 16, border: "1px solid var(--border)", textAlign: "center", position: "relative" }}>
+        <button onClick={handleRefresh} style={{ position: "absolute", top: 14, right: 14, background: "none", border: "none", cursor: loading ? "default" : "pointer", color: "var(--text-muted)", padding: 4, display: "flex", borderRadius: 6 }}>
+          <RefreshIcon spinning={loading} />
+        </button>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>Balance</span>
         {error ? (
-          <div style={{ fontSize: 13, color: "#E05C8A", fontFamily: "'DM Sans',sans-serif" }}>{error}</div>
+          <div style={{ fontSize: 13, color: "#E05C8A", fontFamily: "'DM Sans',sans-serif", marginTop: 8 }}>{error}</div>
         ) : (
-          <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-            <span style={{ fontSize: 36, fontWeight: 700, color: "var(--text)", fontFamily: "'DM Sans',sans-serif", letterSpacing: "-0.02em", lineHeight: 1 }}>
+          <div style={{ marginTop: 6, display: "flex", justifyContent: "center" }}>
+            <span style={{ position: "relative", fontSize: 42, fontWeight: 700, color: "var(--text)", fontFamily: "'DM Sans',sans-serif", letterSpacing: "-0.02em", lineHeight: 1 }}>
               {loading && balance === null ? "—" : fmtBalance(balance)}
+              <span style={{ position: "absolute", left: "calc(100% + 6px)", bottom: 6, fontSize: 13, fontWeight: 500, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", whiteSpace: "nowrap" }}>sats</span>
             </span>
-            <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif" }}>sats</span>
           </div>
         )}
-        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+        <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
           <button onClick={() => setSendOpen(true)} style={{ flex: 1, padding: "10px 0", background: "var(--primary)", color: "white", border: "none", borderRadius: 12, fontFamily: "'DM Sans',sans-serif", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
             Send
           </button>
@@ -429,7 +497,7 @@ export default function WalletPage({ wallet, balance, transactions, flow24h, has
 
     </div>
 
-    {sendOpen    && <SendSheet    onDismiss={() => setSendOpen(false)}    onSuccess={() => { setSendOpen(false);    onRefresh?.(); }} />}
+    {sendOpen    && <SendSheet    onDismiss={() => setSendOpen(false)}    onSuccess={() => { setSendOpen(false); onRefresh?.(); }} recentRecipients={recentRecipients} profiles={profiles} sendZap={sendZap} />}
     {receiveOpen && <ReceiveSheet nwcUri={wallet.nwc_uri} onDismiss={() => setReceiveOpen(false)} />}
     </>
   );

@@ -657,6 +657,7 @@ export default function App() {
                     profiles={profiles}
                     onOpenProfile={handleOpenProfile}
                     onOpenTransaction={handleOpenTransaction}
+                    sendZap={sendZap}
                   />
                 )}
               </div>

@@ -893,7 +893,7 @@
   .zap-send-btn:hover{background:#5B21B6;transform:translateY(-1px);}
   .noffer-modal{min-width:280px;}
   .noffer-amount-input{width:100%;padding:11px 13px;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;box-sizing:border-box;transition:border-color .15s;}
-  .noffer-amount-input:focus{border-color:#f7931a;}
+  .noffer-amount-input:focus{border-color:var(--primary);}
   .noffer-loading{display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 0;color:var(--text-muted);font-size:14px;}
   .noffer-spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:#f7931a;border-radius:50%;animation:spin .7s linear infinite;}
   .noffer-invoice{display:flex;flex-direction:column;align-items:center;gap:10px;padding-top:4px;}
