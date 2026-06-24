@@ -344,7 +344,7 @@ export default function WalletPage({ wallet, balance, transactions, flow24h, has
     const observer = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) loadMore?.(); }, { threshold: 0.1 });
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [hasMore, loadMore]);
+  }, [hasMore, loadMore, sendOpen]);
 
   if (!wallet?.nwc_uri) {
     return (
