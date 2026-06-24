@@ -442,18 +442,16 @@ export default function WalletPage({ wallet, balance, transactions, flow24h, has
         </div>
       </div>
 
-      {/* Transactions section label */}
-      <div style={{ margin: "12px 16px 6px" }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-          Transactions
-        </span>
-      </div>
-
-      {loading && !settled.length ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: 32 }}>
-          <div style={{ width: 20, height: 20, border: "2px solid var(--border)", borderTopColor: "var(--primary)", borderRadius: "50%", animation: "spin .7s linear infinite" }} />
+      {/* Transactions section label — hidden while initial load */}
+      {(!loading || settled.length > 0) && (
+        <div style={{ margin: "12px 16px 6px" }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            Transactions
+          </span>
         </div>
-      ) : !settled.length ? (
+      )}
+
+      {!loading && !settled.length ? (
         <div style={{ padding: "32px 16px", textAlign: "center" }}>
           <div style={{ fontSize: "var(--font-base)", color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif" }}>No transactions yet</div>
         </div>
