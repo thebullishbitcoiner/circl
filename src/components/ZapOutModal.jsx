@@ -127,9 +127,9 @@ export default function ZapOutModal({ event, sellerLnAddr, onClose }) {
         pr = invoiceData.pr;
       }
 
-      if (signed) {
-        const paymentHash = decodeInvoice(pr)?.paymentHash;
-        if (paymentHash) cacheZapReq(paymentHash, signed);
+      const paymentHash = decodeInvoice(pr)?.paymentHash;
+      if (paymentHash) {
+        cacheZapReq(paymentHash, signed ?? { pubkey: null, tags: [["p", event.pubkey]], content: description });
       }
 
       setInvoice(pr);

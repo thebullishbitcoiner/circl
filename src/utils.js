@@ -471,6 +471,7 @@ function getZapReqMemCache() {
 export function cacheZapReq(paymentHash, zapReq) {
   try {
     if (!paymentHash) return;
+    const key = String(paymentHash).toLowerCase();
     const prev = getZapReqMemCache();
     const tags = zapReq.tags ?? [];
     const entry = {
@@ -478,12 +479,10 @@ export function cacheZapReq(paymentHash, zapReq) {
       receiver: tags.find(t => t[0] === "p")?.[1] ?? null,
       event:    tags.find(t => t[0] === "e")?.[1] ?? null,
       content:  zapReq.content ?? "",
-      time:     new Date().toISOString(),
+      time:     new Date().toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }),
     };
-    // Remove existing entry for this hash so the spread puts it at the top
-    delete prev[paymentHash];
-    // Newest first; evict oldest (tail) entries beyond limit
-    const next = { [paymentHash]: entry, ...prev };
+    delete prev[key];
+    const next = { [key]: entry, ...prev };
     const keys = Object.keys(next);
     if (keys.length > ZAP_REQ_CACHE_MAX) keys.slice(ZAP_REQ_CACHE_MAX).forEach(k => delete next[k]);
     _zapReqMemCache = next;
@@ -492,7 +491,7 @@ export function cacheZapReq(paymentHash, zapReq) {
 }
 
 export function getZapReqFromCache(paymentHash) {
-  try { return getZapReqMemCache()[paymentHash] ?? null; }
+  try { return paymentHash ? (getZapReqMemCache()[String(paymentHash).toLowerCase()] ?? null) : null; }
   catch { return null; }
 }
 

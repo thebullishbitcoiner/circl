@@ -28,21 +28,15 @@ function getZapReq(tx) {
 }
 
 function nostrPubkeyFromTx(tx) {
-  if (tx.type === "outgoing") {
-    const zr = getZapReq(tx);
-    return zr?.tags?.find(t => t[0] === "p")?.[1]
-      ?? getZapReqFromCache(tx.payment_hash)?.receiver
-      ?? null;
-  }
+  if (tx.type === "outgoing") return getZapReqFromCache(tx.payment_hash)?.receiver ?? null;
   const zr = getZapReq(tx);
   return tx.metadata?.nostr?.pubkey ?? zr?.pubkey ?? null;
 }
 
 function txComment(tx) {
   if (tx.metadata?.comment?.trim()) return tx.metadata.comment.trim();
-  const zr = getZapReq(tx);
-  if (zr?.content?.trim()) return zr.content.trim();
-  return getZapReqFromCache(tx.payment_hash)?.content?.trim() ?? "";
+  if (tx.type === "outgoing") return getZapReqFromCache(tx.payment_hash)?.content?.trim() ?? "";
+  return getZapReq(tx)?.content?.trim() ?? "";
 }
 
 function txDescription(tx, profiles) {

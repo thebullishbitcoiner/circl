@@ -88,9 +88,10 @@ export default function useZap(wallet) {
         pr = invoiceData.pr;
       }
 
-      if (signed) {
-        const paymentHash = decodeInvoice(pr)?.paymentHash;
-        if (paymentHash) cacheZapReq(paymentHash, signed);
+      const paymentHash = decodeInvoice(pr)?.paymentHash;
+      if (paymentHash) {
+        // Cache signed zap request if NIP-57 succeeded; fall back to known recipient if not
+        cacheZapReq(paymentHash, signed ?? { pubkey: null, tags: [["p", recipientPubkey]], content: msg ?? "" });
       }
 
       client = new NWCClient({ nostrWalletConnectUrl: wallet.nwc_uri });

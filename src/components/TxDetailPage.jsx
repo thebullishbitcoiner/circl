@@ -20,24 +20,22 @@ function zapReqFromDesc(tx) {
   return null;
 }
 
+// Returns a nostr-event-shaped object from wallet metadata or invoice description only.
+// Does NOT return cache entries — read cache fields directly via getZapReqFromCache().
 function getZapReq(tx) {
   if (tx.metadata?.nostr?.tags) return tx.metadata.nostr;
-  const fromDesc = zapReqFromDesc(tx);
-  if (fromDesc) return fromDesc;
-  if (tx.type === "outgoing" && tx.payment_hash) return getZapReqFromCache(tx.payment_hash);
-  return null;
+  return zapReqFromDesc(tx);
 }
 
 function nostrPubkeyFromTx(tx) {
+  if (tx.type === "outgoing") return getZapReqFromCache(tx.payment_hash)?.receiver ?? null;
   const zr = getZapReq(tx);
-  if (tx.type === "outgoing") {
-    return zr?.tags?.find(t => t[0] === "p")?.[1] ?? null;
-  }
   return tx.metadata?.nostr?.pubkey ?? zr?.pubkey ?? null;
 }
 
 function txComment(tx) {
   if (tx.metadata?.comment?.trim()) return tx.metadata.comment.trim();
+  if (tx.type === "outgoing") return getZapReqFromCache(tx.payment_hash)?.content?.trim() ?? "";
   return getZapReq(tx)?.content?.trim() ?? "";
 }
 
@@ -107,14 +105,13 @@ function DetailRow({ label, value, mono = false, wrap = false, pre = false, inli
 }
 
 function resolvedPubkeySource(tx) {
-  const zr = getZapReq(tx);
-  const metaNostr = tx.metadata?.nostr;
   if (tx.type === "outgoing") {
-    const pTag = zr?.tags?.find(t => t[0] === "p")?.[1];
-    if (pTag) return { pk: pTag, source: metaNostr?.tags ? "metadata.nostr p-tag" : "zap request p-tag" };
-    return { pk: null, source: "none found" };
+    const receiver = getZapReqFromCache(tx.payment_hash)?.receiver ?? null;
+    return { pk: receiver, source: receiver ? "zap request cache" : "none found" };
   }
+  const metaNostr = tx.metadata?.nostr;
   if (metaNostr?.pubkey) return { pk: metaNostr.pubkey, source: "metadata.nostr.pubkey" };
+  const zr = getZapReq(tx);
   if (zr?.pubkey) return { pk: zr.pubkey, source: "zap request pubkey field" };
   return { pk: null, source: "none found" };
 }
@@ -262,9 +259,11 @@ export default function TxDetailPage({ tx, profiles, onBack, onOpenProfile, onOp
   const comment    = txComment(tx);
   const isIncoming = tx.type === "incoming";
   const zapReq     = getZapReq(tx);
+  const zapReqTags = zapReq?.tags ?? [];
 
-  const zapReqTags      = zapReq?.tags ?? [];
-  const zappedNoteId    = zapReqTags.find(t => t[0] === "e")?.[1] ?? null;
+  const zappedNoteId = tx.type === "outgoing"
+    ? (getZapReqFromCache(tx.payment_hash)?.event ?? null)
+    : (zapReqTags.find(t => t[0] === "e")?.[1] ?? null);
   const zapReqRelayUrls = (() => { const r = zapReqTags.find(t => t[0] === "relays"); return r ? r.slice(1) : []; })();
 
   return (
