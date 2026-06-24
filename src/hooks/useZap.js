@@ -88,14 +88,25 @@ export default function useZap(wallet) {
         pr = invoiceData.pr;
       }
 
-      const paymentHash = decodeInvoice(pr)?.paymentHash;
+      client = new NWCClient({ nostrWalletConnectUrl: wallet.nwc_uri });
+      const result = await client.payInvoice({ invoice: pr });
+
+      // Derive payment hash from preimage (guaranteed correct); fall back to invoice decode
+      let paymentHash = null;
+      if (result?.preimage) {
+        try {
+          const bytes = new Uint8Array(result.preimage.match(/.{2}/g).map(b => parseInt(b, 16)));
+          const buf = await crypto.subtle.digest("SHA-256", bytes);
+          paymentHash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+        } catch {}
+      }
+      if (!paymentHash) {
+        try { paymentHash = decodeInvoice(pr)?.paymentHash ?? null; } catch {}
+      }
       if (paymentHash) {
-        // Cache signed zap request if NIP-57 succeeded; fall back to known recipient if not
         cacheZapReq(paymentHash, signed ?? { pubkey: null, tags: [["p", recipientPubkey]], content: msg ?? "" });
       }
 
-      client = new NWCClient({ nostrWalletConnectUrl: wallet.nwc_uri });
-      await client.payInvoice({ invoice: pr });
       return { ok: true };
     } catch (e) {
       return { ok: false, reason: e.message || "payment_failed" };

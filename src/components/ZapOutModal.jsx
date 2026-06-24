@@ -127,10 +127,10 @@ export default function ZapOutModal({ event, sellerLnAddr, onClose }) {
         pr = invoiceData.pr;
       }
 
-      const paymentHash = decodeInvoice(pr)?.paymentHash;
-      if (paymentHash) {
-        cacheZapReq(paymentHash, signed ?? { pubkey: null, tags: [["p", event.pubkey]], content: description });
-      }
+      try {
+        const paymentHash = decodeInvoice(pr)?.paymentHash;
+        if (paymentHash) cacheZapReq(paymentHash, signed ?? { pubkey: null, tags: [["p", event.pubkey]], content: description });
+      } catch {}
 
       setInvoice(pr);
       if (walletConnected) {

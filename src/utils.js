@@ -486,7 +486,14 @@ export function cacheZapReq(paymentHash, zapReq) {
     const keys = Object.keys(next);
     if (keys.length > ZAP_REQ_CACHE_MAX) keys.slice(ZAP_REQ_CACHE_MAX).forEach(k => delete next[k]);
     _zapReqMemCache = next;
-    localStorage.setItem(ZAP_REQ_CACHE_KEY, JSON.stringify(next));
+    const serialized = JSON.stringify(next);
+    try {
+      localStorage.setItem(ZAP_REQ_CACHE_KEY, serialized);
+    } catch {
+      // Quota exceeded — evict profile cache (largest) and retry
+      localStorage.removeItem("circl_profiles_v1");
+      try { localStorage.setItem(ZAP_REQ_CACHE_KEY, serialized); } catch {}
+    }
   } catch {}
 }
 
