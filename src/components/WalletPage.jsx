@@ -1,5 +1,4 @@
 import { useCallback, useState, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
 import QRCode from "react-qr-code";
 import { NWCClient } from "@getalby/sdk/nwc";
 import Avatar from "./Avatar.jsx";
@@ -129,43 +128,23 @@ function SendSheet({ onDismiss, onSuccess, recentRecipients, profiles, sendZap }
 
   const selectRecipient = (pk) => { setZapTarget(pk); setZapAmount(zapPresets[0] ?? 21); setZapCustom(""); setZapMsg(""); setPhase("zap"); };
   const backToIdle      = () => { setZapTarget(null); setPhase("idle"); };
+  const handleBack      = phase === "paying" ? undefined : phase === "zap" ? backToIdle : onDismiss;
 
-  const col = document.querySelector(".feed-main") ?? document.body;
-  return createPortal(
-    <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn .15s ease" }} onClick={phase === "paying" ? undefined : onDismiss}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "var(--bg)", borderRadius: 20, padding: "24px 20px 20px", width: 360, maxWidth: "calc(100% - 32px)", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 0 }}>
-
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", marginBottom: 14 }}>
-          {phase === "zap" ? (
-            <button onClick={backToIdle} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: "0 8px 0 0", fontSize: 18, lineHeight: 1 }}>‹</button>
-          ) : (
-            <div style={{ width: 24 }} />
-          )}
-          <div style={{ flex: 1, textAlign: "center", fontSize: 15, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif" }}>
-            {phase === "zap" ? `Zap ${displayName(zapTarget, profiles)}` : "Send"}
-          </div>
-          <div style={{ width: 24 }} />
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", padding: "14px 16px 12px", borderBottom: "1px solid var(--border)", position: "sticky", top: 0, background: "var(--bg)", zIndex: 1 }}>
+        <button onClick={handleBack} disabled={!handleBack}
+          style={{ background: "none", border: "none", cursor: handleBack ? "pointer" : "default", color: "var(--text-muted)", padding: "0 10px 0 0", fontSize: 22, lineHeight: 1, opacity: handleBack ? 1 : 0 }}>
+          ‹
+        </button>
+        <div style={{ flex: 1, textAlign: "center", fontSize: 15, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif" }}>
+          {phase === "zap" ? `Zap ${displayName(zapTarget, profiles)}` : "Send"}
         </div>
+        <div style={{ width: 30 }} />
+      </div>
 
-        {/* Recents row — idle only */}
-        {phase === "idle" && recentRecipients?.length > 0 && (
-          <>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Recents</div>
-            <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 4, marginBottom: 12, scrollbarWidth: "none" }}>
-              {recentRecipients.map(pk => (
-                <button key={pk} onClick={() => selectRecipient(pk)} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 5, padding: 0, flexShrink: 0 }}>
-                  <Avatar pk={pk} profiles={profiles} size={46} />
-                  <span style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", maxWidth: 52, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {displayName(pk, profiles)}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <div style={{ borderTop: "1px solid var(--border)", marginBottom: 12 }} />
-          </>
-        )}
-
+      <div style={{ padding: "16px 16px 32px", display: "flex", flexDirection: "column" }}>
         {/* Invoice paste — idle only */}
         {phase === "idle" && (
           <>
@@ -175,27 +154,46 @@ function SendSheet({ onDismiss, onSuccess, recentRecipients, profiles, sendZap }
               onChange={e => setInvoice(e.target.value)}
               style={{ width: "100%", minHeight: 80, resize: "vertical", padding: "11px 13px", background: "var(--surface)", border: "1.5px solid var(--border)", borderRadius: 10, color: "var(--text)", fontFamily: "monospace", fontSize: 12, outline: "none", boxSizing: "border-box" }}
             />
-            <button className="zap-send-btn" onClick={handlePay} disabled={!invoice.trim()} style={{ opacity: invoice.trim() ? 1 : 0.45 }}>Pay</button>
+            <button className="zap-send-btn" onClick={handlePay} disabled={!invoice.trim()} style={{ opacity: invoice.trim() ? 1 : 0.45, marginTop: 10 }}>Pay</button>
+          </>
+        )}
+
+        {/* Recents list — idle only */}
+        {phase === "idle" && recentRecipients?.length > 0 && (
+          <>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em", margin: "20px 0 8px" }}>Recents</div>
+            <div style={{ background: "var(--surface)", borderRadius: 14, border: "1px solid var(--border)", overflow: "hidden" }}>
+              {recentRecipients.map((pk, i) => (
+                <button key={pk} onClick={() => selectRecipient(pk)}
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", background: "none", border: "none", borderBottom: i < recentRecipients.length - 1 ? "1px solid var(--border)" : "none", cursor: "pointer", textAlign: "left" }}>
+                  <Avatar pk={pk} profiles={profiles} size={36} />
+                  <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", fontFamily: "'DM Sans',sans-serif", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {displayName(pk, profiles)}
+                  </span>
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" strokeWidth={2}><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+              ))}
+            </div>
           </>
         )}
 
         {/* Zap amount picker */}
         {phase === "zap" && (
           <>
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
-              <Avatar pk={zapTarget} profiles={profiles} size={56} />
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+              <Avatar pk={zapTarget} profiles={profiles} size={64} />
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 10 }}>
               {zapPresets.map(sats => (
                 <button key={sats} onClick={() => { setZapAmount(sats); setZapCustom(""); }}
-                  style={{ padding: "9px 4px", borderRadius: 10, border: `1.5px solid ${!zapCustom && zapAmount === sats ? "var(--primary)" : "var(--border)"}`, background: !zapCustom && zapAmount === sats ? "var(--primary)" : "var(--surface)", color: !zapCustom && zapAmount === sats ? "white" : "var(--text)", fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                  style={{ padding: "10px 4px", borderRadius: 10, border: `1.5px solid ${!zapCustom && zapAmount === sats ? "var(--primary)" : "var(--border)"}`, background: !zapCustom && zapAmount === sats ? "var(--primary)" : "var(--surface)", color: !zapCustom && zapAmount === sats ? "white" : "var(--text)", fontFamily: "'DM Sans',sans-serif", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
                   {sats >= 1000 ? `${sats / 1000}k` : sats}
                 </button>
               ))}
             </div>
             <input type="number" placeholder="Custom amount (sats)" value={zapCustom} onChange={e => setZapCustom(e.target.value)} className="noffer-amount-input" style={{ marginBottom: 8 }} />
             <textarea placeholder="Message (optional)" value={zapMsg} onChange={e => setZapMsg(e.target.value)}
-              style={{ width: "100%", minHeight: 60, resize: "none", padding: "11px 13px", background: "var(--surface)", border: "1.5px solid var(--border)", borderRadius: 10, color: "var(--text)", fontFamily: "'DM Sans',sans-serif", fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 2 }}
+              style={{ width: "100%", minHeight: 60, resize: "none", padding: "11px 13px", background: "var(--surface)", border: "1.5px solid var(--border)", borderRadius: 10, color: "var(--text)", fontFamily: "'DM Sans',sans-serif", fontSize: 14, outline: "none", boxSizing: "border-box", marginBottom: 10 }}
             />
             <button className="zap-send-btn" onClick={handleZap} disabled={!effectiveAmount} style={{ opacity: effectiveAmount ? 1 : 0.45 }}>
               Zap {effectiveAmount ? (effectiveAmount >= 1000 ? `${(effectiveAmount/1000).toFixed(effectiveAmount >= 10000 ? 0 : 1)}k` : effectiveAmount) : "—"} sats
@@ -222,8 +220,7 @@ function SendSheet({ onDismiss, onSuccess, recentRecipients, profiles, sendZap }
           </div>
         )}
       </div>
-    </div>,
-    col
+    </div>
   );
 }
 
@@ -380,6 +377,18 @@ export default function WalletPage({ wallet, balance, transactions, flow24h, has
     if (recentRecipients.length >= 21) break;
   }
 
+  if (sendOpen) {
+    return (
+      <SendSheet
+        onDismiss={() => setSendOpen(false)}
+        onSuccess={() => { setSendOpen(false); onRefresh?.(); }}
+        recentRecipients={recentRecipients}
+        profiles={profiles}
+        sendZap={sendZap}
+      />
+    );
+  }
+
   return (
     <>
     <div style={{ display: "flex", flexDirection: "column" }}>
@@ -498,7 +507,6 @@ export default function WalletPage({ wallet, balance, transactions, flow24h, has
 
     </div>
 
-    {sendOpen    && <SendSheet    onDismiss={() => setSendOpen(false)}    onSuccess={() => { setSendOpen(false); onRefresh?.(); }} recentRecipients={recentRecipients} profiles={profiles} sendZap={sendZap} />}
     {receiveOpen && <ReceiveSheet nwcUri={wallet.nwc_uri} onDismiss={() => setReceiveOpen(false)} />}
     </>
   );
