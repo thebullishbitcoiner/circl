@@ -479,7 +479,7 @@ export default function App() {
         <aside className={`sidebar ${isMobile ? "collapsed" : ""}`}>
           <div className="logo"><img src="/logo.png" alt="Circl" style={{ height: 28, width: "auto" }} /></div>
           {navItems.map(item => (
-            <button key={item.id} className={`nav-item ${activeNav === item.id ? "active" : ""}`} onClick={() => navigate(item.id)}>
+            <button key={item.id} className={`nav-item ${!settingsOpen && activeNav === item.id ? "active" : ""}`} onClick={() => navigate(item.id)}>
               <div style={{ position: "relative", display: "inline-flex" }}>
                 {item.SbIcon}
                 {item.id === "notifications" && hasUnread && <div className="notif-unread-dot" />}
@@ -487,7 +487,7 @@ export default function App() {
               {item.label}
             </button>
           ))}
-          <button className={`nav-item ${topEntry?.type === "muted" ? "active" : ""}`} onClick={() => { clearNav(); setSettingsOpen(false); setActiveNav(null); pushNav({ type: "muted" }); }}>
+          <button className={`nav-item ${!settingsOpen && topEntry?.type === "muted" ? "active" : ""}`} onClick={() => { clearNav(); setSettingsOpen(false); setActiveNav(null); pushNav({ type: "muted" }); }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="nav-icon">
               <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
               <line x1="23" y1="9" x2="17" y2="15"/>
@@ -495,7 +495,7 @@ export default function App() {
             </svg>
             Muted
           </button>
-          <button className={`nav-item ${topEntry?.type === "mycircles" || topEntry?.type === "circle-detail" ? "active" : ""}`} onClick={() => { clearNav(); setSettingsOpen(false); setActiveNav(null); pushNav({ type: "mycircles" }); }}>
+          <button className={`nav-item ${!settingsOpen && (topEntry?.type === "mycircles" || topEntry?.type === "circle-detail") ? "active" : ""}`} onClick={() => { clearNav(); setSettingsOpen(false); setActiveNav(null); pushNav({ type: "mycircles" }); }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="nav-icon">
               <circle cx="12" cy="8" r="4" />
               <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
