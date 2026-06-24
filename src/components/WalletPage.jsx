@@ -1,7 +1,11 @@
-import { useCallback } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+import QRCode from "react-qr-code";
+import { NWCClient } from "@getalby/sdk/nwc";
 import Avatar from "./Avatar.jsx";
 import { displayName, relativeTime, getZapReqFromCache } from "../utils.js";
 import { decodeInvoice } from "@getalby/lightning-tools";
+import { payWithNWC } from "../utils/nwcPay.js";
 
 function zapReqFromDesc(tx) {
   try {
@@ -89,8 +93,201 @@ function RefreshIcon({ spinning }) {
   );
 }
 
-export default function WalletPage({ wallet, balance, transactions, loading, error, onRefresh, profiles, onOpenProfile, onOpenTransaction }) {
+function SendSheet({ onDismiss, onSuccess }) {
+  const [invoice, setInvoice] = useState("");
+  const [phase,   setPhase]   = useState("idle"); // idle | paying | paid | error
+  const [error,   setError]   = useState("");
+
+  const handlePay = async () => {
+    const inv = invoice.trim();
+    if (!inv) return;
+    setPhase("paying");
+    const result = await payWithNWC(inv);
+    if (result.ok) {
+      setPhase("paid");
+      onSuccess?.();
+    } else {
+      setError(result.reason || "Payment failed");
+      setPhase("error");
+    }
+  };
+
+  const col = document.querySelector(".feed-main") ?? document.body;
+  return createPortal(
+    <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn .15s ease" }} onClick={phase === "paying" ? undefined : onDismiss}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "var(--bg)", borderRadius: 20, padding: "24px 20px 20px", width: 360, maxWidth: "calc(100% - 32px)", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 0 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif", marginBottom: 14, textAlign: "center" }}>Send</div>
+
+        {phase === "idle" && (
+          <>
+            <textarea
+              placeholder="Paste a BOLT-11 invoice…"
+              value={invoice}
+              onChange={e => setInvoice(e.target.value)}
+              autoFocus
+              style={{ width: "100%", minHeight: 90, resize: "vertical", padding: "11px 13px", background: "var(--surface)", border: "1.5px solid var(--border)", borderRadius: 10, color: "var(--text)", fontFamily: "monospace", fontSize: 12, outline: "none", boxSizing: "border-box", marginTop: 4 }}
+            />
+            <button
+              className="zap-send-btn"
+              onClick={handlePay}
+              disabled={!invoice.trim()}
+              style={{ opacity: invoice.trim() ? 1 : 0.45 }}
+            >
+              Pay
+            </button>
+          </>
+        )}
+
+        {phase === "paying" && (
+          <div className="noffer-loading">
+            <div className="noffer-spinner" />
+            <span>Paying…</span>
+          </div>
+        )}
+
+        {phase === "paid" && (
+          <div className="noffer-paid">
+            <svg width={48} height={48} viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth={2}>
+              <circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/>
+            </svg>
+            <span className="noffer-paid-label">Payment sent!</span>
+            <button className="zap-send-btn" style={{ marginTop: 4 }} onClick={onDismiss}>Done</button>
+          </div>
+        )}
+
+        {phase === "error" && (
+          <div className="noffer-error">
+            <div className="noffer-error-msg">{error}</div>
+            <button className="zap-send-btn" onClick={() => { setError(""); setPhase("idle"); }}>Try again</button>
+          </div>
+        )}
+      </div>
+    </div>,
+    col
+  );
+}
+
+function ReceiveSheet({ nwcUri, onDismiss }) {
+  const [amount,  setAmount]  = useState("");
+  const [memo,    setMemo]    = useState("");
+  const [phase,   setPhase]   = useState("idle"); // idle | loading | invoice | error
+  const [invoice, setInvoice] = useState("");
+  const [error,   setError]   = useState("");
+  const [copied,  setCopied]  = useState(false);
+
+  const handleGenerate = async () => {
+    const sats = parseInt(amount, 10);
+    if (!sats || sats < 1) return;
+    setPhase("loading");
+    let client;
+    try {
+      client = new NWCClient({ nostrWalletConnectUrl: nwcUri });
+      const res = await client.makeInvoice({ amount: sats * 1000, description: memo.trim() || "Circl payment" });
+      const bolt11 = res.invoice ?? res.payment_request;
+      if (!bolt11) throw new Error("No invoice returned");
+      setInvoice(bolt11);
+      setPhase("invoice");
+    } catch (e) {
+      setError(e?.message || "Failed to create invoice");
+      setPhase("error");
+    } finally {
+      client?.close();
+    }
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(invoice).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const col = document.querySelector(".feed-main") ?? document.body;
+  return createPortal(
+    <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn .15s ease" }} onClick={phase === "loading" ? undefined : onDismiss}>
+      <div onClick={e => e.stopPropagation()} style={{ background: "var(--bg)", borderRadius: 20, padding: "24px 20px 20px", width: 360, maxWidth: "calc(100% - 32px)", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 0 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif", marginBottom: 14, textAlign: "center" }}>Receive</div>
+
+        {phase === "idle" && (
+          <>
+            <input
+              type="number"
+              placeholder="Amount (sats)"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              autoFocus
+              min={1}
+              className="noffer-amount-input"
+              style={{ marginTop: 4 }}
+            />
+            <input
+              type="text"
+              placeholder="Memo (optional)"
+              value={memo}
+              onChange={e => setMemo(e.target.value)}
+              className="noffer-amount-input"
+              style={{ marginTop: 8 }}
+            />
+            <button
+              className="zap-send-btn"
+              onClick={handleGenerate}
+              disabled={!parseInt(amount, 10)}
+              style={{ opacity: parseInt(amount, 10) > 0 ? 1 : 0.45 }}
+            >
+              Generate Invoice
+            </button>
+          </>
+        )}
+
+        {phase === "loading" && (
+          <div className="noffer-loading">
+            <div className="noffer-spinner" />
+            <span>Creating invoice…</span>
+          </div>
+        )}
+
+        {phase === "invoice" && (
+          <div className="noffer-invoice">
+            <div className="noffer-qr">
+              <QRCode value={`lightning:${invoice}`} size={300} bgColor="#ffffff" fgColor="#000000" level="M" style={{ display: "block" }} />
+            </div>
+            <div className="noffer-invoice-string">
+              <input className="noffer-invoice-input" readOnly value={invoice} onFocus={e => e.target.select()} />
+              <button className={`noffer-invoice-copy-btn${copied ? " copied" : ""}`} type="button" onClick={handleCopy} aria-label={copied ? "Copied" : "Copy"}>
+                {copied
+                  ? <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><polyline points="20 6 9 17 4 12"/></svg>
+                  : <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                }
+              </button>
+            </div>
+            <button className="zap-send-btn" style={{ width: "328px" }} onClick={onDismiss}>Done</button>
+          </div>
+        )}
+
+        {phase === "error" && (
+          <div className="noffer-error">
+            <div className="noffer-error-msg">{error}</div>
+            <button className="zap-send-btn" onClick={() => { setError(""); setPhase("idle"); }}>Try again</button>
+          </div>
+        )}
+      </div>
+    </div>,
+    col
+  );
+}
+
+export default function WalletPage({ wallet, balance, transactions, flow24h, hasMore, loadMore, loadingMore, loading, error, onRefresh, profiles, onOpenProfile, onOpenTransaction }) {
   const handleRefresh = useCallback(() => { if (!loading) onRefresh?.(); }, [loading, onRefresh]);
+  const [sendOpen,    setSendOpen]    = useState(false);
+  const [receiveOpen, setReceiveOpen] = useState(false);
+  const sentinelRef = useRef(null);
+
+  useEffect(() => {
+    if (!sentinelRef.current || !hasMore) return;
+    const observer = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) loadMore?.(); }, { threshold: 0.1 });
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore]);
 
   if (!wallet?.nwc_uri) {
     return (
@@ -110,12 +307,15 @@ export default function WalletPage({ wallet, balance, transactions, loading, err
     return true;
   });
 
+  const flow = flow24h ?? { satsIn: 0, satsOut: 0, feesPaid: 0, net: 0 };
+
   return (
+    <>
     <div style={{ display: "flex", flexDirection: "column" }}>
 
       {/* Balance card */}
       <div style={{ margin: "16px 16px 4px", padding: "20px 20px 18px", background: "var(--surface)", borderRadius: 16, border: "1px solid var(--border)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>Balance</span>
           <button onClick={handleRefresh} style={{ background: "none", border: "none", cursor: loading ? "default" : "pointer", color: "var(--text-muted)", padding: 4, display: "flex", borderRadius: 6 }}>
             <RefreshIcon spinning={loading} />
@@ -131,6 +331,37 @@ export default function WalletPage({ wallet, balance, transactions, loading, err
             <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif" }}>sats</span>
           </div>
         )}
+        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+          <button onClick={() => setSendOpen(true)} style={{ flex: 1, padding: "10px 0", background: "var(--primary)", color: "white", border: "none", borderRadius: 12, fontFamily: "'DM Sans',sans-serif", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+            Send
+          </button>
+          <button onClick={() => setReceiveOpen(true)} style={{ flex: 1, padding: "10px 0", background: "var(--surface2, var(--surface))", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 12, fontFamily: "'DM Sans',sans-serif", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+            Receive
+          </button>
+        </div>
+      </div>
+
+      {/* Satsflow widget */}
+      <div style={{ margin: "4px 16px 8px", padding: "16px 20px 14px", background: "var(--surface)", borderRadius: 16, border: "1px solid var(--border)", textAlign: "center" }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>Satsflow · 24h</span>
+        <div style={{ marginTop: 8, display: "flex", alignItems: "baseline", justifyContent: "center", gap: 5 }}>
+          <span style={{ fontSize: 32, fontWeight: 700, color: flow.net >= 0 ? "#4CAF50" : "#E05C8A", fontFamily: "'DM Sans',sans-serif", letterSpacing: "-0.02em", lineHeight: 1 }}>
+            {flow.net >= 0 ? "+" : "−"}{Math.abs(flow.net).toLocaleString("en-US").replace(/,/g, " ")}
+          </span>
+          <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif" }}>sats</span>
+        </div>
+        <div style={{ marginTop: 12, display: "flex", justifyContent: "center", gap: 0, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
+          {[
+            { label: "In",   value: `+${flow.satsIn.toLocaleString("en-US").replace(/,/g, " ")}`,   color: "#4CAF50" },
+            { label: "Out",  value: `−${flow.satsOut.toLocaleString("en-US").replace(/,/g, " ")}`,  color: "var(--text)" },
+            { label: "Fees", value: `−${flow.feesPaid.toLocaleString("en-US").replace(/,/g, " ")}`, color: "var(--text-muted)" },
+          ].map(({ label, value, color }, i, arr) => (
+            <div key={label} style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2, borderRight: i < arr.length - 1 ? "1px solid var(--border)" : "none" }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color, fontFamily: "'DM Sans',sans-serif" }}>{value}</span>
+              <span style={{ fontSize: 10, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Transactions section label */}
@@ -188,6 +419,18 @@ export default function WalletPage({ wallet, balance, transactions, loading, err
         </div>
       )}
 
+      {/* Infinite scroll sentinel */}
+      <div ref={sentinelRef} style={{ height: 1 }} />
+      {loadingMore && (
+        <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 24px" }}>
+          <div style={{ width: 18, height: 18, border: "2px solid var(--border)", borderTopColor: "var(--primary)", borderRadius: "50%", animation: "spin .7s linear infinite" }} />
+        </div>
+      )}
+
     </div>
+
+    {sendOpen    && <SendSheet    onDismiss={() => setSendOpen(false)}    onSuccess={() => { setSendOpen(false);    onRefresh?.(); }} />}
+    {receiveOpen && <ReceiveSheet nwcUri={wallet.nwc_uri} onDismiss={() => setReceiveOpen(false)} />}
+    </>
   );
 }

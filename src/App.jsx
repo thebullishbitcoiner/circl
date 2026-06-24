@@ -282,7 +282,7 @@ export default function App() {
   const { wallet, saveWallet, disconnect: disconnectWallet } = useWallet();
   const { sendZap } = useZap(wallet);
   const { zapSettings, saveZapSettings } = useZapSettings();
-  const { balance: walletBalance, transactions: walletTxs, loading: walletLoading, error: walletError, refresh: refreshWallet } = useWalletData(wallet);
+  const { balance: walletBalance, transactions: walletTxs, flow24h: walletFlow24h, hasMore: walletHasMore, loadMore: walletLoadMore, loadingMore: walletLoadingMore, loading: walletLoading, error: walletError, refresh: refreshWallet } = useWalletData(wallet);
   const [floatingCompose, setFloatingCompose] = useState(false);
   const [composeCircle, setComposeCircle] = useState(null);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -647,6 +647,10 @@ export default function App() {
                     wallet={wallet}
                     balance={walletBalance}
                     transactions={walletTxs}
+                    flow24h={walletFlow24h}
+                    hasMore={walletHasMore}
+                    loadMore={walletLoadMore}
+                    loadingMore={walletLoadingMore}
                     loading={walletLoading}
                     error={walletError}
                     onRefresh={refreshWallet}
