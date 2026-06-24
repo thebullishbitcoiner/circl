@@ -33,7 +33,7 @@ export default function useWalletData(wallet) {
       const oneDayAgo = Math.floor(Date.now() / 1000) - 86400;
       const [balRes, txRes, flowRes] = await Promise.all([
         client.getBalance(),
-        client.listTransactions({ limit: PAGE_SIZE, offset: 0 }).catch(() => ({ transactions: [] })),
+        client.listTransactions({ limit: PAGE_SIZE, offset: 0 }),
         client.listTransactions({ from: oneDayAgo, limit: 500 }).catch(() => ({ transactions: [] })),
       ]);
       if (abortRef.current) return;
