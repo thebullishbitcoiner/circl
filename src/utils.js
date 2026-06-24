@@ -470,18 +470,24 @@ function getZapReqMemCache() {
 
 export function cacheZapReq(paymentHash, zapReq) {
   try {
-    const cache = getZapReqMemCache();
-    // Store only fields used for display — drop id/sig/created_at/kind and relay/lnurl tags
-    cache[paymentHash] = {
-      pubkey: zapReq.pubkey,
-      content: zapReq.content ?? "",
-      tags: (zapReq.tags ?? []).filter(t => t[0] === "p" || t[0] === "e" || t[0] === "relays"),
+    if (!paymentHash) return;
+    const prev = getZapReqMemCache();
+    const tags = zapReq.tags ?? [];
+    const entry = {
+      sender:   zapReq.pubkey ?? null,
+      receiver: tags.find(t => t[0] === "p")?.[1] ?? null,
+      event:    tags.find(t => t[0] === "e")?.[1] ?? null,
+      content:  zapReq.content ?? "",
+      time:     new Date().toISOString(),
     };
-    const keys = Object.keys(cache);
-    if (keys.length > ZAP_REQ_CACHE_MAX) {
-      keys.slice(0, keys.length - ZAP_REQ_CACHE_MAX).forEach(k => delete cache[k]);
-    }
-    localStorage.setItem(ZAP_REQ_CACHE_KEY, JSON.stringify(cache));
+    // Remove existing entry for this hash so the spread puts it at the top
+    delete prev[paymentHash];
+    // Newest first; evict oldest (tail) entries beyond limit
+    const next = { [paymentHash]: entry, ...prev };
+    const keys = Object.keys(next);
+    if (keys.length > ZAP_REQ_CACHE_MAX) keys.slice(ZAP_REQ_CACHE_MAX).forEach(k => delete next[k]);
+    _zapReqMemCache = next;
+    localStorage.setItem(ZAP_REQ_CACHE_KEY, JSON.stringify(next));
   } catch {}
 }
 

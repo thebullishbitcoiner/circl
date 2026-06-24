@@ -632,7 +632,7 @@ function StorageDetailPage({ storageKey, onBack, onDeleted }) {
           background: "var(--surface)", border: "1px solid var(--border)",
           borderRadius: 8, padding: 12, margin: 0,
           overflow: "auto", maxHeight: "62vh",
-          whiteSpace: "pre-wrap", wordBreak: "break-all",
+          whiteSpace: "pre",
         }}>{display}</pre>
       </div>
     </SubPage>

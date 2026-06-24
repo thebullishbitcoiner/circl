@@ -20,25 +20,29 @@ function zapReqFromDesc(tx) {
   return null;
 }
 
+// Returns a nostr-event-shaped object from wallet metadata or invoice description only.
+// Cache is read separately below since it now uses a different flat format.
 function getZapReq(tx) {
   if (tx.metadata?.nostr?.tags) return tx.metadata.nostr;
-  const fromDesc = zapReqFromDesc(tx);
-  if (fromDesc) return fromDesc;
-  if (tx.type === "outgoing" && tx.payment_hash) return getZapReqFromCache(tx.payment_hash);
-  return null;
+  return zapReqFromDesc(tx);
 }
 
 function nostrPubkeyFromTx(tx) {
-  const zr = getZapReq(tx);
   if (tx.type === "outgoing") {
-    return zr?.tags?.find(t => t[0] === "p")?.[1] ?? null;
+    const zr = getZapReq(tx);
+    return zr?.tags?.find(t => t[0] === "p")?.[1]
+      ?? getZapReqFromCache(tx.payment_hash)?.receiver
+      ?? null;
   }
+  const zr = getZapReq(tx);
   return tx.metadata?.nostr?.pubkey ?? zr?.pubkey ?? null;
 }
 
 function txComment(tx) {
   if (tx.metadata?.comment?.trim()) return tx.metadata.comment.trim();
-  return getZapReq(tx)?.content?.trim() ?? "";
+  const zr = getZapReq(tx);
+  if (zr?.content?.trim()) return zr.content.trim();
+  return getZapReqFromCache(tx.payment_hash)?.content?.trim() ?? "";
 }
 
 function txDescription(tx, profiles) {
