@@ -854,12 +854,11 @@
   .gif-item:hover img{transform:scale(1.05);}
 
   /* Emoji picker */
-  .ep-shell{flex-shrink:0;border-top:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;height:260px;}
-  .ep-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;}
-  .ep-tab{flex:1;padding:8px 0;font-size:18px;background:none;border:none;cursor:pointer;border-bottom:2px solid transparent;transition:border-color .15s;line-height:1;}
-  .ep-tab.active{border-bottom-color:var(--primary);}
-  .ep-tab:hover:not(.active){background:var(--bg);}
-  .ep-grid-wrap{flex:1;overflow-y:auto;padding:6px 8px 10px;}
+  .ep-shell{flex-shrink:0;border-top:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;}
+  .ep-native-wrap{padding:12px;flex-shrink:0;}
+  .ep-native-input{width:100%;box-sizing:border-box;padding:10px 14px;font-size:22px;border:1.5px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);outline:none;text-align:center;caret-color:transparent;}
+  .ep-native-input::placeholder{font-size:14px;color:var(--text-faint);}
+  .ep-grid-wrap{flex:1;overflow-y:auto;padding:6px 8px 10px;max-height:200px;}
   .ep-cat-label{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;color:var(--text-faint);text-transform:uppercase;letter-spacing:.4px;padding:2px 4px 6px;}
   .ep-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:2px;}
   .ep-btn{font-size:22px;padding:6px 2px;border:none;background:none;border-radius:8px;cursor:pointer;transition:background .1s;line-height:1;text-align:center;}
@@ -1159,7 +1158,7 @@
   .cal-inline-media-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
   .cal-inline-media-remove{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;border:none;cursor:pointer;font-size:9px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;}
   .cal-inline-emoji-wrap{border-top:1px solid var(--border);}
-  .cal-inline-emoji-wrap .ep-shell{border-top:none;height:220px;}
+  .cal-inline-emoji-wrap .ep-shell{border-top:none;}
   .cal-inline-gif-picker{border-top:1px solid var(--border);max-height:210px;overflow-y:auto;}
   .cal-inline-gif-search{padding:8px 10px;position:sticky;top:0;background:var(--surface);z-index:1;}
   .cal-inline-gif-input{width:100%;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;transition:border-color .15s;box-sizing:border-box;}
