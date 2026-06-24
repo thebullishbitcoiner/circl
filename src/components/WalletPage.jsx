@@ -31,10 +31,8 @@ function getZapReq(tx) {
 function nostrPubkeyFromTx(tx) {
   const zr = getZapReq(tx);
   if (tx.type === "outgoing") {
-    // Recipient is the p-tag of the zap request we signed
     return zr?.tags?.find(t => t[0] === "p")?.[1] ?? null;
   }
-  // For incoming, the sender is the pubkey who signed the zap request
   return tx.metadata?.nostr?.pubkey ?? zr?.pubkey ?? null;
 }
 
@@ -224,7 +222,7 @@ function SendSheet({ onDismiss, onSuccess, recentRecipients, profiles, sendZap }
   );
 }
 
-function ReceiveSheet({ nwcUri, onDismiss }) {
+function ReceiveSheet({ nwcUri, lnAddress, onDismiss }) {
   const [amount,  setAmount]  = useState("");
   const [memo,    setMemo]    = useState("");
   const [phase,   setPhase]   = useState("idle"); // idle | loading | invoice | error
@@ -259,12 +257,35 @@ function ReceiveSheet({ nwcUri, onDismiss }) {
     });
   };
 
-  const col = document.querySelector(".feed-main") ?? document.body;
-  return createPortal(
-    <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn .15s ease" }} onClick={phase === "loading" ? undefined : onDismiss}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "var(--bg)", borderRadius: 20, padding: "24px 20px 20px", width: 360, maxWidth: "calc(100% - 32px)", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 0 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif", marginBottom: 14, textAlign: "center" }}>Receive</div>
+  const handleBack = phase === "loading" ? undefined : onDismiss;
 
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", padding: "14px 16px 12px", borderBottom: "1px solid var(--border)", position: "sticky", top: 0, background: "var(--bg)", zIndex: 1 }}>
+        <button onClick={handleBack} disabled={!handleBack}
+          style={{ background: "none", border: "none", cursor: handleBack ? "pointer" : "default", color: "var(--text-muted)", padding: "0 10px 0 0", fontSize: 22, lineHeight: 1, opacity: handleBack ? 1 : 0 }}>
+          ‹
+        </button>
+        <div style={{ flex: 1, textAlign: "center", fontSize: 15, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif" }}>Receive</div>
+        <div style={{ width: 30 }} />
+      </div>
+
+      {lnAddress && (
+        <div style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)", padding: "24px 24px 18px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+          <div style={{ background: "#fff", padding: 16, width: "100%", boxSizing: "border-box" }}>
+            <QRCode value={`lightning:${lnAddress}`} style={{ width: "100%", height: "auto", display: "block" }} />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "monospace" }}>{lnAddress}</span>
+            <button onClick={() => navigator.clipboard.writeText(lnAddress)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 2, display: "flex", alignItems: "center" }} aria-label="Copy lightning address">
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ padding: "16px 16px 32px", display: "flex", flexDirection: "column" }}>
         {phase === "idle" && (
           <>
             <input
@@ -275,7 +296,6 @@ function ReceiveSheet({ nwcUri, onDismiss }) {
               autoFocus
               min={1}
               className="noffer-amount-input"
-              style={{ marginTop: 4 }}
             />
             <input
               type="text"
@@ -289,7 +309,7 @@ function ReceiveSheet({ nwcUri, onDismiss }) {
               className="zap-send-btn"
               onClick={handleGenerate}
               disabled={!parseInt(amount, 10)}
-              style={{ opacity: parseInt(amount, 10) > 0 ? 1 : 0.45 }}
+              style={{ opacity: parseInt(amount, 10) > 0 ? 1 : 0.45, marginTop: 10 }}
             >
               Generate Invoice
             </button>
@@ -317,7 +337,7 @@ function ReceiveSheet({ nwcUri, onDismiss }) {
                 }
               </button>
             </div>
-            <button className="zap-send-btn" style={{ width: "328px" }} onClick={onDismiss}>Done</button>
+            <button className="zap-send-btn" onClick={onDismiss}>Done</button>
           </div>
         )}
 
@@ -328,8 +348,7 @@ function ReceiveSheet({ nwcUri, onDismiss }) {
           </div>
         )}
       </div>
-    </div>,
-    col
+    </div>
   );
 }
 
@@ -387,6 +406,10 @@ export default function WalletPage({ wallet, balance, transactions, flow24h, has
         sendZap={sendZap}
       />
     );
+  }
+
+  if (receiveOpen) {
+    return <ReceiveSheet nwcUri={wallet.nwc_uri} lnAddress={wallet.lightning_address} onDismiss={() => setReceiveOpen(false)} />;
   }
 
   return (
@@ -505,7 +528,6 @@ export default function WalletPage({ wallet, balance, transactions, flow24h, has
 
     </div>
 
-    {receiveOpen && <ReceiveSheet nwcUri={wallet.nwc_uri} onDismiss={() => setReceiveOpen(false)} />}
     </>
   );
 }
