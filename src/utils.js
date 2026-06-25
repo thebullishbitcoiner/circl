@@ -103,14 +103,22 @@ export function parseCalendarEvent(event) {
 
 export function formatCalendarDate(start, end, isDateBased) {
   if (!start) return "";
+  const dateOpts = { month: "short", day: "numeric", year: "numeric" };
+  const timeOpts = { hour: "numeric", minute: "2-digit" };
+  const fmt = date => {
+    const d = date.toLocaleDateString(undefined, dateOpts);
+    return isDateBased ? d : `${d} ${date.toLocaleTimeString(undefined, timeOpts)}`;
+  };
   const startDate = new Date(start * 1000);
-  const opts = isDateBased
-    ? { month: "short", day: "numeric", year: "numeric" }
-    : { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" };
-  const startStr = startDate.toLocaleDateString(undefined, opts);
+  const startStr = fmt(startDate);
   if (!end || end === start) return startStr;
   const endDate = new Date(end * 1000);
-  const endStr = endDate.toLocaleDateString(undefined, opts);
+  const sameDay = startDate.getFullYear() === endDate.getFullYear()
+    && startDate.getMonth() === endDate.getMonth()
+    && startDate.getDate() === endDate.getDate();
+  const endStr = (!isDateBased && sameDay)
+    ? endDate.toLocaleTimeString(undefined, timeOpts)
+    : fmt(endDate);
   return `${startStr} – ${endStr}`;
 }
 
