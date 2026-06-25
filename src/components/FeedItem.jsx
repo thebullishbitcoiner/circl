@@ -54,14 +54,10 @@ export default function FeedItem({
         key={event.id}
         event={event}
         profiles={profiles}
-        liked={like.liked}
-        bookmarked={isBookmarked?.(event) || false}
-        likeCount={like.count}
-        onLike={onLike}
-        onBookmark={onBookmark}
         onOpen={onOpenArticle}
         onOpenProfile={onOpenProfile}
         delay={delay}
+        {...noteActionProps}
       />
     );
   }

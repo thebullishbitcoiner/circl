@@ -1,11 +1,12 @@
 import { useState } from "react";
 import Avatar from "./Avatar.jsx";
-import { Hi, Bi, Cl } from "./icons.jsx";
+import { Cl } from "./icons.jsx";
 import { displayName, nip05OrNpub, relativeTime, parseArticle } from "../utils.js";
 import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
+import NoteActions from "./NoteActions.jsx";
 
-export default function LongformCard({ event, profiles, liked, bookmarked, likeCount, onLike, onBookmark, onOpen, onOpenProfile, delay }) {
+export default function LongformCard({ event, profiles, onOpen, onOpenProfile, delay, ...noteActionProps }) {
   const art = parseArticle(event);
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
@@ -59,13 +60,10 @@ export default function LongformCard({ event, profiles, liked, bookmarked, likeC
               ) : null}
               <div className="lf-footer">
                 <span className="lf-readtime"><Cl />{art.readtime}</span>
-                <div className="lf-actions">
-                  <button className={`action-btn ${liked ? "liked" : ""}`} onClick={e => { e.stopPropagation(); onLike(event.id); }}><Hi f={liked} />{likeCount}</button>
-                  <button className={`action-btn ${bookmarked ? "saved" : ""}`} onClick={e => { e.stopPropagation(); onBookmark(event); }}><Bi f={bookmarked} /></button>
-                </div>
               </div>
             </div>
           </div>
+      <NoteActions event={event} profiles={profiles} {...noteActionProps} />
     </div>
     {jsonOpen && <NoteJsonModal event={event} onClose={() => setJsonOpen(false)} />}
     </>

@@ -654,13 +654,13 @@ export default function ProfilePage({
   }, [events, profileEvents, articleEvents, highlightEventsList, repostExtras]);
 
   const theirEvents = useMemo(
-    () => isMuted?.(pubkey) ? [] : mergedEvents.filter(e => e.pubkey === pubkey && (e.kind === 1 || e.kind === 6 || e.kind === 9802 || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311 || e.kind === 9041 || e.kind === 9735)),
+    () => isMuted?.(pubkey) ? [] : mergedEvents.filter(e => e.pubkey === pubkey && (e.kind === 1 || e.kind === 6 || e.kind === 9802 || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311 || e.kind === 9041 || e.kind === 9735 || e.kind === 30023)),
     [mergedEvents, pubkey, isMuted]
   );
 
   const topLevel = useMemo(
     () => theirEvents
-      .filter(e => e.kind === 6 || e.kind === 9802 || e.kind === 9735 || isQuoteRepost(e) || (e.kind === 1 && !hasNonMentionETag(e)) || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311 || e.kind === 9041)
+      .filter(e => e.kind === 6 || e.kind === 9802 || e.kind === 9735 || isQuoteRepost(e) || (e.kind === 1 && !hasNonMentionETag(e)) || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311 || e.kind === 9041 || e.kind === 30023)
       .sort((a, b) => b.created_at - a.created_at),
     [theirEvents]
   );
@@ -1002,13 +1002,31 @@ export default function ProfilePage({
                   key={e.id}
                   event={e}
                   profiles={profiles}
-                  liked={false}
-                  bookmarked={isBookmarked?.(e) || false}
-                  likeCount={0}
-                  onLike={() => {}}
-                  onBookmark={onBookmark}
                   onOpen={onOpenArticle}
                   onOpenProfile={onOpenProfile}
+                  myPubkey={myPubkey}
+                  myProfile={myProfile}
+                  events={mergedEvents}
+                  onOpenThread={onOpenThread}
+                  onOpenZaps={onOpenZaps}
+                  onOpenReactions={onOpenReactions}
+                  onOpenReposts={onOpenReposts}
+                  onPublish={onPublish}
+                  publishEvent={publishEvent}
+                  onPrepend={onPrepend}
+                  onBookmark={onBookmark}
+                  isBookmarked={isBookmarked}
+                  getLocalZaps={getLocalZaps}
+                  addLocalZap={addLocalZap}
+                  getLocalReactions={getLocalReactions}
+                  setLocalReaction={setLocalReaction}
+                  onRequestModal={onRequestModal}
+                  onDismissModal={onDismissModal}
+                  sendZap={sendZap}
+                  defaultZapAmount={defaultZapAmount}
+                  defaultZapMsg={defaultZapMsg}
+                  onZapFail={onZapFail}
+                  customEmojis={customEmojis}
                   delay={0}
                 />
               ))
