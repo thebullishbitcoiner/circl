@@ -348,7 +348,7 @@ const IMAGE_HOST_RE =
 
 export function trimMediaUrl(url) {
   if (!url || typeof url !== "string") return url;
-  return url.replace(/[),.;:!?*»\]}]+$/, "");
+  return url.replace(/(?:[),.;:!?*»\]}]|[^\x00-\x7F])+$/, "");
 }
 
 /** @returns {"image"|"video"|null} */
@@ -415,6 +415,7 @@ export function parseNoteMediaSegments(raw) {
   while ((m = re.exec(input)) !== null) {
     const rawUrl = m[0];
     const url    = trimMediaUrl(rawUrl);
+    const suffix = rawUrl.slice(url.length);
     if (m.index > last) {
       const text = input.slice(last, m.index);
       if (text) segments.push({ type: "text", value: text });
@@ -423,6 +424,7 @@ export function parseNoteMediaSegments(raw) {
     if (kind === "image") segments.push({ type: "image", url });
     else if (kind === "video") segments.push({ type: "video", url });
     else segments.push({ type: "text", value: rawUrl });
+    if (suffix && kind) segments.push({ type: "text", value: suffix });
     last = m.index + rawUrl.length;
   }
   if (last < input.length) {

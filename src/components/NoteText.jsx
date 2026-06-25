@@ -2,7 +2,7 @@ import { Fragment } from "react";
 import { displayName, nip19 } from "../utils.js";
 
 function trimUrlToken(url) {
-  return url.replace(/[),.;:!?*»\]}]+$/, "");
+  return url.replace(/(?:[),.;:!?*»\]}]|[^\x00-\x7F])+$/, "");
 }
 
 // Tries to decode a nostr bech32 string (without the "nostr:" prefix), tolerating
@@ -60,7 +60,7 @@ function applyInlineMarkdown(text, keyPrefix) {
 }
 
 export default function NoteText({ content, profiles, onOpenProfile, onOpenHashtag, customEmojis, className = "note-text", style = {} }) {
-  const parts = content.split(/(https?:\/\/[^\s<>'"]+|nostr:(?:npub1|nprofile1)[023456789acdefghjklmnpqrstuvwxyz]+|#[a-zA-Z][a-zA-Z0-9_]+|@\S+|:[a-zA-Z0-9_]+:)/gi);
+  const parts = content.split(/(https?:\/\/[^\s<>'"]+|nostr:(?:npub1|nprofile1)[023456789acdefghjklmnpqrstuvwxyz]+|#[a-zA-Z0-9][a-zA-Z0-9_]+|@\S+|:[a-zA-Z0-9_]+:)/gi);
 
   const handleMention = mention => {
     if (!onOpenProfile) return;
@@ -79,7 +79,7 @@ export default function NoteText({ content, profiles, onOpenProfile, onOpenHasht
     let part = parts[i];
     if (!part) { prevWasDecodedNostr = false; continue; }
 
-    if (/^#[a-zA-Z][a-zA-Z0-9_]+$/.test(part)) {
+    if (/^#[a-zA-Z0-9][a-zA-Z0-9_]+$/.test(part)) {
       const tag = part.slice(1);
       elements.push(
         <span key={i} className="note-hashtag" onClick={e => { e.stopPropagation(); onOpenHashtag?.(tag); }}>
