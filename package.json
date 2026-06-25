@@ -1,7 +1,7 @@
 {
   "name": "circl",
   "private": true,
-  "version": "0.47.5",
+  "version": "0.48.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,6 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@emoji-mart/data": "^1.2.1",
+    "@emoji-mart/react": "^1.1.1",
     "@getalby/lightning-tools": "^8.1.1",
     "@getalby/sdk": "^8.0.3",
     "@shocknet/clink-sdk": "^1.5.5",

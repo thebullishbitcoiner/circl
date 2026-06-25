@@ -182,7 +182,7 @@ export default function InlineCompose({
 
         {showEmoji && (
           <div className="cal-inline-emoji-wrap">
-            <EmojiPicker customEmojis={customEmojis} onSelect={e => { insertEmoji(e); setShowEmoji(false); }} />
+            <EmojiPicker customEmojis={customEmojis} height={280} onSelect={e => { insertEmoji(e); setShowEmoji(false); }} />
           </div>
         )}
 

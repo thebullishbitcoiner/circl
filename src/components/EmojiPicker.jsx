@@ -1,62 +1,47 @@
-import { useRef, useEffect } from "react";
+import { useEffect, useState } from "react";
+import Picker from "@emoji-mart/react";
 
-function extractFirstEmoji(str) {
-  if (!str) return null;
-  try {
-    const seg = new Intl.Segmenter([], { granularity: "grapheme" });
-    for (const { segment } of seg.segment(str)) {
-      if (/\p{Extended_Pictographic}/u.test(segment)) return segment;
-    }
-  } catch {
-    const m = str.match(/\p{Extended_Pictographic}/u);
-    if (m) return m[0];
-  }
-  return null;
-}
-
-export default function EmojiPicker({ onSelect, customEmojis = [] }) {
-  const inputRef = useRef(null);
+export default function EmojiPicker({ onSelect, customEmojis = [], height }) {
+  const [data, setData] = useState(null);
 
   useEffect(() => {
-    const t = setTimeout(() => inputRef.current?.focus(), 80);
-    return () => clearTimeout(t);
+    import("@emoji-mart/data").then(m => setData(m.default));
   }, []);
 
-  const handleChange = (e) => {
-    const emoji = extractFirstEmoji(e.target.value);
-    if (emoji) onSelect(emoji);
-  };
+  if (!data) return <div className="ep-loading" />;
+
+  const custom = customEmojis.length > 0 ? [{
+    id: "nostr",
+    name: "Custom",
+    emojis: customEmojis.map(({ name, url }) => ({
+      id: name,
+      name,
+      skins: [{ src: url }],
+    })),
+  }] : [];
+
+  const theme = document.documentElement.classList.contains("dark") ? "dark" : "light";
 
   return (
-    <div className="ep-shell">
-      <div className="ep-native-wrap">
-        <input
-          ref={inputRef}
-          type="text"
-          inputMode="text"
-          className="ep-native-input"
-          placeholder="Tap an emoji on your keyboard…"
-          onChange={handleChange}
-        />
-      </div>
-      {customEmojis.length > 0 && (
-        <div className="ep-grid-wrap">
-          <div className="ep-cat-label">Custom</div>
-          <div className="ep-grid">
-            {customEmojis.map(({ name, url }) => (
-              <button
-                key={name}
-                type="button"
-                className="ep-btn"
-                title={`:${name}:`}
-                onClick={() => onSelect({ content: `:${name}:`, emojiTag: ["emoji", name, url] })}
-              >
-                <img src={url} alt={name} style={{ width: 22, height: 22, objectFit: "contain" }} />
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+    <div onClick={e => e.stopPropagation()}>
+      <Picker
+        data={data}
+        custom={custom}
+        theme={theme}
+        onEmojiSelect={emoji => {
+          if (emoji.src) {
+            onSelect({ content: `:${emoji.id}:`, emojiTag: ["emoji", emoji.id, emoji.src] });
+          } else {
+            onSelect(emoji.native);
+          }
+        }}
+        skinTonePosition="search"
+        previewPosition="none"
+        navPosition="bottom"
+        set="native"
+        width="100%"
+        height={height ?? 380}
+      />
     </div>
   );
 }

@@ -649,7 +649,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
         {uploading   && <div className="compose-upload-status">Uploading…</div>}
 
         {showEmoji && (
-          <EmojiPicker customEmojis={customEmojis} onSelect={emoji => { insertEmoji(emoji); setShowEmoji(false); }} />
+          <EmojiPicker customEmojis={customEmojis} height={280} onSelect={emoji => { insertEmoji(emoji); setShowEmoji(false); }} />
         )}
 
         {showTagList && (

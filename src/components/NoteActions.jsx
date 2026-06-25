@@ -41,6 +41,7 @@ export default function NoteActions({
   const [showZapModal, setShowZapModal] = useState(false);
   const [localModal,   setLocalModal]   = useState(null);
   const zapBtnRef     = useRef(null);
+  const reactBtnRef   = useRef(null);
   const zapAnimCoords = useRef(null);
 
   const recipientLnAddr = profiles[event.pubkey]?.lud16 || profiles[event.pubkey]?.lud06 || null;
@@ -124,11 +125,11 @@ export default function NoteActions({
             <Zi />
             {localZaps.length ? fmtSatsVal(localZaps.reduce((s, z) => s + Math.round(z.amount / 1000), 0)) : ""}
           </button>
-          <button className={`action-btn${reaction ? " reacted" : ""}`}
+          <button ref={reactBtnRef} className={`action-btn${reaction ? " reacted" : ""}`}
             style={reaction ? { color: "var(--primary)" } : {}}
             onClick={e => { e.stopPropagation(); handleReact(); }}
-            onMouseDown={e => { e.stopPropagation(); const t = setTimeout(() => openModal(<EmojiPickerSheet customEmojis={customEmojis} onPick={emoji => { handleReactPick(emoji); dismiss(); }} onDismiss={dismiss} />), 600); window.addEventListener("mouseup", () => clearTimeout(t), { once: true }); }}
-            onTouchStart={e => { e.stopPropagation(); const t = setTimeout(() => openModal(<EmojiPickerSheet customEmojis={customEmojis} onPick={emoji => { handleReactPick(emoji); dismiss(); }} onDismiss={dismiss} />), 600); window.addEventListener("touchend", () => clearTimeout(t), { once: true }); }}
+            onMouseDown={e => { e.stopPropagation(); const t = setTimeout(() => { haptic.longPress(); const rect = reactBtnRef.current?.getBoundingClientRect(); openModal(<EmojiPickerSheet customEmojis={customEmojis} triggerRect={rect} onPick={emoji => { handleReactPick(emoji); dismiss(); }} onDismiss={dismiss} />); }, 600); window.addEventListener("mouseup", () => clearTimeout(t), { once: true }); }}
+            onTouchStart={e => { e.stopPropagation(); const t = setTimeout(() => { haptic.longPress(); const rect = reactBtnRef.current?.getBoundingClientRect(); openModal(<EmojiPickerSheet customEmojis={customEmojis} triggerRect={rect} onPick={emoji => { handleReactPick(emoji); dismiss(); }} onDismiss={dismiss} />); }, 600); window.addEventListener("touchend", () => clearTimeout(t), { once: true }); }}
           >
             {reaction && reaction !== "💜"
               ? reactionEmojiUrl
