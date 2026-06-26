@@ -23,7 +23,7 @@ function measureText(text) {
 function buildTagLabel(pubkeys, excludedMentions, profiles, availableWidth) {
   const active = pubkeys.filter(pk => !excludedMentions.has(pk));
   if (!active.length) return "no one";
-  const names = active.map(pk => `@${displayName(pk, profiles)}`);
+  const names = active.map(pk => displayName(pk, profiles));
   const total = names.length;
   if (!availableWidth) return total === 1 ? names[0] : `${names[0]} and ${total - 1} other${total - 1 !== 1 ? "s" : ""}`;
   for (let n = total; n >= 1; n--) {
