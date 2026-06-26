@@ -858,7 +858,8 @@
   .dark em-emoji-picker{--em-rgb-background:26,22,37;--em-rgb-color:237,233,254;--em-color-border:var(--border);--em-rgb-accent:167,139,250;}
   .ep-loading{height:60px;}
   /* Desktop popover */
-  .ep-popover{position:fixed;z-index:1000;width:356px;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px var(--shadow-md);overflow:hidden;}
+  .ep-popover{position:fixed;z-index:1000;width:380px;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px var(--shadow-md);overflow:hidden;}
+  .ep-popover em-emoji-picker{width:100%!important;--border-radius:0px;}
   @media(max-width:600px){.compose-emoji-toggle{display:none;}}
   .mention-list{border-top:1px solid var(--border);flex-shrink:0;max-height:220px;overflow-y:auto;}
   .mention-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 16px;background:none;border:none;cursor:pointer;text-align:left;transition:background .12s;}

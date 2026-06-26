@@ -14,7 +14,7 @@ function DesktopPopover({ triggerRect, onDismiss, children }) {
     return () => document.removeEventListener("pointerdown", handler, true);
   }, [onDismiss]);
 
-  const POPOVER_WIDTH  = 356;
+  const POPOVER_WIDTH  = 380;
   const POPOVER_HEIGHT = 400;
   const gap = 8;
   const spaceBelow = window.innerHeight - triggerRect.bottom - gap;
