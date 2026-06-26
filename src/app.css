@@ -914,8 +914,8 @@
   .emoji-btn:hover{background:var(--surface);}
 
   /* Emoji reaction sheet (full picker in a bottom sheet) */
-  .emoji-reaction-sheet{width:100%;max-width:480px;border-radius:20px 20px 0 0;overflow:hidden;animation:slideUp .2s cubic-bezier(.4,0,.2,1);padding-bottom:calc(env(safe-area-inset-bottom) + 4px);}
-  .emoji-reaction-sheet em-emoji-picker{--border-radius:0px;}
+  .emoji-reaction-sheet{width:100%;border-radius:20px 20px 0 0;overflow:hidden;animation:slideUp .2s cubic-bezier(.4,0,.2,1);padding-bottom:calc(env(safe-area-inset-bottom) + 4px);}
+  .emoji-reaction-sheet em-emoji-picker{--border-radius:0px;width:100%;}
 
   /* Reaction button active */
   .action-btn.reacted{color:var(--primary);}
