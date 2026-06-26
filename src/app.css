@@ -915,7 +915,7 @@
 
   /* Emoji reaction sheet (full picker in a bottom sheet) */
   .emoji-reaction-sheet{width:100%;border-radius:20px 20px 0 0;overflow:hidden;animation:slideUp .2s cubic-bezier(.4,0,.2,1);padding-bottom:calc(env(safe-area-inset-bottom) + 4px);}
-  .emoji-reaction-sheet em-emoji-picker{--border-radius:0px;display:block;width:100%!important;}
+  .emoji-reaction-sheet em-emoji-picker{--border-radius:0px;width:100%!important;}
 
   /* Reaction button active */
   .action-btn.reacted{color:var(--primary);}
