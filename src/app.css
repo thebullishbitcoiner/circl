@@ -854,12 +854,11 @@
   .gif-item:hover img{transform:scale(1.05);}
 
   /* Emoji picker — emoji-mart theming */
-  em-emoji-picker{--em-rgb-background:239,233,250;--em-rgb-color:30,27,46;--em-color-border:var(--border);--em-rgb-accent:109,40,217;--border-radius:0px;font-family:'DM Sans',sans-serif;}
+  em-emoji-picker{--em-rgb-background:239,233,250;--em-rgb-color:30,27,46;--em-color-border:var(--border);--em-rgb-accent:109,40,217;--border-radius:0px;font-family:'DM Sans',sans-serif;width:100%!important;}
   .dark em-emoji-picker{--em-rgb-background:26,22,37;--em-rgb-color:237,233,254;--em-color-border:var(--border);--em-rgb-accent:167,139,250;}
   .ep-loading{height:60px;}
   /* Desktop popover */
   .ep-popover{position:fixed;z-index:1000;width:380px;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px var(--shadow-md);overflow:hidden;}
-  .ep-popover em-emoji-picker{width:100%!important;--border-radius:0px;}
   @media(max-width:600px){.compose-emoji-toggle{display:none;}}
   .mention-list{border-top:1px solid var(--border);flex-shrink:0;max-height:220px;overflow-y:auto;}
   .mention-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 16px;background:none;border:none;cursor:pointer;text-align:left;transition:background .12s;}
@@ -916,7 +915,7 @@
 
   /* Emoji reaction sheet (full picker in a bottom sheet) */
   .emoji-reaction-sheet{width:100%;border-radius:20px 20px 0 0;overflow:hidden;animation:slideUp .2s cubic-bezier(.4,0,.2,1);padding-bottom:calc(env(safe-area-inset-bottom) + 4px);}
-  .emoji-reaction-sheet em-emoji-picker{--border-radius:0px;width:100%!important;}
+  .emoji-reaction-sheet em-emoji-picker{--border-radius:0px;}
 
   /* Reaction button active */
   .action-btn.reacted{color:var(--primary);}
