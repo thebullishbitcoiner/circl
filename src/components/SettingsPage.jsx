@@ -2,6 +2,7 @@ import { useState } from "react";
 import useMailboxes from "../hooks/useMailboxes.js";
 import { MailboxesFactory } from "applesauce-core";
 import CustomEmojiSettingsPage from "./CustomEmojiSettingsPage.jsx";
+import useContentSettings from "../hooks/useContentSettings.js";
 
 // ── Wallet helpers ────────────────────────────────────────────────────────────
 
@@ -397,6 +398,37 @@ function ZapsSubPage({ onBack, zapSettings, onSaveZapSettings }) {
   );
 }
 
+function ContentSubPage({ onBack }) {
+  const { autoplayVideos, setAutoplayVideos, loopVideos, setLoopVideos } = useContentSettings();
+
+  return (
+    <SubPage title="Content" onBack={onBack}>
+      <div className="settings-row" onClick={() => setAutoplayVideos(!autoplayVideos)}>
+        <div>
+          <div className="settings-row-label">Autoplay videos</div>
+          <div className="settings-row-sub">Play videos automatically in the feed (muted)</div>
+        </div>
+        <label className="toggle" onClick={e => e.stopPropagation()}>
+          <input type="checkbox" checked={autoplayVideos} onChange={() => setAutoplayVideos(!autoplayVideos)} />
+          <div className="toggle-track" />
+          <div className="toggle-thumb" />
+        </label>
+      </div>
+      <div className="settings-row" onClick={() => setLoopVideos(!loopVideos)}>
+        <div>
+          <div className="settings-row-label">Loop videos</div>
+          <div className="settings-row-sub">Replay videos automatically when they end</div>
+        </div>
+        <label className="toggle" onClick={e => e.stopPropagation()}>
+          <input type="checkbox" checked={loopVideos} onChange={() => setLoopVideos(!loopVideos)} />
+          <div className="toggle-track" />
+          <div className="toggle-thumb" />
+        </label>
+      </div>
+    </SubPage>
+  );
+}
+
 function AppearanceSubPage({ onBack, dark, toggleDark, textSize, onTextSizeChange }) {
   return (
     <SubPage title="Appearance" onBack={onBack}>
@@ -714,6 +746,9 @@ export default function SettingsPage({
   if (subPage === "appearance") {
     return <AppearanceSubPage onBack={() => setSubPage(null)} dark={dark} toggleDark={toggleDark} textSize={textSize} onTextSizeChange={onTextSizeChange} />;
   }
+  if (subPage === "content") {
+    return <ContentSubPage onBack={() => setSubPage(null)} />;
+  }
   if (subPage === "relays") {
     return <RelaysSubPage onBack={() => setSubPage(null)} pubkey={pubkey} signAndPublish={signAndPublish} />;
   }
@@ -767,6 +802,14 @@ export default function SettingsPage({
         <div>
           <div className="settings-row-label">Appearance</div>
           <div className="settings-row-sub">{dark ? "Dark" : "Light"} theme, {textSize} text</div>
+        </div>
+        <div style={{ color: "var(--text-muted)", fontSize: 18 }}>›</div>
+      </div>
+
+      <div className="settings-row" onClick={() => setSubPage("content")}>
+        <div>
+          <div className="settings-row-label">Content</div>
+          <div className="settings-row-sub">Video autoplay and media preferences</div>
         </div>
         <div style={{ color: "var(--text-muted)", fontSize: 18 }}>›</div>
       </div>

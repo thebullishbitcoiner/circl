@@ -12,6 +12,7 @@ import PodcastPreviewChip from "./PodcastPreviewChip.jsx";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 import { useNavigation } from "../context/NavigationContext.jsx";
+import useContentSettings from "../hooks/useContentSettings.js";
 
 function ZapEmbed({ event, profiles, onOpenProfile }) {
   const [liveEvent, setLiveEvent]     = useState(null);
@@ -437,6 +438,7 @@ export default function NoteContent({
   const [resolvedRefs, setResolvedRefs] = useState({});
   const [resolvedNaddrRefs, setResolvedNaddrRefs] = useState({});
   const [expanded, setExpanded] = useState(false);
+  const { autoplayVideos, loopVideos } = useContentSettings();
 
   // Fetch profiles for any nprofile/npub mentions so display names resolve
   useEffect(() => { fetchMentionedProfiles(content); }, [content]);
@@ -580,7 +582,7 @@ export default function NoteContent({
               className="note-media note-media-video"
               onClick={e => e.stopPropagation()}
             >
-              <video src={seg.url} controls playsInline preload="metadata" />
+              <video src={seg.url} controls playsInline preload="metadata" autoPlay={autoplayVideos} muted={autoplayVideos} loop={loopVideos} />
             </div>
           );
         }
