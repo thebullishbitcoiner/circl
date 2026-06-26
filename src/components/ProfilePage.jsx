@@ -779,24 +779,22 @@ export default function ProfilePage({
         >
           <Bk s={16} />
         </button>
-        {!isOwn && (
-          <div style={{ position: "absolute", top: 12, right: 12 }}>
-            <button
-              type="button"
-              className="back-btn"
-              style={{ background: "rgba(0,0,0,.25)", backdropFilter: "blur(8px)", color: "white", flexDirection: "column", gap: "2.5px" }}
-              onClick={e => { e.stopPropagation(); setProfileMenuOpen(v => !v); }}
-              aria-label="More options"
-            >
-              <span style={{ width: 2.5, height: 2.5, borderRadius: "50%", background: "currentColor", display: "block" }} />
-              <span style={{ width: 2.5, height: 2.5, borderRadius: "50%", background: "currentColor", display: "block" }} />
-              <span style={{ width: 2.5, height: 2.5, borderRadius: "50%", background: "currentColor", display: "block" }} />
-            </button>
-            {profileMenuOpen && (
-              <ProfileContextMenu pubkey={pubkey} onClose={() => setProfileMenuOpen(false)} onViewMetadata={() => setShowProfileMetadata(true)} />
-            )}
-          </div>
-        )}
+        <div style={{ position: "absolute", top: 12, right: 12 }}>
+          <button
+            type="button"
+            className="back-btn"
+            style={{ background: "rgba(0,0,0,.25)", backdropFilter: "blur(8px)", color: "white", flexDirection: "column", gap: "2.5px" }}
+            onClick={e => { e.stopPropagation(); setProfileMenuOpen(v => !v); }}
+            aria-label="More options"
+          >
+            <span style={{ width: 2.5, height: 2.5, borderRadius: "50%", background: "currentColor", display: "block" }} />
+            <span style={{ width: 2.5, height: 2.5, borderRadius: "50%", background: "currentColor", display: "block" }} />
+            <span style={{ width: 2.5, height: 2.5, borderRadius: "50%", background: "currentColor", display: "block" }} />
+          </button>
+          {profileMenuOpen && (
+            <ProfileContextMenu pubkey={pubkey} isOwn={isOwn} onClose={() => setProfileMenuOpen(false)} onViewMetadata={() => setShowProfileMetadata(true)} />
+          )}
+        </div>
       </div>
 
       <div className="profile-identity" style={{ paddingBottom: 16 }}>
