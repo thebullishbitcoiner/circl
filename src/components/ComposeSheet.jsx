@@ -11,6 +11,45 @@ import PollCompose from "./PollCompose.jsx";
 import GoalCompose from "./GoalCompose.jsx";
 import { uploadToBlossom } from "../utils/blossom.js";
 
+const TAGGING_FONT = "12.5px 'DM Sans', sans-serif";
+let _measureCanvas = null;
+function measureText(text) {
+  if (!_measureCanvas) { _measureCanvas = document.createElement("canvas"); _measureCanvas.getContext("2d").font = TAGGING_FONT; }
+  const ctx = _measureCanvas.getContext("2d");
+  ctx.font = TAGGING_FONT;
+  return ctx.measureText(text).width;
+}
+
+function buildTagLabel(pubkeys, excludedMentions, profiles, availableWidth) {
+  const active = pubkeys.filter(pk => !excludedMentions.has(pk));
+  if (!active.length) return "no one";
+  const names = active.map(pk => `@${displayName(pk, profiles)}`);
+  const total = names.length;
+  if (!availableWidth) return total === 1 ? names[0] : `${names[0]} and ${total - 1} other${total - 1 !== 1 ? "s" : ""}`;
+  for (let n = total; n >= 1; n--) {
+    const rem = total - n;
+    const text = names.slice(0, n).join(", ") + (rem > 0 ? ` and ${rem} other${rem !== 1 ? "s" : ""}` : "");
+    if (measureText(text) <= availableWidth) return text;
+  }
+  return names[0];
+}
+
+function TaggingLink({ pubkeys, excludedMentions, profiles, onClick }) {
+  const ref = useRef(null);
+  const [label, setLabel] = useState(() => buildTagLabel(pubkeys, excludedMentions, profiles, 0));
+  useEffect(() => {
+    if (!ref.current) return;
+    const w = ref.current.getBoundingClientRect().width;
+    setLabel(buildTagLabel(pubkeys, excludedMentions, profiles, w));
+  }, [pubkeys, excludedMentions, profiles]);
+  return (
+    <button ref={ref} type="button" className="tagging-link" onClick={onClick}
+      style={{ flex: 1, minWidth: 0, textAlign: "left", whiteSpace: "nowrap", overflow: "hidden" }}>
+      {label}
+    </button>
+  );
+}
+
 export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey, myProfile, onPost, onDismiss, publishEvent, onPrepend, events = [], circles = [], initialCircle = null, customEmojis = [], blossomServers = [] }) {
   const { getDraft, saveDraft, deleteDraft } = useDraftsContext();
   const [hasText,        setHasText]        = useState(false);
@@ -69,8 +108,6 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     }
   }, [draft, circles]);
 
-  const TAGS_VISIBLE = 3;
-
   const isNip22Reply = replyTo?.kind === 1068 || replyTo?.kind === 6969 || replyTo?.kind === 1111 || replyTo?.kind === 30023;
   const mentionedPubkeys = (replyTo && !isNip22Reply)
     ? [...new Set(replyTagsForPublish(replyTo, events).filter(t => t[0] === "p").map(t => t[1]))]
@@ -91,12 +128,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
 
   const lockedAuthorPk = replyTo ? replyTo.pubkey : quotedEvent ? quotedEvent.pubkey : null;
 
-  const tagLinkLabel = (pubkeys) => {
-    const active = pubkeys.filter(pk => !excludedMentions.has(pk));
-    if (active.length === 0) return "no one";
-    const shown = active.slice(0, 3).map(pk => `@${displayName(pk, profiles)}`).join(", ");
-    return active.length > 3 ? `${shown} and ${active.length - 3} other${active.length - 3 !== 1 ? "s" : ""}` : shown;
-  };
+
 
   const toggleAllTags = () => {
     const nonLocked = allTaggedPubkeys.filter(pk => pk !== lockedAuthorPk);
@@ -531,9 +563,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
             {mentionedPubkeys.length > 0 && (
               <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 6 }}>
                 <span className="compose-sheet-context-label" style={{ margin: 0 }}>Tagging</span>
-                <button type="button" className="tagging-link" onClick={() => setShowTagList(true)}>
-                  {tagLinkLabel(mentionedPubkeys)}
-                </button>
+                <TaggingLink pubkeys={mentionedPubkeys} excludedMentions={excludedMentions} profiles={profiles} onClick={() => setShowTagList(true)} />
               </div>
             )}
           </div>
@@ -597,9 +627,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
               {quotedMentionPubkeys.length > 0 && (
                 <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
                   <span className="compose-sheet-context-label" style={{ margin: 0 }}>Tagging</span>
-                  <button type="button" className="tagging-link" onClick={() => setShowTagList(true)}>
-                    {tagLinkLabel(quotedMentionPubkeys)}
-                  </button>
+                  <TaggingLink pubkeys={quotedMentionPubkeys} excludedMentions={excludedMentions} profiles={profiles} onClick={() => setShowTagList(true)} />
                 </div>
               )}
               <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px", background: "var(--surface)" }}>
