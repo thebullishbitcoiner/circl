@@ -39,7 +39,7 @@ export default function EmojiPicker({ onSelect, customEmojis = [], height }) {
         previewPosition="none"
         navPosition="bottom"
         set="native"
-        width="100%"
+        dynamicWidth
         height={height ?? 380}
       />
     </div>

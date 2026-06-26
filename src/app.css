@@ -328,7 +328,7 @@
   .media-lightbox-counter{position:absolute;bottom:max(16px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);color:rgba(255,255,255,.88);font-size:13px;font-family:'DM Sans',sans-serif;pointer-events:none;}
   .ix-body .note-content-stack{margin-bottom:0;}
   .note-actions{display:flex;gap:12px;margin-top:8px;}
-  .action-btn{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--text-faint);cursor:pointer;padding:3px 4px;border-radius:6px;transition:all .12s;border:none;background:none;font-family:'DM Sans',sans-serif;}
+  .action-btn{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--text-faint);cursor:pointer;padding:3px 4px;border-radius:6px;transition:all .12s;border:none;background:none;font-family:'DM Sans',sans-serif;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
   .action-btn:hover{color:var(--primary);background:rgba(109,40,217,.07);}
   .action-btn.liked{color:#E05C8A;}
   .action-btn.saved{color:var(--primary);}
@@ -915,7 +915,7 @@
 
   /* Emoji reaction sheet (full picker in a bottom sheet) */
   .emoji-reaction-sheet{width:100%;border-radius:20px 20px 0 0;overflow:hidden;animation:slideUp .2s cubic-bezier(.4,0,.2,1);padding-bottom:calc(env(safe-area-inset-bottom) + 4px);}
-  .emoji-reaction-sheet em-emoji-picker{--border-radius:0px;width:100%;}
+  .emoji-reaction-sheet em-emoji-picker{--border-radius:0px;display:block;width:100%!important;}
 
   /* Reaction button active */
   .action-btn.reacted{color:var(--primary);}
