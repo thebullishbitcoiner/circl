@@ -819,11 +819,12 @@
 
   /* Media previews */
   .compose-previews{
-    display:flex;flex-wrap:wrap;gap:8px;
+    display:flex;flex-wrap:nowrap;gap:8px;
     padding:8px 16px 0;flex-shrink:0;
+    overflow-x:auto;-webkit-overflow-scrolling:touch;
   }
-  .compose-preview{position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--border);}
-  .compose-preview img{display:block;height:90px;max-width:160px;object-fit:cover;}
+  .compose-preview{position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--border);flex-shrink:0;}
+  .compose-preview img,.compose-preview video{display:block;height:90px;width:auto;max-width:160px;object-fit:cover;}
   .compose-preview-remove{
     position:absolute;top:4px;right:4px;
     width:20px;height:20px;border-radius:50%;
@@ -1149,9 +1150,9 @@
   .cal-inline-toolbar-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:none;background:none;border-radius:7px;cursor:pointer;color:var(--text-muted);transition:background .12s,color .12s;}
   .cal-inline-toolbar-btn:hover{background:var(--surface2);color:var(--text);}
   .cal-inline-uploading{font-size:11px;color:var(--text-faint);margin-left:4px;}
-  .cal-inline-media-strip{display:flex;gap:6px;padding:6px 10px 2px;flex-wrap:wrap;}
+  .cal-inline-media-strip{display:flex;gap:6px;padding:6px 10px 2px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;}
   .cal-inline-media-thumb{position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;border:1px solid var(--border);flex-shrink:0;}
-  .cal-inline-media-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .cal-inline-media-thumb img,.cal-inline-media-thumb video{width:100%;height:100%;object-fit:cover;display:block;}
   .cal-inline-media-remove{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;border:none;cursor:pointer;font-size:9px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;}
   .cal-inline-emoji-wrap{border-top:1px solid var(--border);}
   .cal-inline-emoji-wrap em-emoji-picker{--border-radius:0px;}

@@ -121,7 +121,7 @@ export default function InlineCompose({
     for (const file of files) {
       try {
         const url = await uploadFile(file);
-        setMedia(m => [...m, { url, type: "image" }]);
+        setMedia(m => [...m, { url, type: file.type.startsWith("video/") ? "video" : "image" }]);
       } catch {}
     }
     setUploading(false);
@@ -173,7 +173,9 @@ export default function InlineCompose({
           <div className="cal-inline-media-strip">
             {media.map((m, i) => (
               <div key={i} className="cal-inline-media-thumb">
-                <img src={m.url} alt="" />
+                {m.type === "video"
+                  ? <video src={m.url} muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : <img src={m.url} alt="" />}
                 <button type="button" className="cal-inline-media-remove" onClick={() => setMedia(prev => prev.filter((_, j) => j !== i))}>✕</button>
               </div>
             ))}
@@ -216,7 +218,7 @@ export default function InlineCompose({
         )}
 
         <div className="cal-inline-compose-footer">
-          <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleFileChange} />
+          <input ref={fileRef} type="file" accept="image/*,video/*" multiple style={{ display: "none" }} onChange={handleFileChange} />
           <div className="cal-inline-toolbar">
             <button type="button" className="cal-inline-toolbar-btn" title="Add image" onClick={() => fileRef.current?.click()}>
               <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
