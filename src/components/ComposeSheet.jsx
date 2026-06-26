@@ -119,6 +119,8 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   }), [media, emojiTags, excludedMentions, selectedCircle]);
 
   const handleDismiss = useCallback(() => {
+    // Force keyboard to dismiss before closing (prevents iOS dead-zone after emoji search)
+    document.activeElement?.blur();
     const content = getContent();
     const hasDraftContent = content.trim().length > 0 || media.length > 0;
     if (hasDraftContent) saveDraft(thisDraftId, collectDraftState());
