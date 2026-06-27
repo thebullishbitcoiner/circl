@@ -6,7 +6,7 @@ import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
 import NoteActions from "./NoteActions.jsx";
 
-export default function LongformCard({ event, profiles, onOpen, onOpenProfile, delay, ...noteActionProps }) {
+export default function LongformCard({ event, profiles, onOpen, onOpenProfile, delay, additionalEventIds, ...noteActionProps }) {
   const art = parseArticle(event);
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
@@ -63,7 +63,7 @@ export default function LongformCard({ event, profiles, onOpen, onOpenProfile, d
               </div>
             </div>
           </div>
-      <NoteActions event={event} profiles={profiles} {...noteActionProps} />
+      <NoteActions event={event} profiles={profiles} additionalEventIds={additionalEventIds} {...noteActionProps} />
     </div>
     {jsonOpen && <NoteJsonModal event={event} onClose={() => setJsonOpen(false)} />}
     </>

@@ -18,10 +18,22 @@ export default function NoteActions({
   onRequestModal, onDismissModal,
   sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail,
   customEmojis,
+  additionalEventIds = [],
 }) {
-  const reactions    = getLocalReactions?.(event.id) ?? [];
-  const rCount       = replyCount(event.id, allEvents);
-  const localZaps    = getLocalZaps?.(event.id) ?? [];
+  const primaryReactions = getLocalReactions?.(event.id) ?? [];
+  const reactions = additionalEventIds.length === 0 ? primaryReactions : (() => {
+    const seen = new Set(primaryReactions.map(r => r.id).filter(Boolean));
+    const extra = additionalEventIds.flatMap(id => (getLocalReactions?.(id) ?? []).filter(r => !r.id || !seen.has(r.id)));
+    return [...primaryReactions, ...extra];
+  })();
+  const rCount = replyCount(event.id, allEvents)
+    + (additionalEventIds.length ? additionalEventIds.reduce((s, id) => s + replyCount(id, allEvents), 0) : 0);
+  const primaryZaps = getLocalZaps?.(event.id) ?? [];
+  const localZaps = additionalEventIds.length === 0 ? primaryZaps : (() => {
+    const seen = new Set(primaryZaps.map(z => z.id).filter(Boolean));
+    const extra = additionalEventIds.flatMap(id => (getLocalZaps?.(id) ?? []).filter(z => !z.id || !seen.has(z.id)));
+    return [...primaryZaps, ...extra].sort((a, b) => b.amount - a.amount);
+  })();
   const myReaction   = reactions.find(r => (r.pk ?? r) === myPubkey);
 
   const [reaction,     setReaction]     = useState(myReaction?.emoji || null);
@@ -148,7 +160,7 @@ export default function NoteActions({
             onMouseDown={e => { e.stopPropagation(); const t = setTimeout(() => { haptic.longPress(); openModal(<ComposeSheet quotedEvent={event} profiles={profiles} myPubkey={myPubkey} myProfile={myProfile} events={allEvents} publishEvent={publishEvent} onPrepend={onPrepend} onDismiss={dismiss} customEmojis={customEmojis} />); }, 600); window.addEventListener("mouseup", () => clearTimeout(t), { once: true }); }}
             onTouchStart={e => { e.stopPropagation(); const t = setTimeout(() => { haptic.longPress(); openModal(<ComposeSheet quotedEvent={event} profiles={profiles} myPubkey={myPubkey} myProfile={myProfile} events={allEvents} publishEvent={publishEvent} onPrepend={onPrepend} onDismiss={dismiss} customEmojis={customEmojis} />); }, 600); window.addEventListener("touchend", () => clearTimeout(t), { once: true }); }}
           >
-            <Rpi />{repostAndQuoteCount(event.id, allEvents) || ""}
+            <Rpi />{(repostAndQuoteCount(event.id, allEvents) + additionalEventIds.reduce((s, id) => s + repostAndQuoteCount(id, allEvents), 0)) || ""}
           </button>
           <button className={`action-btn${isBookmarked?.(event) ? " saved" : ""}`}
             onClick={e => { e.stopPropagation(); onBookmark?.(event); }}>

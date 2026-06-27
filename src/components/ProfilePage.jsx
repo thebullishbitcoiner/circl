@@ -678,12 +678,23 @@ export default function ProfilePage({
     [theirEvents]
   );
 
-  const articles = useMemo(
-    () => mergedEvents
-      .filter(e => e.pubkey === pubkey && e.kind === 30023)
-      .sort((a, b) => b.created_at - a.created_at),
-    [mergedEvents, pubkey]
-  );
+  const articles = useMemo(() => {
+    const byDTag = new Map();
+    for (const e of mergedEvents) {
+      if (e.pubkey !== pubkey || e.kind !== 30023) continue;
+      const d = e.tags.find(t => t[0] === "d")?.[1] ?? "";
+      if (!byDTag.has(d)) byDTag.set(d, []);
+      byDTag.get(d).push(e);
+    }
+    const result = [];
+    for (const versions of byDTag.values()) {
+      versions.sort((a, b) => b.created_at - a.created_at);
+      const latest = versions[0];
+      const olderIds = versions.slice(1).map(v => v.id);
+      result.push(olderIds.length ? { ...latest, _olderIds: olderIds } : latest);
+    }
+    return result.sort((a, b) => b.created_at - a.created_at);
+  }, [mergedEvents, pubkey]);
 
   const highlights = useMemo(
     () => mergedEvents
@@ -999,6 +1010,7 @@ export default function ProfilePage({
                 <LongformCard
                   key={e.id}
                   event={e}
+                  additionalEventIds={e._olderIds ?? []}
                   profiles={profiles}
                   onOpen={onOpenArticle}
                   onOpenProfile={onOpenProfile}
