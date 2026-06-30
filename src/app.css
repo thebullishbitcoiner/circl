@@ -268,6 +268,36 @@
   .podcast-preview-host{font-size:11px;color:var(--text-faint);margin-bottom:3px;text-transform:lowercase;}
   .podcast-preview-title{font-size:13px;font-weight:500;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
   .podcast-preview-skel{height:64px;border:1px solid var(--border);border-radius:10px;background:var(--surface);animation:lp-pulse 1.4s ease-in-out infinite;margin-top:2px;}
+  /* Podcasts tab */
+  .podcast-show-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 12px 20px;}
+  .podcast-show-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer;position:relative;}
+  .podcast-show-card:active{opacity:.85;}
+  .podcast-show-art{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;}
+  .podcast-show-art-placeholder{width:100%;aspect-ratio:1/1;background:var(--surface2);display:block;}
+  .podcast-show-info{padding:8px 10px 10px;}
+  .podcast-show-title{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .podcast-show-desc{font-size:12px;color:var(--text-muted);margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .podcast-back-row{display:flex;align-items:center;gap:10px;padding:10px 12px 4px;font-size:14px;font-weight:500;color:var(--text);}
+  .podcast-back-btn{background:none;border:none;cursor:pointer;color:var(--accent);font-size:14px;padding:0;}
+  .podcast-section-label{padding:10px 12px 4px;font-size:11px;font-weight:600;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em;}
+  .podcast-episode-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);position:relative;cursor:pointer;}
+  .podcast-episode-row:active{background:var(--surface2);}
+  .podcast-episode-art{flex-shrink:0;width:48px;height:48px;border-radius:6px;object-fit:cover;}
+  .podcast-episode-art-placeholder{flex-shrink:0;width:48px;height:48px;border-radius:6px;background:var(--surface2);}
+  .podcast-episode-info{flex:1;min-width:0;}
+  .podcast-episode-title{font-size:14px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .podcast-episode-date{font-size:12px;color:var(--text-faint);margin-top:2px;}
+  .podcast-play-btn{flex-shrink:0;width:36px;height:36px;border-radius:50%;border:1.5px solid var(--accent);background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--accent);}
+  .podcast-play-btn.playing{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .podcast-player-bar{position:sticky;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);padding:8px 12px;display:flex;align-items:center;gap:10px;z-index:10;}
+  .podcast-player-art{width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0;}
+  .podcast-player-info{flex:1;min-width:0;}
+  .podcast-player-title{font-size:13px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .podcast-player-show{font-size:11px;color:var(--text-faint);}
+  .podcast-player-controls{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:110px;}
+  .podcast-player-seek{width:100%;accent-color:var(--accent);cursor:pointer;}
+  .podcast-player-time{font-size:10px;color:var(--text-faint);}
+  .podcast-player-close{flex-shrink:0;background:none;border:none;cursor:pointer;color:var(--text-faint);font-size:20px;line-height:1;padding:0 4px;}
   .live-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;letter-spacing:.04em;color:#ef4444;background:rgba(239,68,68,.12);border-radius:4px;padding:1px 5px;margin-right:4px;vertical-align:middle;text-transform:uppercase;}
   .live-badge::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:#ef4444;animation:lp-pulse 1.5s ease-in-out infinite;}
   .lightning-card{display:flex;align-items:center;gap:12px;border:1px solid var(--border);border-left:3px solid #f7931a;border-radius:10px;padding:16px 14px;background:var(--surface);margin-top:8px;min-width:0;overflow:hidden;}

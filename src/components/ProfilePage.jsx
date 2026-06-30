@@ -28,6 +28,9 @@ import PollInline from "./PollInline.jsx";
 import useActiveStream from "../hooks/useActiveStream.js";
 import ListingCard from "./ListingCard.jsx";
 import ListingDetail from "./ListingDetail.jsx";
+import PodcastShowCard from "./PodcastShowCard.jsx";
+import PodcastEpisodeRow from "./PodcastEpisodeRow.jsx";
+import PodcastPlayer from "./PodcastPlayer.jsx";
 import CreateListingSheet from "./CreateListingSheet.jsx";
 import BadgeCard from "./BadgeCard.jsx";
 import BadgeDetail from "./BadgeDetail.jsx";
@@ -202,6 +205,16 @@ export default function ProfilePage({
   const [selectedBadge,      setSelectedBadge]      = useState(null);
   const [notAcceptedOpen,    setNotAcceptedOpen]    = useState(false);
 
+  const [podcastsLoading,      setPodcastsLoading]      = useState(false);
+  const [podcastShows,         setPodcastShows]         = useState([]);
+  const [directTracksLoading,  setDirectTracksLoading]  = useState(false);
+  const [directTracks,         setDirectTracks]         = useState([]);
+  const [selectedPodcast,      setSelectedPodcast]      = useState(null);
+  const [podcastEpisodes,      setPodcastEpisodes]      = useState([]);
+  const [episodesLoading,      setEpisodesLoading]      = useState(false);
+  const [playingEpisode,       setPlayingEpisode]       = useState(null);
+  const podcastsFetchedRef = useRef(false);
+
   const handleBadgeAccept = async (awardEvent) => {
     const aTag = awardEvent.tags?.find(t => t[0] === "a")?.[1];
     if (!aTag) return;
@@ -310,6 +323,12 @@ export default function ProfilePage({
     setBadgesLoading(false);
     setSelectedBadge(null);
     setNotAcceptedOpen(false);
+    setPodcastShows([]);
+    setDirectTracks([]);
+    setSelectedPodcast(null);
+    setPodcastEpisodes([]);
+    setPlayingEpisode(null);
+    podcastsFetchedRef.current = false;
   }, [pubkey]);
 
   useEffect(() => {
@@ -588,6 +607,111 @@ export default function ProfilePage({
     };
   }, [pubkey, isOwn]);
 
+  // Podcasts: lazy-load shows + direct tracks when the podcasts tab is first opened
+  useEffect(() => {
+    if (!pubkey || tab !== "podcasts" || podcastsFetchedRef.current) return;
+    podcastsFetchedRef.current = true;
+    let cancelled = false;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+
+    // 1. NIP-F4 show structure: kind 10064 → podcast pubkeys → kind 10154 metadata
+    setPodcastsLoading(true);
+    pool.request(relayUrls, [{ kinds: [10064], authors: [pubkey], limit: 1 }]).subscribe({
+      next: raw => {
+        if (cancelled) return;
+        const podcastPubkeys = raw.tags?.filter(t => t[0] === "p" && t[1]).map(t => t[1]) ?? [];
+        if (!podcastPubkeys.length) { setPodcastsLoading(false); return; }
+        const pending = new Set(podcastPubkeys);
+        podcastPubkeys.forEach(pk => {
+          pool.request(relayUrls, [{ kinds: [10154], authors: [pk], limit: 1 }]).subscribe({
+            next: meta => {
+              if (cancelled) return;
+              try { eventStore.add(meta); } catch {}
+              setPodcastShows(prev => prev.some(s => s.pubkey === pk) ? prev : [...prev, { pubkey: pk, meta }]);
+            },
+            complete: () => { pending.delete(pk); if (!cancelled && pending.size === 0) setPodcastsLoading(false); },
+            error:    () => { pending.delete(pk); if (!cancelled && pending.size === 0) setPodcastsLoading(false); },
+          });
+        });
+      },
+      complete: () => { if (!cancelled) setPodcastsLoading(false); },
+      error:    () => { if (!cancelled) setPodcastsLoading(false); },
+    });
+
+    // 2. Direct audio: kind 54 episodes + kind 1063 audio files from the profile pubkey itself
+    setDirectTracksLoading(true);
+    const directAccum = [];
+    let directPending = 2;
+    const directFinalize = () => {
+      if (--directPending > 0) return;
+      if (cancelled) return;
+      directAccum.sort((a, b) => b.created_at - a.created_at);
+      setDirectTracks(directAccum);
+      setDirectTracksLoading(false);
+    };
+    pool.request(relayUrls, [{ kinds: [54], authors: [pubkey], limit: 100 }]).subscribe({
+      next: raw => {
+        if (cancelled) return;
+        try { eventStore.add(raw); } catch {}
+        if (!directAccum.some(e => e.id === raw.id)) directAccum.push(raw);
+      },
+      complete: directFinalize,
+      error:    directFinalize,
+    });
+    pool.request(relayUrls, [{ kinds: [1063], authors: [pubkey], limit: 100 }]).subscribe({
+      next: raw => {
+        if (cancelled) return;
+        const mime = raw.tags?.find(t => t[0] === "m")?.[1] ?? "";
+        if (!mime.startsWith("audio/")) return;
+        try { eventStore.add(raw); } catch {}
+        if (!directAccum.some(e => e.id === raw.id)) directAccum.push(raw);
+      },
+      complete: directFinalize,
+      error:    directFinalize,
+    });
+
+    return () => { cancelled = true; };
+  }, [pubkey, tab]);
+
+  // Podcasts: load episodes (kind 54) and audio tracks (kind 1063) when a show is selected
+  useEffect(() => {
+    if (!selectedPodcast?.pubkey) return;
+    let cancelled = false;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    setPodcastEpisodes([]);
+    setEpisodesLoading(true);
+    const accumulated = [];
+    let pending = 2;
+    const finalize = () => {
+      if (--pending > 0) return;
+      if (cancelled) return;
+      accumulated.sort((a, b) => b.created_at - a.created_at);
+      setPodcastEpisodes(accumulated);
+      setEpisodesLoading(false);
+    };
+    pool.request(relayUrls, [{ kinds: [54], authors: [selectedPodcast.pubkey], limit: 100 }]).subscribe({
+      next: raw => {
+        if (cancelled) return;
+        try { eventStore.add(raw); } catch {}
+        if (!accumulated.some(e => e.id === raw.id)) accumulated.push(raw);
+      },
+      complete: finalize,
+      error: finalize,
+    });
+    pool.request(relayUrls, [{ kinds: [1063], authors: [selectedPodcast.pubkey], limit: 100 }]).subscribe({
+      next: raw => {
+        if (cancelled) return;
+        const mime = raw.tags?.find(t => t[0] === "m")?.[1] ?? "";
+        if (!mime.startsWith("audio/")) return;
+        try { eventStore.add(raw); } catch {}
+        if (!accumulated.some(e => e.id === raw.id)) accumulated.push(raw);
+      },
+      complete: finalize,
+      error: finalize,
+    });
+    return () => { cancelled = true; };
+  }, [selectedPodcast]);
+
   // Content subscriptions — articles, highlights, listings — re-run when the
   // profile's outbox relays become known so data from the author's preferred
   // relays is included even if those relays aren't in the user's pool.
@@ -629,7 +753,7 @@ export default function ProfilePage({
     const listingsSub = req([{ kinds: listingKinds, authors: [pubkey], limit: 100 }]).subscribe({
       next: raw => {
         if (cancelled) return;
-        eventStore.add(raw);
+        try { eventStore.add(raw); } catch {}
         setListingEvents(prev => prev.some(e => e.id === raw.id) ? prev : [...prev, raw]);
       },
       complete: () => { if (!cancelled) setListingsLoading(false); },
@@ -918,6 +1042,9 @@ export default function ProfilePage({
         <div className={`profile-stat ${tab === "goals" ? "active" : ""}`} onClick={() => switchTab("goals")}>
           <div className="profile-stat-label">Goals</div>
         </div>
+        <div className={`profile-stat ${tab === "podcasts" ? "active" : ""}`} onClick={() => switchTab("podcasts")}>
+          <div className="profile-stat-label">Podcasts</div>
+        </div>
       </div>
 
       {/* Notes tab */}
@@ -1128,6 +1255,85 @@ export default function ProfilePage({
                   delay={0}
                 />
             )
+      )}
+
+      {/* Podcasts tab */}
+      {tab === "podcasts" && (
+        selectedPodcast ? (
+          <>
+            <div className="podcast-back-row">
+              <button
+                type="button"
+                className="podcast-back-btn"
+                onClick={() => { setSelectedPodcast(null); setPodcastEpisodes([]); }}
+              >
+                ← Back
+              </button>
+              <span>{selectedPodcast.meta?.tags?.find(t => t[0] === "title")?.[1] ?? "Podcast"}</span>
+            </div>
+            {episodesLoading && podcastEpisodes.length === 0
+              ? [0, 1, 2].map(i => <SkelCard key={i} />)
+              : podcastEpisodes.length === 0
+                ? <div className="empty-state"><div className="empty-state-title">No episodes yet</div><div className="empty-state-sub">Episodes will appear here when published</div></div>
+                : podcastEpisodes.map(e => (
+                    <PodcastEpisodeRow
+                      key={e.id}
+                      event={e}
+                      showArt={selectedPodcast.meta?.tags?.find(t => t[0] === "image")?.[1] ?? null}
+                      onPlay={() => setPlayingEpisode(e)}
+                      isPlaying={playingEpisode?.id === e.id}
+                      profiles={profiles}
+                      onOpenProfile={onOpenProfile}
+                    />
+                  ))
+            }
+          </>
+        ) : (() => {
+          const stillLoading = (podcastsLoading && podcastShows.length === 0) || (directTracksLoading && directTracks.length === 0);
+          const hasShows     = podcastShows.length > 0;
+          const hasTracks    = directTracks.length > 0;
+          if (stillLoading && !hasShows && !hasTracks) return [0, 1, 2].map(i => <SkelCard key={i} />);
+          if (!hasShows && !hasTracks) return (
+            <div className="empty-state">
+              <div className="empty-state-title">No podcasts yet</div>
+              <div className="empty-state-sub">Podcast shows and audio tracks will appear here</div>
+            </div>
+          );
+          return (
+            <>
+              {hasShows && (
+                <div className="podcast-show-grid">
+                  {podcastShows.map(({ pubkey: pk, meta }) => (
+                    <PodcastShowCard
+                      key={pk}
+                      showMeta={meta}
+                      podcastPubkey={pk}
+                      profiles={profiles}
+                      onSelect={setSelectedPodcast}
+                      onOpenProfile={onOpenProfile}
+                    />
+                  ))}
+                </div>
+              )}
+              {hasTracks && (
+                <>
+                  {hasShows && <div className="podcast-section-label">Tracks</div>}
+                  {directTracks.map(e => (
+                    <PodcastEpisodeRow
+                      key={e.id}
+                      event={e}
+                      showArt={null}
+                      onPlay={() => setPlayingEpisode(e)}
+                      isPlaying={playingEpisode?.id === e.id}
+                      profiles={profiles}
+                      onOpenProfile={onOpenProfile}
+                    />
+                  ))}
+                </>
+              )}
+            </>
+          );
+        })()
       )}
 
       {/* Listings tab */}
@@ -1344,6 +1550,15 @@ export default function ProfilePage({
           index={0}
           onClose={() => setLightboxUrl(null)}
           onIndexChange={() => {}}
+        />
+      )}
+
+      {/* Podcast mini-player — rendered outside tab block so it persists on tab switch */}
+      {playingEpisode && (
+        <PodcastPlayer
+          episode={playingEpisode}
+          showMeta={selectedPodcast?.meta ?? null}
+          onClose={() => setPlayingEpisode(null)}
         />
       )}
 
