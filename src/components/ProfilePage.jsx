@@ -213,7 +213,7 @@ export default function ProfilePage({
   const [podcastEpisodes,      setPodcastEpisodes]      = useState([]);
   const [episodesLoading,      setEpisodesLoading]      = useState(false);
   const podcastsFetchedRef = useRef(false);
-  const { playingEpisode, setPlayingEpisode, setPlayingShowMeta } = useAudio();
+  const { playingEpisode, setPlayingEpisode, setPlayingShowMeta, isPlaying: audioIsPlaying } = useAudio();
 
   const handleBadgeAccept = async (awardEvent) => {
     const aTag = awardEvent.tags?.find(t => t[0] === "a")?.[1];
@@ -1292,7 +1292,7 @@ export default function ProfilePage({
                       event={e}
                       showArt={selectedPodcast.meta?.tags?.find(t => t[0] === "image")?.[1] ?? null}
                       onPlay={() => { setPlayingEpisode(e); setPlayingShowMeta(selectedPodcast.meta ?? null); }}
-                      isPlaying={playingEpisode?.id === e.id}
+                      isPlaying={playingEpisode?.id === e.id && audioIsPlaying}
                       profiles={profiles}
                       onOpenProfile={onOpenProfile}
                     />
@@ -1335,7 +1335,7 @@ export default function ProfilePage({
                       event={e}
                       showArt={null}
                       onPlay={() => { setPlayingEpisode(e); setPlayingShowMeta(null); }}
-                      isPlaying={playingEpisode?.id === e.id}
+                      isPlaying={playingEpisode?.id === e.id && audioIsPlaying}
                       profiles={profiles}
                       onOpenProfile={onOpenProfile}
                     />

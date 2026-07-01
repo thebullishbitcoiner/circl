@@ -34,39 +34,39 @@ export default function AudioPlayer() {
         />
       )}
 
+      <button
+        type="button"
+        className="audio-play-btn"
+        style={{ border: "none", background: "none", color: "var(--text)", width: 32, height: 32, flexShrink: 0 }}
+        onClick={togglePlay}
+        aria-label={isPlaying ? "Pause" : "Play"}
+      >
+        {isPlaying ? (
+          <svg width={16} height={16} viewBox="0 0 24 24" fill="currentColor">
+            <rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" />
+          </svg>
+        ) : (
+          <svg width={16} height={16} viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5,3 19,12 5,21" />
+          </svg>
+        )}
+      </button>
+
       <div className="audio-player-info">
         <div className="audio-player-title">{title}</div>
         {subtitle && <div className="audio-player-subtitle">{subtitle}</div>}
-      </div>
-
-      <div className="audio-player-controls">
-        <button
-          type="button"
-          className="audio-play-btn"
-          style={{ border: "none", background: "none", color: "var(--text)", width: 32, height: 32 }}
-          onClick={togglePlay}
-          aria-label={isPlaying ? "Pause" : "Play"}
-        >
-          {isPlaying ? (
-            <svg width={16} height={16} viewBox="0 0 24 24" fill="currentColor">
-              <rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" />
-            </svg>
-          ) : (
-            <svg width={16} height={16} viewBox="0 0 24 24" fill="currentColor">
-              <polygon points="5,3 19,12 5,21" />
-            </svg>
-          )}
-        </button>
-        <input
-          type="range"
-          className="audio-player-seek"
-          min={0}
-          max={isFinite(duration) && duration > 0 ? duration : 0}
-          step={1}
-          value={currentTime}
-          onChange={e => seekTo(Number(e.target.value))}
-        />
-        <div className="audio-player-time">{fmtTime(currentTime)} / {fmtTime(duration)}</div>
+        <div className="audio-player-controls">
+          <input
+            type="range"
+            className="audio-player-seek"
+            min={0}
+            max={isFinite(duration) && duration > 0 ? duration : 0}
+            step={1}
+            value={currentTime}
+            onChange={e => seekTo(Number(e.target.value))}
+          />
+          <div className="audio-player-time">{fmtTime(currentTime)} / {fmtTime(duration)}</div>
+        </div>
       </div>
 
       <button type="button" className="audio-player-close" onClick={stop} aria-label="Close player">×</button>

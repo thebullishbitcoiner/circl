@@ -681,7 +681,7 @@ export default function App() {
                   onClick={() => setFloatingCompose(true)}
                   style={{
                     position: "absolute",
-                    bottom: isMobile ? "calc(var(--bottom-nav-h) + 16px)" : "20px",
+                    bottom: isMobile ? "calc(var(--bottom-nav-h) + var(--audio-bar-h, 0px) + 16px)" : "20px",
                     right: "18px",
                     width: 52, height: 52,
                     borderRadius: "50%",
