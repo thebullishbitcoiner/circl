@@ -8,6 +8,7 @@ import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
 import LightningCard from "./LightningCard.jsx";
 import { parseNoteMediaSegments, groupNoteMediaSegments, displayName, relativeTime, nip19, isHexPubkey, normPubkey, fmtSats, parseBolt11Msats, zapCommentFromKind9735, zapperPubkeyFromKind9735, firstLinkPreviewUrl, parseArticle } from "../utils.js";
 import LinkPreviewCard from "./LinkPreviewCard.jsx";
+import NoteAudioAttachment from "./NoteAudioAttachment.jsx";
 import PodcastPreviewChip from "./PodcastPreviewChip.jsx";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
@@ -589,6 +590,10 @@ export default function NoteContent({
         return null;
       })
     )}
+
+    {normalizedSegments.filter(s => s.type === "audio").map((seg, i) => (
+      <NoteAudioAttachment key={seg.url || i} url={seg.url} platform={seg.platform} />
+    ))}
 
     {embeddedRefs.map((ref, i) => {
       if (ref.type === "naddr") {

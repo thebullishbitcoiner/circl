@@ -349,6 +349,8 @@ export function zapperPubkeyFromKind9735(ev) {
 
 const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp|avif|svg)(\?|#|$)/i;
 const VIDEO_EXT_RE = /\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i;
+const AUDIO_EXT_RE = /\.(mp3|m4a|wav|flac|aac|opus|oga|wma)(\?|#|$)/i;
+const WAVLAKE_RE   = /(?:^|[./])wavlake\.com\/track\//i;
 
 /** Hosts that commonly serve images without a file extension in the path. */
 const IMAGE_HOST_RE =
@@ -359,14 +361,16 @@ export function trimMediaUrl(url) {
   return url.replace(/(?:[),.;:!?*»\]}]|[^\x00-\x7F])+$/, "");
 }
 
-/** @returns {"image"|"video"|null} */
+/** @returns {"image"|"video"|"audio"|"wavlake"|null} */
 export function classifyMediaUrl(url) {
   if (!url || !/^https?:\/\//i.test(url)) return null;
   if (/imgur\.com\/(gallery|a)\//i.test(url)) return null;
   const path = url.split("?")[0].toLowerCase();
   if (IMAGE_EXT_RE.test(path)) return "image";
   if (VIDEO_EXT_RE.test(path)) return "video";
+  if (AUDIO_EXT_RE.test(path)) return "audio";
   if (IMAGE_HOST_RE.test(url)) return "image";
+  if (WAVLAKE_RE.test(url)) return "wavlake";
   return null;
 }
 
@@ -431,6 +435,7 @@ export function parseNoteMediaSegments(raw) {
     const kind = classifyMediaUrl(url);
     if (kind === "image") segments.push({ type: "image", url });
     else if (kind === "video") segments.push({ type: "video", url });
+    else if (kind === "audio" || kind === "wavlake") segments.push({ type: "audio", url, platform: kind });
     else segments.push({ type: "text", value: rawUrl });
     if (suffix && kind) segments.push({ type: "text", value: suffix });
     last = m.index + rawUrl.length;

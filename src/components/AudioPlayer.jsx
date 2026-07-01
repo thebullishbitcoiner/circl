@@ -7,26 +7,26 @@ function fmtTime(secs) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function PodcastPlayer() {
+export default function AudioPlayer() {
   const { playingEpisode, playingShowMeta, isPlaying, currentTime, duration, togglePlay, seekTo, stop } = useAudio();
 
   if (!playingEpisode) return null;
 
-  const etags   = playingEpisode.tags ?? [];
-  const title   = etags.find(t => t[0] === "title")?.[1]
-               ?? etags.find(t => t[0] === "alt")?.[1]
-               ?? etags.find(t => t[0] === "name")?.[1]
-               ?? "Untitled";
-  const artUrl  = etags.find(t => t[0] === "image")?.[1]
-               ?? etags.find(t => t[0] === "thumb")?.[1]
-               ?? playingShowMeta?.tags?.find(t => t[0] === "image")?.[1] ?? null;
-  const showName = playingShowMeta?.tags?.find(t => t[0] === "title")?.[1] ?? null;
+  const etags    = playingEpisode.tags ?? [];
+  const title    = etags.find(t => t[0] === "title")?.[1]
+                ?? etags.find(t => t[0] === "alt")?.[1]
+                ?? etags.find(t => t[0] === "name")?.[1]
+                ?? "Untitled";
+  const artUrl   = etags.find(t => t[0] === "image")?.[1]
+                ?? etags.find(t => t[0] === "thumb")?.[1]
+                ?? playingShowMeta?.tags?.find(t => t[0] === "image")?.[1] ?? null;
+  const subtitle = playingShowMeta?.tags?.find(t => t[0] === "title")?.[1] ?? null;
 
   return (
-    <div className="podcast-player-bar">
+    <div className="audio-player-bar">
       {artUrl && (
         <img
-          className="podcast-player-art"
+          className="audio-player-art"
           src={artUrl}
           alt=""
           referrerPolicy="no-referrer"
@@ -34,15 +34,15 @@ export default function PodcastPlayer() {
         />
       )}
 
-      <div className="podcast-player-info">
-        <div className="podcast-player-title">{title}</div>
-        {showName && <div className="podcast-player-show">{showName}</div>}
+      <div className="audio-player-info">
+        <div className="audio-player-title">{title}</div>
+        {subtitle && <div className="audio-player-subtitle">{subtitle}</div>}
       </div>
 
-      <div className="podcast-player-controls">
+      <div className="audio-player-controls">
         <button
           type="button"
-          className="podcast-play-btn"
+          className="audio-play-btn"
           style={{ border: "none", background: "none", color: "var(--text)", width: 32, height: 32 }}
           onClick={togglePlay}
           aria-label={isPlaying ? "Pause" : "Play"}
@@ -59,17 +59,17 @@ export default function PodcastPlayer() {
         </button>
         <input
           type="range"
-          className="podcast-player-seek"
+          className="audio-player-seek"
           min={0}
           max={isFinite(duration) && duration > 0 ? duration : 0}
           step={1}
           value={currentTime}
           onChange={e => seekTo(Number(e.target.value))}
         />
-        <div className="podcast-player-time">{fmtTime(currentTime)} / {fmtTime(duration)}</div>
+        <div className="audio-player-time">{fmtTime(currentTime)} / {fmtTime(duration)}</div>
       </div>
 
-      <button type="button" className="podcast-player-close" onClick={stop} aria-label="Close player">×</button>
+      <button type="button" className="audio-player-close" onClick={stop} aria-label="Close player">×</button>
     </div>
   );
 }

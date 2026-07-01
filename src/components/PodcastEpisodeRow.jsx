@@ -65,7 +65,6 @@ export default function PodcastEpisodeRow({ event, showArt, onPlay, isPlaying })
   const [jsonOpen, setJsonOpen] = useState(false);
 
   const tags     = event.tags ?? [];
-  // kind 54 uses "title"/"image"/"audio"; kind 1063 uses "alt"/"name"/"thumb"/"url"
   const title    = tags.find(t => t[0] === "title")?.[1]
                 ?? tags.find(t => t[0] === "alt")?.[1]
                 ?? tags.find(t => t[0] === "name")?.[1]
@@ -104,7 +103,7 @@ export default function PodcastEpisodeRow({ event, showArt, onPlay, isPlaying })
         </div>
         <button
           type="button"
-          className={`podcast-play-btn${isPlaying ? " playing" : ""}`}
+          className={`audio-play-btn${isPlaying ? " playing" : ""}`}
           onClick={e => { e.stopPropagation(); onPlay?.(); }}
           aria-label={isPlaying ? "Pause" : "Play"}
         >

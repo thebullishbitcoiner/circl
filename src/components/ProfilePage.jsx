@@ -30,7 +30,7 @@ import ListingCard from "./ListingCard.jsx";
 import ListingDetail from "./ListingDetail.jsx";
 import PodcastShowCard from "./PodcastShowCard.jsx";
 import PodcastEpisodeRow from "./PodcastEpisodeRow.jsx";
-import PodcastPlayer from "./PodcastPlayer.jsx";
+import { useAudio } from "../contexts/AudioContext.jsx";
 import CreateListingSheet from "./CreateListingSheet.jsx";
 import BadgeCard from "./BadgeCard.jsx";
 import BadgeDetail from "./BadgeDetail.jsx";
@@ -212,8 +212,8 @@ export default function ProfilePage({
   const [selectedPodcast,      setSelectedPodcast]      = useState(null);
   const [podcastEpisodes,      setPodcastEpisodes]      = useState([]);
   const [episodesLoading,      setEpisodesLoading]      = useState(false);
-  const [playingEpisode,       setPlayingEpisode]       = useState(null);
   const podcastsFetchedRef = useRef(false);
+  const { playingEpisode, setPlayingEpisode, setPlayingShowMeta } = useAudio();
 
   const handleBadgeAccept = async (awardEvent) => {
     const aTag = awardEvent.tags?.find(t => t[0] === "a")?.[1];
@@ -327,7 +327,6 @@ export default function ProfilePage({
     setDirectTracks([]);
     setSelectedPodcast(null);
     setPodcastEpisodes([]);
-    setPlayingEpisode(null);
     podcastsFetchedRef.current = false;
   }, [pubkey]);
 
@@ -614,28 +613,40 @@ export default function ProfilePage({
     let cancelled = false;
     const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
 
-    // 1. NIP-F4 show structure: kind 10064 → podcast pubkeys → kind 10154 metadata
+    // 1. NIP-F4 show structure: fetch kind 10154 from the profile pubkey itself,
+    //    and also via kind 10064 → declared podcast pubkeys → kind 10154 metadata
     setPodcastsLoading(true);
+    let showsPending = 1; // tracks outstanding requests before we can clear loading
+    const showsFinalize = () => { if (!cancelled && --showsPending === 0) setPodcastsLoading(false); };
+    const addShow = (pk, meta) => {
+      if (cancelled) return;
+      try { eventStore.add(meta); } catch {}
+      setPodcastShows(prev => prev.some(s => s.pubkey === pk) ? prev : [...prev, { pubkey: pk, meta }]);
+    };
+    // Direct: profile pubkey itself may be a podcast (no kind 10064 required)
+    pool.request(relayUrls, [{ kinds: [10154], authors: [pubkey], limit: 1 }]).subscribe({
+      next: meta => addShow(pubkey, meta),
+      complete: showsFinalize,
+      error:    showsFinalize,
+    });
+    // Via kind 10064: declared separate podcast pubkeys
+    showsPending++;
     pool.request(relayUrls, [{ kinds: [10064], authors: [pubkey], limit: 1 }]).subscribe({
       next: raw => {
         if (cancelled) return;
         const podcastPubkeys = raw.tags?.filter(t => t[0] === "p" && t[1]).map(t => t[1]) ?? [];
-        if (!podcastPubkeys.length) { setPodcastsLoading(false); return; }
-        const pending = new Set(podcastPubkeys);
+        if (!podcastPubkeys.length) return;
+        showsPending += podcastPubkeys.length;
         podcastPubkeys.forEach(pk => {
           pool.request(relayUrls, [{ kinds: [10154], authors: [pk], limit: 1 }]).subscribe({
-            next: meta => {
-              if (cancelled) return;
-              try { eventStore.add(meta); } catch {}
-              setPodcastShows(prev => prev.some(s => s.pubkey === pk) ? prev : [...prev, { pubkey: pk, meta }]);
-            },
-            complete: () => { pending.delete(pk); if (!cancelled && pending.size === 0) setPodcastsLoading(false); },
-            error:    () => { pending.delete(pk); if (!cancelled && pending.size === 0) setPodcastsLoading(false); },
+            next: meta => addShow(pk, meta),
+            complete: showsFinalize,
+            error:    showsFinalize,
           });
         });
       },
-      complete: () => { if (!cancelled) setPodcastsLoading(false); },
-      error:    () => { if (!cancelled) setPodcastsLoading(false); },
+      complete: showsFinalize,
+      error:    showsFinalize,
     });
 
     // 2. Direct audio: kind 54 episodes + kind 1063 audio files from the profile pubkey itself
@@ -1280,7 +1291,7 @@ export default function ProfilePage({
                       key={e.id}
                       event={e}
                       showArt={selectedPodcast.meta?.tags?.find(t => t[0] === "image")?.[1] ?? null}
-                      onPlay={() => setPlayingEpisode(e)}
+                      onPlay={() => { setPlayingEpisode(e); setPlayingShowMeta(selectedPodcast.meta ?? null); }}
                       isPlaying={playingEpisode?.id === e.id}
                       profiles={profiles}
                       onOpenProfile={onOpenProfile}
@@ -1323,7 +1334,7 @@ export default function ProfilePage({
                       key={e.id}
                       event={e}
                       showArt={null}
-                      onPlay={() => setPlayingEpisode(e)}
+                      onPlay={() => { setPlayingEpisode(e); setPlayingShowMeta(null); }}
                       isPlaying={playingEpisode?.id === e.id}
                       profiles={profiles}
                       onOpenProfile={onOpenProfile}
@@ -1550,15 +1561,6 @@ export default function ProfilePage({
           index={0}
           onClose={() => setLightboxUrl(null)}
           onIndexChange={() => {}}
-        />
-      )}
-
-      {/* Podcast mini-player — rendered outside tab block so it persists on tab switch */}
-      {playingEpisode && (
-        <PodcastPlayer
-          episode={playingEpisode}
-          showMeta={selectedPodcast?.meta ?? null}
-          onClose={() => setPlayingEpisode(null)}
         />
       )}
 

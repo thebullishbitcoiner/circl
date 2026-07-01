@@ -73,6 +73,9 @@ import ZapGoalPage from "./components/ZapGoalPage.jsx";
 import Avatar from "./components/Avatar.jsx";
 import NoteContent from "./components/NoteContent.jsx";
 import { SbHome, SbBell, SbBook, SbZap, SbSearch, SbWallet, NavHome, NavBell, NavBook, NavZap, NavSearch, NavWallet, Bk } from "./components/icons.jsx";
+import { AudioProvider, useAudio } from "./contexts/AudioContext.jsx";
+import AudioPlayer from "./components/AudioPlayer.jsx";
+import AudioPlayerCard from "./components/AudioPlayerCard.jsx";
 export default function App() {
   const { pubkey, status, error, login, logout, signAndPublish } = useAuth();
   const { follows, loading: fl, follow: followPk, unfollow: unfollowPk, refresh: refreshFollows } = useFollows({ pubkey, signAndPublish });
@@ -453,6 +456,7 @@ export default function App() {
   }
 
   return (
+    <AudioProvider>
     <DraftsProvider pubkey={pubkey} signAndPublish={signAndPublish}>
     <NavigationContext.Provider value={{
       onOpenThread: handleOpenThread,
@@ -1369,6 +1373,7 @@ export default function App() {
             </div>
 
             <div className="right-panel">
+              <AudioPlayerCard />
               <RelaysCard profilePubkey={viewedProfilePubkey} />
               {topEntry?.type === "thread" && (
                 <ParticipantsCard
@@ -1471,8 +1476,23 @@ export default function App() {
       )}
 
       <div className={`toast ${toast.show ? "show" : ""}`}>{toast.msg}</div>
+      <GlobalAudioPlayer />
     </>
     </NavigationContext.Provider>
     </DraftsProvider>
+    </AudioProvider>
   );
+}
+
+function GlobalAudioPlayer() {
+  const { playingEpisode } = useAudio();
+
+  useEffect(() => {
+    const h = playingEpisode ? "72px" : "0px";
+    document.documentElement.style.setProperty("--audio-bar-h", h);
+    return () => document.documentElement.style.setProperty("--audio-bar-h", "0px");
+  }, [playingEpisode]);
+
+  // The bar is shown on mobile only (CSS hides it on desktop where the sidebar card is used)
+  return <AudioPlayer />;
 }
