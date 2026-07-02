@@ -666,7 +666,7 @@ export default function App() {
                 )}
               </div>
               {activeNav === "search" && (
-                <div style={{ flex: 1, width: "100%", overflow: "hidden", display: "flex" }}>
+                <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
                   <SearchPage
                     profiles={profiles}
                     onOpenProfile={handleOpenProfile}

@@ -30,7 +30,8 @@ function groupItems(items) {
   const seen = new Map();
   const result = [];
   for (const ev of items) {
-    const targetId = ev.tags?.find(t => t[0] === "e")?.[1];
+    const eTags = ev.tags?.filter(t => t[0] === "e") ?? [];
+    const targetId = eTags[eTags.length - 1]?.[1];
     if ((ev.kind === 7 || ev.kind === 6 || ev.kind === 1018) && targetId) {
       const key = `${ev.kind}:${targetId}`;
       if (seen.has(key)) {

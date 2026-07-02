@@ -29,6 +29,15 @@ function decodeNostrRef(raw) {
 // then "1" (bech32 separator), then 30+ bech32 data chars.
 const BECH32_GARBAGE_RE = /^[^\s1]{0,12}1[023456789acdefghjklmnpqrstuvwxyz]{30,}/;
 
+// Common TLDs used to detect bare URLs (no protocol) like "example.com" or "github.com/path".
+const _TLD = "com|net|org|io|co|app|dev|xyz|me|info|biz|gov|edu|tv|fm|gg|ai|so|uk|us|ca|au|de|fr|jp|br|ru|in|it|nl|es|pl|se|no|fi|ch|be|nz|mx|sg|hk|za|ae|ng|ke|ly|sh|social|media|news";
+const _BARE = `(?:www\\.[^\\s<>'"]+|[a-zA-Z0-9][a-zA-Z0-9.-]*\\.(?:${_TLD})[^\\s<>'"]*)`;
+const SPLIT_RE = new RegExp(
+  `(https?://[^\\s<>'"]+|(?<!\\S)${_BARE}|nostr:(?:npub1|nprofile1)[023456789acdefghjklmnpqrstuvwxyz]+|#[a-zA-Z0-9][a-zA-Z0-9_]+|(?<!\\S)@\\S+|:[a-zA-Z0-9_]+:)`,
+  "gi"
+);
+const BARE_URL_RE = new RegExp(`^(?:www\\.|[a-zA-Z0-9][a-zA-Z0-9.-]*\\.(?:${_TLD}))`, "i");
+
 // Order matters: ***bold-italic*** before **bold** before *italic*, all before single *.
 // Excludes newlines and delimiter chars inside spans to prevent runaway matches.
 const INLINE_MD_RE = /(\*\*\*[^*\n]+\*\*\*|\*\*[^*\n]+\*\*|~~[^~\n]+~~|`[^`\n]+`|\*[^*\n]+\*)/g;
@@ -60,7 +69,7 @@ function applyInlineMarkdown(text, keyPrefix) {
 }
 
 export default function NoteText({ content, profiles, onOpenProfile, onOpenHashtag, customEmojis, className = "note-text", style = {} }) {
-  const parts = content.split(/(https?:\/\/[^\s<>'"]+|nostr:(?:npub1|nprofile1)[023456789acdefghjklmnpqrstuvwxyz]+|#[a-zA-Z0-9][a-zA-Z0-9_]+|@\S+|:[a-zA-Z0-9_]+:)/gi);
+  const parts = content.split(SPLIT_RE);
 
   const handleMention = mention => {
     if (!onOpenProfile) return;
@@ -113,7 +122,16 @@ export default function NoteText({ content, profiles, onOpenProfile, onOpenHasht
       const href = trimUrlToken(part);
       elements.push(
         <a key={i} className="note-link" href={href} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-          {href}
+          {href.replace(/^https?:\/\//, "")}
+        </a>
+      );
+      prevWasDecodedNostr = false;
+
+    } else if (BARE_URL_RE.test(part)) {
+      const display = trimUrlToken(part);
+      elements.push(
+        <a key={i} className="note-link" href={`https://${display}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+          {display}
         </a>
       );
       prevWasDecodedNostr = false;

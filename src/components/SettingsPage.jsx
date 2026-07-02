@@ -157,100 +157,119 @@ function normalizeRelayUrl(input) {
   try { new URL(withScheme); return withScheme; } catch { return null; }
 }
 
+const _fmtRelayUrl = url => url.replace(/^wss?:\/\//, "").replace(/\/$/, "");
+
 function RelayEditor({ pubkey, signAndPublish }) {
   const { inboxes, outboxes } = useMailboxes(pubkey);
   const [localInboxes, setLocalInboxes] = useState(null);
   const [localOutboxes, setLocalOutboxes] = useState(null);
-  const [inboxInput, setInboxInput] = useState("");
-  const [outboxInput, setOutboxInput] = useState("");
+  const [urlInput, setUrlInput] = useState("");
+  const [addRead, setAddRead] = useState(true);
+  const [addWrite, setAddWrite] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const effectiveInboxes = localInboxes ?? inboxes;
   const effectiveOutboxes = localOutboxes ?? outboxes;
+  const allRelays = [...new Set([...effectiveInboxes, ...effectiveOutboxes])];
 
-  async function publish(nextInboxes, nextOutboxes) {
+  async function publish(nextIn, nextOut) {
     if (!signAndPublish) return;
     setSaving(true);
     try {
-      const template = await MailboxesFactory.create({ inboxes: nextInboxes, outboxes: nextOutboxes });
+      const template = await MailboxesFactory.create({ inboxes: nextIn, outboxes: nextOut });
       await signAndPublish(template);
     } finally {
       setSaving(false);
     }
   }
 
-  function addInbox() {
-    const url = normalizeRelayUrl(inboxInput);
-    if (!url || effectiveInboxes.includes(url)) return;
-    const next = [...effectiveInboxes, url];
-    setLocalInboxes(next);
-    setInboxInput("");
-    publish(next, effectiveOutboxes);
-  }
-
-  function removeInbox(url) {
-    const next = effectiveInboxes.filter(r => r !== url);
+  function toggleRead(url, checked) {
+    const next = checked ? [...effectiveInboxes, url] : effectiveInboxes.filter(r => r !== url);
     setLocalInboxes(next);
     publish(next, effectiveOutboxes);
   }
 
-  function addOutbox() {
-    const url = normalizeRelayUrl(outboxInput);
-    if (!url || effectiveOutboxes.includes(url)) return;
-    const next = [...effectiveOutboxes, url];
-    setLocalOutboxes(next);
-    setOutboxInput("");
-    publish(effectiveInboxes, next);
-  }
-
-  function removeOutbox(url) {
-    const next = effectiveOutboxes.filter(r => r !== url);
+  function toggleWrite(url, checked) {
+    const next = checked ? [...effectiveOutboxes, url] : effectiveOutboxes.filter(r => r !== url);
     setLocalOutboxes(next);
     publish(effectiveInboxes, next);
   }
 
-  const fmtUrl = url => url.replace(/^wss?:\/\//, "").replace(/\/$/, "");
-
-  function RelaySection({ title, relays, input, onInputChange, onAdd, onRemove, onKeyDown }) {
-    return (
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
-          <span style={{
-            fontSize: "calc(var(--font-base) - 3px)", fontWeight: 700,
-            color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif",
-            textTransform: "uppercase", letterSpacing: "0.07em",
-          }}>{title}</span>
-          <span style={{
-            fontSize: "calc(var(--font-base) - 4px)", color: "var(--text-faint)",
-            fontFamily: "'DM Sans',sans-serif", background: "var(--bg)",
-            border: "1px solid var(--border)", borderRadius: 20, padding: "1px 7px",
-          }}>{relays.length}</span>
-        </div>
-        {relays.length === 0 ? (
-          <div style={{ fontSize: "calc(var(--font-base) - 2px)", color: "var(--text-faint)", fontFamily: "monospace", padding: "6px 0" }}>None configured</div>
-        ) : relays.map((r, i) => (
-          <div key={r} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: i < relays.length - 1 ? "1px solid var(--border)" : "none" }}>
-            <span style={{ fontFamily: "monospace", fontSize: "calc(var(--font-base) - 2px)", color: "var(--text)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fmtUrl(r)}</span>
-            <button onClick={() => onRemove(r)} disabled={saving}
-              style={{ padding: "3px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "transparent", color: "var(--text-faint)", fontSize: "calc(var(--font-base) + 2px)", fontFamily: "'DM Sans',sans-serif", cursor: saving ? "default" : "pointer", lineHeight: 1, flexShrink: 0, opacity: saving ? 0.5 : 1 }}>×</button>
-          </div>
-        ))}
-        <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-          <input value={input} onChange={e => onInputChange(e.target.value)} onKeyDown={onKeyDown}
-            placeholder="relay.example.com" disabled={saving}
-            style={{ flex: 1, padding: "0 10px", borderRadius: 8, border: "1.5px solid var(--border)", background: "var(--bg)", color: "var(--text)", fontFamily: "monospace", fontSize: "calc(var(--font-base) - 2px)", outline: "none", minWidth: 0, opacity: saving ? 0.5 : 1, height: "calc(var(--font-base) + 20px)", boxSizing: "border-box" }} />
-          <button onClick={onAdd} disabled={saving}
-            style={{ padding: "0 14px", borderRadius: 8, border: "none", background: "var(--primary)", color: "white", fontFamily: "'DM Sans',sans-serif", fontSize: "calc(var(--font-base) - 2px)", fontWeight: 600, cursor: saving ? "default" : "pointer", opacity: saving ? 0.6 : 1, flexShrink: 0, height: "calc(var(--font-base) + 20px)" }}>Add</button>
-        </div>
-      </div>
-    );
+  function remove(url) {
+    const nextIn = effectiveInboxes.filter(r => r !== url);
+    const nextOut = effectiveOutboxes.filter(r => r !== url);
+    setLocalInboxes(nextIn);
+    setLocalOutboxes(nextOut);
+    publish(nextIn, nextOut);
   }
+
+  function add() {
+    const url = normalizeRelayUrl(urlInput);
+    if (!url || (!addRead && !addWrite)) return;
+    const nextIn = addRead && !effectiveInboxes.includes(url) ? [...effectiveInboxes, url] : effectiveInboxes;
+    const nextOut = addWrite && !effectiveOutboxes.includes(url) ? [...effectiveOutboxes, url] : effectiveOutboxes;
+    if (nextIn === effectiveInboxes && nextOut === effectiveOutboxes) return;
+    setLocalInboxes(nextIn);
+    setLocalOutboxes(nextOut);
+    setUrlInput("");
+    publish(nextIn, nextOut);
+  }
+
+  const colW = 44;
+  const removeW = 26;
+  const inputH = "calc(var(--font-base) + 20px)";
+  const colHead = { width: colW, textAlign: "center", fontSize: "calc(var(--font-base) - 3px)", fontWeight: 700, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.05em", flexShrink: 0 };
+  const cbCell = { width: colW, display: "flex", justifyContent: "center", flexShrink: 0 };
+  const cbStyle = { cursor: saving ? "default" : "pointer", width: 15, height: 15 };
 
   return (
     <div style={{ padding: "0 16px" }}>
-      <RelaySection title="Read" relays={effectiveInboxes} input={inboxInput} onInputChange={setInboxInput} onAdd={addInbox} onKeyDown={e => e.key === "Enter" && addInbox()} onRemove={removeInbox} />
-      <RelaySection title="Write" relays={effectiveOutboxes} input={outboxInput} onInputChange={setOutboxInput} onAdd={addOutbox} onKeyDown={e => e.key === "Enter" && addOutbox()} onRemove={removeOutbox} />
-      {saving && <div style={{ fontSize: "calc(var(--font-base) - 3px)", color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textAlign: "center", paddingTop: 2 }}>Publishing…</div>}
+      {allRelays.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 5, marginBottom: 2, borderBottom: "1px solid var(--border)" }}>
+          <span style={{ flex: 1 }} />
+          <span style={colHead}>Read</span>
+          <span style={colHead}>Write</span>
+          <span style={{ width: removeW, flexShrink: 0 }} />
+        </div>
+      )}
+      {allRelays.length === 0 && (
+        <div style={{ fontSize: "calc(var(--font-base) - 2px)", color: "var(--text-faint)", fontFamily: "monospace", padding: "6px 0" }}>None configured</div>
+      )}
+      {allRelays.map((r, i) => (
+        <div key={r} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: i < allRelays.length - 1 ? "1px solid var(--border)" : "none" }}>
+          <span style={{ fontFamily: "monospace", fontSize: "calc(var(--font-base) - 2px)", color: "var(--text)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {_fmtRelayUrl(r)}
+          </span>
+          <div style={cbCell}>
+            <input type="checkbox" checked={effectiveInboxes.includes(r)} onChange={e => toggleRead(r, e.target.checked)} disabled={saving} style={cbStyle} />
+          </div>
+          <div style={cbCell}>
+            <input type="checkbox" checked={effectiveOutboxes.includes(r)} onChange={e => toggleWrite(r, e.target.checked)} disabled={saving} style={cbStyle} />
+          </div>
+          <button onClick={() => remove(r)} disabled={saving}
+            style={{ width: removeW, padding: 0, borderRadius: 6, border: "1px solid var(--border)", background: "transparent", color: "var(--text-faint)", fontSize: "calc(var(--font-base) + 2px)", fontFamily: "'DM Sans',sans-serif", cursor: saving ? "default" : "pointer", lineHeight: 1, flexShrink: 0, opacity: saving ? 0.5 : 1, height: "calc(var(--font-base) + 14px)" }}>×</button>
+        </div>
+      ))}
+      <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1.5px solid var(--border)" }}>
+        <div style={{ fontSize: "calc(var(--font-base) - 3px)", fontWeight: 700, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Add relay</div>
+        <input value={urlInput} onChange={e => setUrlInput(e.target.value)} onKeyDown={e => e.key === "Enter" && add()}
+          placeholder="relay.example.com" disabled={saving}
+          style={{ width: "100%", padding: "0 10px", borderRadius: 8, border: "1.5px solid var(--border)", background: "var(--bg)", color: "var(--text)", fontFamily: "monospace", fontSize: "calc(var(--font-base) - 2px)", outline: "none", opacity: saving ? 0.5 : 1, height: inputH, boxSizing: "border-box", display: "block" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 8 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "calc(var(--font-base) - 2px)", color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", cursor: "pointer", userSelect: "none" }}>
+            <input type="checkbox" checked={addRead} onChange={e => setAddRead(e.target.checked)} style={{ cursor: "pointer", width: 15, height: 15 }} />
+            Read
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "calc(var(--font-base) - 2px)", color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", cursor: "pointer", userSelect: "none" }}>
+            <input type="checkbox" checked={addWrite} onChange={e => setAddWrite(e.target.checked)} style={{ cursor: "pointer", width: 15, height: 15 }} />
+            Write
+          </label>
+          <div style={{ flex: 1 }} />
+          <button onClick={add} disabled={saving || (!addRead && !addWrite)}
+            style={{ padding: "0 18px", borderRadius: 8, border: "none", background: "var(--primary)", color: "white", fontFamily: "'DM Sans',sans-serif", fontSize: "var(--font-base)", fontWeight: 600, cursor: (saving || (!addRead && !addWrite)) ? "default" : "pointer", opacity: (saving || (!addRead && !addWrite)) ? 0.6 : 1, flexShrink: 0, height: inputH }}>Add</button>
+        </div>
+      </div>
+      {saving && <div style={{ fontSize: "calc(var(--font-base) - 3px)", color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textAlign: "center", paddingTop: 6 }}>Publishing…</div>}
     </div>
   );
 }

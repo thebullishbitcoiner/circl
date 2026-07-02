@@ -377,11 +377,17 @@ export function classifyMediaUrl(url) {
 /** First URL in note content that isn't an image or video — used for link preview. */
 export function firstLinkPreviewUrl(content) {
   if (!content || typeof content !== "string") return null;
-  const re = /https?:\/\/[^\s<>'"]+/gi;
+  const _TLD = "com|net|org|io|co|app|dev|xyz|me|info|biz|gov|edu|tv|fm|gg|ai|so|uk|us|ca|au|de|fr|jp|br|ru|in|it|nl|es|pl|se|no|fi|ch|be|nz|mx|sg|hk|za|ae|ng|ke|ly|sh|social|media|news";
+  const re = new RegExp(
+    `(https?://[^\\s<>'"]+|(?<!\\S)(?:www\\.[^\\s<>'"]+|[a-zA-Z0-9][a-zA-Z0-9.-]*\\.(?:${_TLD})[^\\s<>'"]*))`,
+    "gi"
+  );
   let m;
   while ((m = re.exec(content)) !== null) {
-    const url = trimMediaUrl(m[0]);
-    if (url && !classifyMediaUrl(url)) return url;
+    let raw = trimMediaUrl(m[0]);
+    if (!raw) continue;
+    const full = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    if (!classifyMediaUrl(full)) return full;
   }
   return null;
 }

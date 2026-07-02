@@ -15,7 +15,7 @@ const SUGGEST_LIMIT = 8;
 const NOTE_LIMIT    = 30;
 const SUGGEST_DEBOUNCE_MS = 350;
 const RECENT_KEY    = "circl_recent_searches";
-const MAX_RECENT    = 8;
+const MAX_RECENT    = 21;
 
 function loadRecent() {
   try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || []; } catch { return []; }
@@ -29,7 +29,23 @@ function IconCircle({ children, color = "var(--primary)" }) {
   );
 }
 
-function RecentSearchItem({ item, profiles, onSelect }) {
+function DeleteBtn({ onDelete }) {
+  return (
+    <button
+      type="button"
+      className="recent-delete-btn"
+      onClick={e => { e.stopPropagation(); onDelete(); }}
+      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onDelete(); } }}
+      aria-label="Remove"
+    >
+      <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+  );
+}
+
+function RecentSearchItem({ item, profiles, onSelect, onDelete }) {
   if (item.type === "people") {
     const pk  = item.pubkey;
     const p   = profiles?.[pk] || {};
@@ -47,6 +63,7 @@ function RecentSearchItem({ item, profiles, onSelect }) {
           <div className="search-result-name">{name || sub}</div>
           {name && sub && <div className="search-result-sub">{sub}</div>}
         </div>
+        <DeleteBtn onDelete={onDelete} />
       </div>
     );
   }
@@ -68,6 +85,7 @@ function RecentSearchItem({ item, profiles, onSelect }) {
         <div className="search-result-name">{label}</div>
         <div className="search-result-sub">{sub}</div>
       </div>
+      <DeleteBtn onDelete={onDelete} />
     </div>
   );
 }
@@ -178,6 +196,15 @@ export default function SearchPage({ profiles, onOpenProfile, onOpenThread, onOp
     localStorage.removeItem(RECENT_KEY);
     setRecentSearches([]);
   };
+
+  const removeRecent = useCallback((item) => {
+    setRecentSearches(prev => {
+      const next = prev.filter(r => !(r.type === item.type && (r.type === "people" ? r.pubkey === item.pubkey : r.query === item.query)));
+      if (next.length) localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+      else localStorage.removeItem(RECENT_KEY);
+      return next;
+    });
+  }, []);
 
   const runPeopleSearch = useCallback(q => {
     suggestSubRef.current?.unsubscribe();
@@ -333,7 +360,7 @@ export default function SearchPage({ profiles, onOpenProfile, onOpenThread, onOp
               </button>
             </div>
             {recentSearches.map((item, i) => (
-              <RecentSearchItem key={`${item.type}:${item.pubkey ?? item.query}:${i}`} item={item} profiles={mergedProfiles} onSelect={handleSelectRecent} />
+              <RecentSearchItem key={`${item.type}:${item.pubkey ?? item.query}:${i}`} item={item} profiles={mergedProfiles} onSelect={handleSelectRecent} onDelete={() => removeRecent(item)} />
             ))}
           </>
         )}
