@@ -1,0 +1,139 @@
+import { useState, useEffect, useCallback, useRef } from "react";
+import { isHexPubkey, normPubkey } from "../utils.js";
+import { pool, eventStore } from "../nostr.js";
+import { RELAYS } from "../constants.js";
+
+const PIN_LIST_KIND = 10001;
+const CACHE_KEY = "circl_pins";
+
+export function readPinnedCache(pk) {
+  try { return JSON.parse(localStorage.getItem(CACHE_KEY))?.[pk] ?? null; } catch { return null; }
+}
+const readCache = readPinnedCache;
+function writeCache(pk, items, created_at) {
+  try {
+    const store = JSON.parse(localStorage.getItem(CACHE_KEY) ?? "{}");
+    store[pk] = { created_at, items };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(store));
+  } catch {}
+}
+
+export default function usePinnedNotes({ pubkey, signAndPublish } = {}) {
+  const [items, setItems] = useState(() => {
+    const pk = normPubkey(pubkey);
+    return isHexPubkey(pk) ? (readCache(pk)?.items ?? []) : [];
+  });
+  const itemsRef = useRef(items);
+  useEffect(() => { itemsRef.current = items; }, [items]);
+  const settledRef = useRef(!!readCache(normPubkey(pubkey)));
+
+  useEffect(() => {
+    const pk = normPubkey(pubkey);
+    if (!isHexPubkey(pk)) { setItems([]); return; }
+
+    let cancelled = false;
+    let generation = 0;
+
+    const cached = readCache(pk);
+    if (cached) {
+      setItems(cached.items);
+    } else {
+      setItems([]);
+    }
+
+    let latestEvent = null;
+    let knownCreatedAt = cached?.created_at ?? 0;
+    let processTimer = null;
+
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+
+    const process = () => {
+      if (cancelled || !latestEvent) return;
+      const gen = ++generation;
+      const ev = latestEvent;
+      const ids = (ev.tags || []).filter(t => t[0] === "e" && typeof t[1] === "string").map(t => t[1]);
+      if (!cancelled && generation === gen) {
+        setItems(ids);
+        itemsRef.current = ids;
+        writeCache(pk, ids, ev.created_at);
+        knownCreatedAt = ev.created_at;
+        settledRef.current = true;
+      }
+    };
+
+    const sub = pool.subscription(relayUrls, [{ kinds: [PIN_LIST_KIND], authors: [pk] }]).subscribe({
+      next: raw => {
+        eventStore.add(raw);
+        if (!cancelled && raw.created_at > Math.max(knownCreatedAt, latestEvent?.created_at ?? 0)) {
+          latestEvent = raw;
+          clearTimeout(processTimer);
+          processTimer = setTimeout(process, 300);
+        }
+      },
+      error: () => { if (!cancelled && !cached) setItems([]); },
+    });
+
+    const cutoffTimer = setTimeout(() => { sub.unsubscribe(); settledRef.current = true; process(); }, 8000);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(processTimer);
+      clearTimeout(cutoffTimer);
+      sub.unsubscribe();
+    };
+  }, [pubkey]);
+
+  const persist = useCallback(
+    async nextIds => {
+      const pk = normPubkey(pubkey);
+      if (!signAndPublish || !isHexPubkey(pk)) throw new Error("Sign in to update pin list");
+      if (!settledRef.current) throw new Error("Pin list is still syncing from relays, please try again in a moment");
+      await signAndPublish({ kind: PIN_LIST_KIND, content: "", tags: nextIds.map(id => ["e", id]) });
+    },
+    [signAndPublish, pubkey]
+  );
+
+  const pinNote = useCallback(
+    async event => {
+      if (event?.kind !== 1 || !event?.id) return;
+      const prev = itemsRef.current;
+      if (prev.includes(event.id)) return;
+      const next = [...prev, event.id];
+      itemsRef.current = next;
+      setItems(next);
+      try { await persist(next); } catch (e) { itemsRef.current = prev; setItems(prev); throw e; }
+    },
+    [persist]
+  );
+
+  const unpinNote = useCallback(
+    async event => {
+      if (!event?.id) return;
+      const prev = itemsRef.current;
+      const next = prev.filter(id => id !== event.id);
+      if (next.length === prev.length) return;
+      itemsRef.current = next;
+      setItems(next);
+      try { await persist(next); } catch (e) { itemsRef.current = prev; setItems(prev); throw e; }
+    },
+    [persist]
+  );
+
+  const togglePin = useCallback(
+    async event => {
+      if (itemsRef.current.includes(event?.id)) return unpinNote(event);
+      return pinNote(event);
+    },
+    [pinNote, unpinNote]
+  );
+
+  const isPinned = useCallback(
+    event => {
+      if (event?.kind !== 1 || !event?.id) return false;
+      return items.includes(event.id);
+    },
+    [items]
+  );
+
+  return { pinnedIds: items, pinNote, unpinNote, togglePin, isPinned };
+}

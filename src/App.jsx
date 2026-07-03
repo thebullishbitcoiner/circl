@@ -20,6 +20,7 @@ import useFeed from "./hooks/useFeed.js";
 import useNotifications from "./hooks/useNotifications.js";
 import useProfiles from "./hooks/useProfiles.js";
 import useBookmarks from "./hooks/useBookmarks.js";
+import usePinnedNotes from "./hooks/usePinnedNotes.js";
 import useMutes from "./hooks/useMutes.js";
 import useCircles from "./hooks/useCircles.js";
 import useCustomEmojiList from "./hooks/useCustomEmojiList.js";
@@ -130,6 +131,7 @@ export default function App() {
   const { items: notificationEvents, loading: notifLoading } = useNotifications({ pubkey });
   const [bookmarkRefreshKey, setBookmarkRefreshKey] = useState(0);
   const { toggle: toggleBm, isBookmarked, bookmarkItems } = useBookmarks({ pubkey, signAndPublish, refreshKey: bookmarkRefreshKey });
+  const { togglePin, isPinned, pinnedIds } = usePinnedNotes({ pubkey, signAndPublish });
   const { mutes, muteEvent, mute: muteUser, unmute: unmuteUser, isMuted } = useMutes({ pubkey, signAndPublish });
   const { circles, createCircle, renameCircle, deleteCircle, addMember: addCircleMember, removeMember: removeCircleMember } = useCircles({ pubkey, signAndPublish });
   const { emojis: customEmojis, sets: customEmojiSets, allCustomEmojis, addEmoji, removeEmoji, addSet: addEmojiSet, removeSet: removeEmojiSet, loading: customEmojiLoading } = useCustomEmojiList({ pubkey, signAndPublish });
@@ -371,6 +373,16 @@ export default function App() {
     }
   };
 
+  const handleTogglePin = async event => {
+    try {
+      const wasPin = isPinned(event);
+      await togglePin(event);
+      showToast(wasPin ? "Unpinned from profile" : "Pinned to profile");
+    } catch (e) {
+      showToast(e?.message || "Could not update pin list");
+    }
+  };
+
   const handleMuteUser = async pk => {
     try {
       await muteUser(pk);
@@ -476,6 +488,8 @@ export default function App() {
       onUnmuteUser: handleUnmuteUser,
       myPubkey: pubkey,
       mutes,
+      onTogglePin: handleTogglePin,
+      isPinned,
     }}>
     <>
       <div className="app-shell">
@@ -844,6 +858,7 @@ export default function App() {
                         scrollToTopTrigger={isTop && profileEntry.payload === pubkey ? profileScrollTrigger : 0}
                         customEmojis={allCustomEmojis}
                         onEditProfile={profileEntry.payload === pubkey ? handleEditProfile : undefined}
+                        ownPinnedIds={profileEntry.payload === pubkey ? pinnedIds : undefined}
                       />
                     </div>
                   );

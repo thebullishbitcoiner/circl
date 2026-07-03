@@ -4,7 +4,7 @@ import { broadcastEvent } from "../nostr.js";
 import { useNavigation } from "../context/NavigationContext.jsx";
 
 export default function NoteContextMenu({ event, onClose, onViewJson, publishEvent, onDeleted }) {
-  const { isMuted, onMuteUser, onUnmuteUser, myPubkey } = useNavigation();
+  const { isMuted, onMuteUser, onUnmuteUser, myPubkey, onTogglePin, isPinned } = useNavigation();
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -62,6 +62,11 @@ export default function NoteContextMenu({ event, onClose, onViewJson, publishEve
       {!isOwnNote && (
         <button type="button" className="note-card-menu-item note-card-menu-item--danger" onClick={handleMute}>
           {authorMuted ? "Unmute User" : "Mute User"}
+        </button>
+      )}
+      {isOwnNote && event.kind === 1 && onTogglePin && (
+        <button type="button" className="note-card-menu-item" onClick={() => { onTogglePin(event); onClose(); }}>
+          {isPinned?.(event) ? "Unpin from Profile" : "Pin to Profile"}
         </button>
       )}
       {isOwnNote && publishEvent && (

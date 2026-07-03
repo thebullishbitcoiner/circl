@@ -36,6 +36,8 @@ import BadgeCard from "./BadgeCard.jsx";
 import BadgeDetail from "./BadgeDetail.jsx";
 import LightningSheet from "./LightningSheet.jsx";
 import ZapAnimation from "./ZapAnimation.jsx";
+import PinnedNotesCarousel from "./PinnedNotesCarousel.jsx";
+import { readPinnedCache } from "../hooks/usePinnedNotes.js";
 
 // Persists across component mounts so returning to a profile doesn't refetch
 const mediaCache = new Map(); // pubkey → { items, until, exhausted }
@@ -156,6 +158,7 @@ export default function ProfilePage({
   scrollToTopTrigger,
   customEmojis,
   onEditProfile,
+  ownPinnedIds,
 }) {
   const { isMuted } = useNavigation();
 
@@ -181,6 +184,9 @@ export default function ProfilePage({
   const [showProfileMetadata, setShowProfileMetadata] = useState(false);
   const [zapAnimCoords, setZapAnimCoords] = useState(null);
   const avatarRef = useRef(null);
+
+  const [pinnedNoteIds, setPinnedNoteIds] = useState([]);
+  const [pinnedEvents, setPinnedEvents] = useState([]);
 
   const [articlesLoading, setArticlesLoading] = useState(true);
   const [highlightsLoading, setHighlightsLoading] = useState(true);
@@ -314,6 +320,8 @@ export default function ProfilePage({
     setHighlightEventsList([]);
     setDeletedIds(new Set());
     setDeletedAddrs(new Set());
+    setPinnedNoteIds([]);
+    setPinnedEvents([]);
     setListingsLoading(true);
     setListingEvents([]);
     setListingsSearch("");
@@ -609,6 +617,45 @@ export default function ProfilePage({
       for (const sub of activeSubs) { try { sub.unsubscribe(); } catch {} }
     };
   }, [pubkey, isOwn]);
+
+  // Fetch kind 10001 (pin list) for the viewed profile
+  useEffect(() => {
+    if (!pubkey) return;
+    let cancelled = false;
+    const cached = readPinnedCache(pubkey);
+    let knownCreatedAt = cached?.created_at ?? 0;
+    if (cached?.items?.length) setPinnedNoteIds(cached.items);
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const sub = pool.subscription(relayUrls, [{ kinds: [10001], authors: [pubkey], limit: 1 }]).subscribe({
+      next: raw => {
+        if (cancelled || raw.created_at <= knownCreatedAt) return;
+        knownCreatedAt = raw.created_at;
+        eventStore.add(raw);
+        const ids = (raw.tags || []).filter(t => t[0] === "e" && typeof t[1] === "string").map(t => t[1]);
+        setPinnedNoteIds(ids);
+      },
+    });
+    const timer = setTimeout(() => { try { sub.unsubscribe(); } catch {} }, 8000);
+    return () => { cancelled = true; clearTimeout(timer); try { sub.unsubscribe(); } catch {} };
+  }, [pubkey]);
+
+  // Resolve pinned note IDs to event objects.
+  // ownPinnedIds from the parent hook takes precedence so optimistic updates are instant.
+  const activePinnedIds = ownPinnedIds ?? pinnedNoteIds;
+  useEffect(() => {
+    if (!activePinnedIds.length) { setPinnedEvents([]); return; }
+    let cancelled = false;
+    (async () => {
+      const resolved = await Promise.all(
+        activePinnedIds.map(id => {
+          const local = profileEvents.find(e => e.id === id);
+          return local ? Promise.resolve(local) : resolveEventById(id);
+        })
+      );
+      if (!cancelled) setPinnedEvents(resolved.filter(Boolean));
+    })();
+    return () => { cancelled = true; };
+  }, [activePinnedIds, profileEvents]);
 
   // Podcasts: lazy-load shows + direct tracks when the podcasts tab is first opened
   useEffect(() => {
@@ -1088,11 +1135,18 @@ export default function ProfilePage({
 
       {/* Notes tab */}
       {tab === "notes" && (
-        profileLoading && topLevel.length === 0
-          ? [0, 1, 2].map(i => <SkelCard key={i} />)
-          : topLevel.length === 0
-            ? <div className="empty-state"><div className="empty-state-title">No notes yet</div><div className="empty-state-sub">Notes, reposts, and quote reposts will appear here</div></div>
-            : topLevel.slice(0, visibleNotes).map(e =>
+        <>
+          {pinnedEvents.length > 0 && !profileLoading && (
+            <PinnedNotesCarousel
+              events={pinnedEvents}
+              onOpenThread={onOpenThread}
+            />
+          )}
+          {profileLoading && topLevel.length === 0
+            ? [0, 1, 2].map(i => <SkelCard key={i} />)
+            : topLevel.length === 0
+              ? <div className="empty-state"><div className="empty-state-title">No notes yet</div><div className="empty-state-sub">Notes, reposts, and quote reposts will appear here</div></div>
+              : topLevel.slice(0, visibleNotes).map(e =>
                 <FeedItem
                   key={e.id}
                   event={e}
@@ -1128,7 +1182,9 @@ export default function ProfilePage({
                   customEmojis={customEmojis}
                   delay={0}
                 />
-            )
+              )
+          }
+        </>
       )}
 
       {/* Replies tab */}
