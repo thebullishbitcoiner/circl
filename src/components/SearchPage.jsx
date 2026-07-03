@@ -51,7 +51,7 @@ function RecentSearchItem({ item, profiles, onSelect, onDelete }) {
     const pk  = item.pubkey;
     const p   = profiles?.[pk] || {};
     const name = p.display_name || p.name || "";
-    const sub  = p.nip05 || (() => { try { const n = nip19.npubEncode(pk); return n.slice(0, 8) + "…" + n.slice(-4); } catch { return ""; } })();
+    const sub  = p.nip05 || (() => { try { const n = nip19.npubEncode(pk); return n.slice(0, 11) + ":" + n.slice(-11); } catch { return ""; } })();
     return (
       <div className="search-result" role="button" tabIndex={0}
         onClick={() => onSelect(item)}
@@ -91,13 +91,20 @@ function RecentSearchItem({ item, profiles, onSelect, onDelete }) {
   );
 }
 
+function fmtFollowers(n) {
+  if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${+(n / 1_000).toFixed(1)}k`;
+  return String(n);
+}
+
 function ProfileSuggestion({ ev, onOpenProfile }) {
   let meta = {};
   try { meta = JSON.parse(ev.content); } catch {}
   const name = (typeof meta.display_name === "string" ? meta.display_name : "") || (typeof meta.name === "string" ? meta.name : "");
   const pk   = ev.pubkey;
-  const sub  = (typeof meta.nip05 === "string" ? meta.nip05 : "") || (() => {
-    try { const n = nip19.npubEncode(pk); return n.slice(0, 8) + "…" + n.slice(-4); } catch { return ""; }
+  const nip05 = typeof meta.nip05 === "string" ? meta.nip05 : "";
+  const sub  = nip05 || (() => {
+    try { const n = nip19.npubEncode(pk); return n.slice(0, 11) + ":" + n.slice(-11); } catch { return ""; }
   })();
 
   return (
@@ -109,7 +116,14 @@ function ProfileSuggestion({ ev, onOpenProfile }) {
         <Avatar pk={pk} profiles={{ [pk]: meta }} size={40} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="search-result-name">{name || sub}</div>
+        <div className="search-result-name" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name || sub}</span>
+          {ev.follower_count != null && (
+            <span style={{ flexShrink: 0, fontSize: "calc(var(--font-base) - 4px)", fontWeight: 600, color: "var(--text-faint)", background: "var(--surface2, var(--border))", borderRadius: 99, padding: "1px 6px", fontFamily: "'DM Sans',sans-serif", letterSpacing: "0.02em" }}>
+              {fmtFollowers(ev.follower_count)} followers
+            </span>
+          )}
+        </div>
         {name && sub && <div className="search-result-sub">{sub}</div>}
       </div>
     </div>
@@ -185,6 +199,7 @@ export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThre
   const suggestSeenRef = useRef(new Set());
   const noteSeenRef    = useRef(new Set());
   const debounceRef    = useRef(null);
+  const abortRef       = useRef(null);
 
   const addRecent = useCallback((entry) => {
     setRecentSearches(prev => {
@@ -209,12 +224,43 @@ export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThre
     });
   }, []);
 
-  const runPeopleSearch = useCallback(q => {
+  const runPeopleSearch = useCallback(async q => {
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+
     suggestSubRef.current?.unsubscribe();
     suggestSeenRef.current = new Set();
     setSuggestions([]);
     setLoadingSuggest(true);
 
+    // Try nostrarchives suggest API first — faster and follower-count ranked
+    try {
+      const res = await fetch(
+        `https://api.nostrarchives.com/v1/search/suggest?q=${encodeURIComponent(q)}&limit=${SUGGEST_LIMIT}`,
+        { signal: ctrl.signal },
+      );
+      if (ctrl.signal.aborted) return;
+      if (res.ok) {
+        const data = await res.json();
+        if (ctrl.signal.aborted) return;
+        if (data.suggestions?.length > 0) {
+          setSuggestions(data.suggestions.map(s => ({
+            pubkey: s.pubkey,
+            content: JSON.stringify({ name: s.name, display_name: s.display_name, picture: s.picture }),
+            id: `api-${s.pubkey}`,
+            follower_count: s.follower_count ?? null,
+            _fromApi: true,
+          })));
+          setLoadingSuggest(false);
+          return;
+        }
+      }
+    } catch (e) {
+      if (e.name === "AbortError") return;
+    }
+
+    // Fall back to NIP-50 relay search
     const sub = pool.request(searchRelays, [{ kinds: [0], search: q, limit: SUGGEST_LIMIT }]).subscribe({
       next: ev => {
         if (!ev?.id || suggestSeenRef.current.has(ev.id)) return;
@@ -232,7 +278,7 @@ export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThre
     setTimeout(() => {
       if (suggestSubRef.current === sub) { sub.unsubscribe(); suggestSubRef.current = null; setLoadingSuggest(false); }
     }, 8000);
-  }, []);
+  }, [searchRelays]);
 
   const runNoteSearch = useCallback(q => {
     noteSubRef.current?.unsubscribe();
@@ -257,7 +303,7 @@ export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThre
     setTimeout(() => {
       if (noteSubRef.current === sub) { sub.unsubscribe(); noteSubRef.current = null; setLoadingNotes(false); }
     }, 10000);
-  }, []);
+  }, [searchRelays]);
 
   const handleInput = e => {
     const q = e.target.value;
@@ -295,6 +341,7 @@ export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThre
 
   const handleClear = () => {
     clearTimeout(debounceRef.current);
+    abortRef.current?.abort();
     suggestSubRef.current?.unsubscribe();
     noteSubRef.current?.unsubscribe();
     setQuery(""); setSuggestions([]); setNoteResults([]);
