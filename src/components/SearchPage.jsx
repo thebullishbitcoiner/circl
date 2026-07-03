@@ -1,11 +1,12 @@
 import { useState, useCallback, useRef, useMemo } from "react";
 import useProfiles from "../hooks/useProfiles.js";
+import useSearchRelays from "../hooks/useSearchRelays.js";
 import { pool, eventStore } from "../nostr.js";
 import { displayName, relativeTime, nip19, normPubkey, isHexPubkey } from "../utils.js";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 
-const SEARCH_RELAYS = [
+const DEFAULT_SEARCH_RELAYS = [
   "wss://relay.primal.net",
   "wss://search.nos.today",
   "wss://nostr.wine",
@@ -160,7 +161,9 @@ function Spinner() {
   );
 }
 
-export default function SearchPage({ profiles, onOpenProfile, onOpenThread, onOpenHashtag }) {
+export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThread, onOpenHashtag }) {
+  const configuredRelays = useSearchRelays(pubkey);
+  const searchRelays = configuredRelays.length > 0 ? configuredRelays : DEFAULT_SEARCH_RELAYS;
   const [query,          setQuery]          = useState("");
   const [suggestions,    setSuggestions]    = useState([]);
   const [noteResults,    setNoteResults]    = useState([]);
@@ -212,7 +215,7 @@ export default function SearchPage({ profiles, onOpenProfile, onOpenThread, onOp
     setSuggestions([]);
     setLoadingSuggest(true);
 
-    const sub = pool.request(SEARCH_RELAYS, [{ kinds: [0], search: q, limit: SUGGEST_LIMIT }]).subscribe({
+    const sub = pool.request(searchRelays, [{ kinds: [0], search: q, limit: SUGGEST_LIMIT }]).subscribe({
       next: ev => {
         if (!ev?.id || suggestSeenRef.current.has(ev.id)) return;
         suggestSeenRef.current.add(ev.id);
@@ -237,7 +240,7 @@ export default function SearchPage({ profiles, onOpenProfile, onOpenThread, onOp
     setNoteResults([]);
     setLoadingNotes(true);
 
-    const sub = pool.request(SEARCH_RELAYS, [{ kinds: [1], search: q, limit: NOTE_LIMIT }]).subscribe({
+    const sub = pool.request(searchRelays, [{ kinds: [1], search: q, limit: NOTE_LIMIT }]).subscribe({
       next: ev => {
         if (!ev?.id || noteSeenRef.current.has(ev.id)) return;
         noteSeenRef.current.add(ev.id);

@@ -668,6 +668,7 @@ export default function App() {
               {activeNav === "search" && (
                 <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
                   <SearchPage
+                    pubkey={pubkey}
                     profiles={profiles}
                     onOpenProfile={handleOpenProfile}
                     onOpenThread={handleOpenThread}
@@ -1374,7 +1375,7 @@ export default function App() {
 
             <div className="right-panel">
               <AudioPlayerCard />
-              <RelaysCard profilePubkey={viewedProfilePubkey} />
+              <RelaysCard profilePubkey={viewedProfilePubkey} pubkey={pubkey} activeNav={activeNav} />
               {topEntry?.type === "thread" && (
                 <ParticipantsCard
                   event={topEntry.payload}

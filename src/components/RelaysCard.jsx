@@ -1,29 +1,49 @@
 import { useState, useEffect } from "react";
 import useMailboxes from "../hooks/useMailboxes.js";
+import useSearchRelays from "../hooks/useSearchRelays.js";
 import { pool } from "../nostr.js";
+
+const DEFAULT_SEARCH_RELAYS = [
+  "wss://relay.primal.net",
+  "wss://search.nos.today",
+  "wss://nostr.wine",
+];
 
 const isValidRelay = url => /^wss?:\/\/[^\s]+$/.test(url) && !/wss?:\/\//i.test(url.slice(6));
 const fmtUrl = url => url.replace(/^wss?:\/\//, "").replace(/\/$/, "");
 
-export default function RelaysCard({ profilePubkey }) {
+export default function RelaysCard({ profilePubkey, pubkey, activeNav }) {
   const [poolRelays, setPoolRelays] = useState(() => [...pool.relays.keys()]);
   const { inboxes } = useMailboxes(profilePubkey ?? null);
+  const configuredSearchRelays = useSearchRelays(activeNav === "search" ? pubkey : null);
+  const searchRelays = configuredSearchRelays.length > 0 ? configuredSearchRelays : DEFAULT_SEARCH_RELAYS;
 
-  // Keep pool relay list current when not viewing a profile
+  // Keep pool relay list current when not viewing a profile or search
   useEffect(() => {
-    if (profilePubkey) return;
+    if (profilePubkey || activeNav === "search") return;
     const id = setInterval(() => setPoolRelays([...pool.relays.keys()]), 2000);
     return () => clearInterval(id);
-  }, [profilePubkey]);
+  }, [profilePubkey, activeNav]);
 
-  const relays = (profilePubkey ? inboxes : poolRelays).filter(isValidRelay);
+  const relays = (
+    activeNav === "search" ? searchRelays :
+    profilePubkey ? inboxes :
+    poolRelays
+  ).filter(isValidRelay);
+
+  const emptyLabel =
+    activeNav === "search" ? "No search relays" :
+    profilePubkey ? "No relay list" :
+    "Connecting...";
 
   return (
     <div className="panel-card">
-      <div className="panel-title">Relays</div>
+      <div className="panel-title">
+        {activeNav === "search" ? "Search Relays" : "Relays"}
+      </div>
       {relays.length === 0 && (
         <div style={{ fontSize: "calc(var(--font-base) - 3px)", color: "var(--text-faint)", fontFamily: "monospace" }}>
-          {profilePubkey ? "No relay list" : "Connecting..."}
+          {emptyLabel}
         </div>
       )}
       {relays.map((r, i) => (

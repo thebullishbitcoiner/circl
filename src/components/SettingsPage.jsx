@@ -1,6 +1,8 @@
 import { useState } from "react";
 import useMailboxes from "../hooks/useMailboxes.js";
+import useSearchRelays from "../hooks/useSearchRelays.js";
 import { MailboxesFactory } from "applesauce-core";
+import { Factories } from "applesauce-common";
 import CustomEmojiSettingsPage from "./CustomEmojiSettingsPage.jsx";
 import useContentSettings from "../hooks/useContentSettings.js";
 
@@ -148,6 +150,40 @@ function NWCConnect({ onConnected }) {
   );
 }
 
+// ── Relay shared helpers ──────────────────────────────────────────────────────
+
+function InfoTooltip({ text }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
+      <button
+        onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}
+        onFocus={() => setShow(true)} onBlur={() => setShow(false)}
+        aria-label="More info"
+        style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)", fontSize: "calc(var(--font-base) - 1px)", lineHeight: 1, padding: "1px 3px", display: "flex", alignItems: "center" }}
+      >ⓘ</button>
+      {show && (
+        <span style={{
+          position: "absolute", left: 0, top: "calc(100% + 5px)", zIndex: 20,
+          background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8,
+          padding: "6px 10px", fontSize: "calc(var(--font-base) - 3px)", color: "var(--text-muted)",
+          fontFamily: "'DM Sans',sans-serif", lineHeight: 1.5, width: 260, whiteSpace: "normal",
+          boxShadow: "0 4px 12px rgba(0,0,0,.18)", pointerEvents: "none",
+        }}>{text}</span>
+      )}
+    </span>
+  );
+}
+
+function RelaySectionHeader({ label, info }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "14px 16px 6px" }}>
+      <span style={{ fontSize: "calc(var(--font-base) - 2px)", fontWeight: 700, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</span>
+      {info && <InfoTooltip text={info} />}
+    </div>
+  );
+}
+
 // ── Relay editor ──────────────────────────────────────────────────────────────
 
 function normalizeRelayUrl(input) {
@@ -223,7 +259,7 @@ function RelayEditor({ pubkey, signAndPublish }) {
   const cbStyle = { cursor: saving ? "default" : "pointer", width: 15, height: 15 };
 
   return (
-    <div style={{ padding: "0 16px" }}>
+    <div style={{ padding: "16px" }}>
       {allRelays.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 5, marginBottom: 2, borderBottom: "1px solid var(--border)" }}>
           <span style={{ flex: 1 }} />
@@ -250,24 +286,87 @@ function RelayEditor({ pubkey, signAndPublish }) {
             style={{ width: removeW, padding: 0, borderRadius: 6, border: "1px solid var(--border)", background: "transparent", color: "var(--text-faint)", fontSize: "calc(var(--font-base) + 2px)", fontFamily: "'DM Sans',sans-serif", cursor: saving ? "default" : "pointer", lineHeight: 1, flexShrink: 0, opacity: saving ? 0.5 : 1, height: "calc(var(--font-base) + 14px)" }}>×</button>
         </div>
       ))}
-      <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1.5px solid var(--border)" }}>
-        <div style={{ fontSize: "calc(var(--font-base) - 3px)", fontWeight: 700, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Add relay</div>
+      <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8 }}>
         <input value={urlInput} onChange={e => setUrlInput(e.target.value)} onKeyDown={e => e.key === "Enter" && add()}
           placeholder="relay.example.com" disabled={saving}
-          style={{ width: "100%", padding: "0 10px", borderRadius: 8, border: "1.5px solid var(--border)", background: "var(--bg)", color: "var(--text)", fontFamily: "monospace", fontSize: "calc(var(--font-base) - 2px)", outline: "none", opacity: saving ? 0.5 : 1, height: inputH, boxSizing: "border-box", display: "block" }} />
-        <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 8 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "calc(var(--font-base) - 2px)", color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", cursor: "pointer", userSelect: "none" }}>
-            <input type="checkbox" checked={addRead} onChange={e => setAddRead(e.target.checked)} style={{ cursor: "pointer", width: 15, height: 15 }} />
-            Read
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "calc(var(--font-base) - 2px)", color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", cursor: "pointer", userSelect: "none" }}>
-            <input type="checkbox" checked={addWrite} onChange={e => setAddWrite(e.target.checked)} style={{ cursor: "pointer", width: 15, height: 15 }} />
-            Write
-          </label>
-          <div style={{ flex: 1 }} />
-          <button onClick={add} disabled={saving || (!addRead && !addWrite)}
-            style={{ padding: "0 18px", borderRadius: 8, border: "none", background: "var(--primary)", color: "white", fontFamily: "'DM Sans',sans-serif", fontSize: "var(--font-base)", fontWeight: 600, cursor: (saving || (!addRead && !addWrite)) ? "default" : "pointer", opacity: (saving || (!addRead && !addWrite)) ? 0.6 : 1, flexShrink: 0, height: inputH }}>Add</button>
+          style={{ flex: 1, padding: "0 10px", borderRadius: 8, border: "1.5px solid var(--border)", background: "var(--bg)", color: "var(--text)", fontFamily: "monospace", fontSize: "calc(var(--font-base) - 2px)", outline: "none", opacity: saving ? 0.5 : 1, height: inputH, boxSizing: "border-box", minWidth: 0 }} />
+        <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: "calc(var(--font-base) - 2px)", color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", cursor: "pointer", userSelect: "none", flexShrink: 0 }}>
+          <input type="checkbox" checked={addRead} onChange={e => setAddRead(e.target.checked)} style={{ cursor: "pointer", width: 14, height: 14 }} />
+          Read
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: "calc(var(--font-base) - 2px)", color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", cursor: "pointer", userSelect: "none", flexShrink: 0 }}>
+          <input type="checkbox" checked={addWrite} onChange={e => setAddWrite(e.target.checked)} style={{ cursor: "pointer", width: 14, height: 14 }} />
+          Write
+        </label>
+        <button onClick={add} disabled={saving || (!addRead && !addWrite)}
+          style={{ padding: "0 14px", borderRadius: 8, border: "none", background: "var(--primary)", color: "white", fontFamily: "'DM Sans',sans-serif", fontSize: "var(--font-base)", fontWeight: 600, cursor: (saving || (!addRead && !addWrite)) ? "default" : "pointer", opacity: (saving || (!addRead && !addWrite)) ? 0.6 : 1, flexShrink: 0, height: inputH }}>Add</button>
+      </div>
+      {saving && <div style={{ fontSize: "calc(var(--font-base) - 3px)", color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textAlign: "center", paddingTop: 6 }}>Publishing…</div>}
+    </div>
+  );
+}
+
+// ── Search relay editor ───────────────────────────────────────────────────────
+
+function SearchRelayEditor({ pubkey, signAndPublish }) {
+  const searchRelays = useSearchRelays(pubkey);
+  const [localRelays, setLocalRelays] = useState(null);
+  const [urlInput, setUrlInput] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const effective = localRelays ?? searchRelays;
+
+  async function publish(nextRelays) {
+    if (!signAndPublish) return;
+    setSaving(true);
+    try {
+      let factory = Factories.SearchRelaysFactory.create();
+      for (const url of nextRelays) factory = factory.addRelay(url);
+      const template = await factory;
+      await signAndPublish(template);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function remove(url) {
+    const next = effective.filter(r => r !== url);
+    setLocalRelays(next);
+    publish(next);
+  }
+
+  function add() {
+    const url = normalizeRelayUrl(urlInput);
+    if (!url || effective.includes(url)) return;
+    const next = [...effective, url];
+    setLocalRelays(next);
+    setUrlInput("");
+    publish(next);
+  }
+
+  const removeW = 26;
+  const inputH = "calc(var(--font-base) + 20px)";
+
+  return (
+    <div style={{ padding: "16px" }}>
+      {effective.length === 0 && (
+        <div style={{ fontSize: "calc(var(--font-base) - 2px)", color: "var(--text-faint)", fontFamily: "monospace", padding: "6px 0" }}>None configured</div>
+      )}
+      {effective.map((r, i) => (
+        <div key={r} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: i < effective.length - 1 ? "1px solid var(--border)" : "none" }}>
+          <span style={{ fontFamily: "monospace", fontSize: "calc(var(--font-base) - 2px)", color: "var(--text)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {_fmtRelayUrl(r)}
+          </span>
+          <button onClick={() => remove(r)} disabled={saving}
+            style={{ width: removeW, padding: 0, borderRadius: 6, border: "1px solid var(--border)", background: "transparent", color: "var(--text-faint)", fontSize: "calc(var(--font-base) + 2px)", fontFamily: "'DM Sans',sans-serif", cursor: saving ? "default" : "pointer", lineHeight: 1, flexShrink: 0, opacity: saving ? 0.5 : 1, height: "calc(var(--font-base) + 14px)" }}>×</button>
         </div>
+      ))}
+      <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8 }}>
+        <input value={urlInput} onChange={e => setUrlInput(e.target.value)} onKeyDown={e => e.key === "Enter" && add()}
+          placeholder="search.relay.example.com" disabled={saving}
+          style={{ flex: 1, padding: "0 10px", borderRadius: 8, border: "1.5px solid var(--border)", background: "var(--bg)", color: "var(--text)", fontFamily: "monospace", fontSize: "calc(var(--font-base) - 2px)", outline: "none", opacity: saving ? 0.5 : 1, height: inputH, boxSizing: "border-box" }} />
+        <button onClick={add} disabled={saving || !urlInput.trim()}
+          style={{ padding: "0 18px", borderRadius: 8, border: "none", background: "var(--primary)", color: "white", fontFamily: "'DM Sans',sans-serif", fontSize: "var(--font-base)", fontWeight: 600, cursor: (saving || !urlInput.trim()) ? "default" : "pointer", opacity: (saving || !urlInput.trim()) ? 0.6 : 1, flexShrink: 0, height: inputH }}>Add</button>
       </div>
       {saving && <div style={{ fontSize: "calc(var(--font-base) - 3px)", color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textAlign: "center", paddingTop: 6 }}>Publishing…</div>}
     </div>
@@ -491,8 +590,13 @@ function AppearanceSubPage({ onBack, dark, toggleDark, textSize, onTextSizeChang
 function RelaysSubPage({ onBack, pubkey, signAndPublish }) {
   return (
     <SubPage title="Relays" onBack={onBack}>
-      <div style={{ marginTop: 12 }}>
+      <RelaySectionHeader label="Mailbox Relays" info="Relays used to publish and receive notes (NIP-65)" />
+      <div style={{ margin: "0 12px 20px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
         <RelayEditor pubkey={pubkey} signAndPublish={signAndPublish} />
+      </div>
+      <RelaySectionHeader label="Search Relays" info="Relays queried when searching notes (NIP-51 kind 10007)" />
+      <div style={{ margin: "0 12px 16px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
+        <SearchRelayEditor pubkey={pubkey} signAndPublish={signAndPublish} />
       </div>
     </SubPage>
   );
