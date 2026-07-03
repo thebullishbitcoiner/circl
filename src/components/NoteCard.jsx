@@ -30,6 +30,8 @@ function NoteCard({
   const { onOpenGoal, onOpenPoll, onOpenCalendarEvent } = useNavigation();
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+  if (deleted) return null;
   const [highlightDraft, setHighlightDraft] = useState(null);
   const contentRef = useRef(null);
   const isBookmarkedFn = useCallback(() => bookmarked, [bookmarked]);
@@ -99,6 +101,8 @@ function NoteCard({
               event={event}
               onClose={() => setCardMenuOpen(false)}
               onViewJson={() => setJsonOpen(true)}
+              publishEvent={publishEvent}
+              onDeleted={() => setDeleted(true)}
             />
           )}
         </div>

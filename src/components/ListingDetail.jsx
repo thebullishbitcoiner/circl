@@ -29,7 +29,7 @@ function ListingContextMenu({ event, onClose, onViewJson, onDelete }) {
       <button type="button" className="note-card-menu-item" onClick={() => { onClose(); onViewJson(); }}>View JSON</button>
       {onDelete && (
         <button type="button" className="note-card-menu-item note-card-menu-item--danger" onClick={() => { onDelete(); onClose(); }}>
-          Delete listing
+          Request Delete
         </button>
       )}
     </div>

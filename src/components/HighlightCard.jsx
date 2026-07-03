@@ -61,7 +61,9 @@ function HighlightCard({
 }) {
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
+  const [deleted, setDeleted] = useState(false);
   const [sourceEvent, setSourceEvent] = useState(null);
+  if (deleted) return null;
 
   const { text, sourceTag, sourceRef, authorPubkey, comment } = parseHighlight(event);
   const isNoteSource = sourceEvent?.kind === 1 || (sourceTag === "e" && sourceEvent && sourceEvent.kind !== 30023);
@@ -120,6 +122,8 @@ function HighlightCard({
               event={event}
               onClose={() => setCardMenuOpen(false)}
               onViewJson={() => setJsonOpen(true)}
+              publishEvent={publishEvent}
+              onDeleted={() => setDeleted(true)}
             />
           )}
         </div>

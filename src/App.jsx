@@ -122,7 +122,7 @@ export default function App() {
     });
   }, []);
 
-  const { events, loading: el, prependEvent } = useFeed({
+  const { events, loading: el, prependEvent, isDeleted } = useFeed({
     follows,
     setLocalReaction,
     addLocalZap,
@@ -423,7 +423,7 @@ export default function App() {
     if (nav === "zaps" && activeNav !== "zaps") refreshWallet();
   };
 
-  const displayEvs = (activeNav === "bookmarks" ? bookmarkFeedEvents : events).filter(e => !isMuted(e.pubkey));
+  const displayEvs = (activeNav === "bookmarks" ? bookmarkFeedEvents : events).filter(e => !isMuted(e.pubkey) && !isDeleted(e));
   const isLoading = fl || el;
   const anyPanelOpen = settingsOpen || !!openStreamEvent || navStack.length > 0;
   const myProfile = profiles[pubkey];

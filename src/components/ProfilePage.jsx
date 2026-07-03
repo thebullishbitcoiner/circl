@@ -186,6 +186,8 @@ export default function ProfilePage({
   const [highlightsLoading, setHighlightsLoading] = useState(true);
   const [articleEvents, setArticleEvents] = useState([]);
   const [highlightEventsList, setHighlightEventsList] = useState([]);
+  const [deletedIds, setDeletedIds] = useState(new Set());
+  const [deletedAddrs, setDeletedAddrs] = useState(new Set());
 
   const [mediaItems, setMediaItems] = useState([]);
   const [mediaLoading, setMediaLoading] = useState(false);
@@ -310,6 +312,8 @@ export default function ProfilePage({
     setHighlightsLoading(true);
     setArticleEvents([]);
     setHighlightEventsList([]);
+    setDeletedIds(new Set());
+    setDeletedAddrs(new Set());
     setListingsLoading(true);
     setListingEvents([]);
     setListingsSearch("");
@@ -772,6 +776,17 @@ export default function ProfilePage({
     });
     subs.push(listingsSub);
 
+    const deletionSub = req([{ kinds: [5], authors: [pubkey], limit: 500 }]).subscribe({
+      next: raw => {
+        if (cancelled) return;
+        const newIds = raw.tags.filter(t => t[0] === "e" && t[1]).map(t => t[1]);
+        const newAddrs = raw.tags.filter(t => t[0] === "a" && t[1]).map(t => t[1]);
+        if (newIds.length) setDeletedIds(prev => new Set([...prev, ...newIds]));
+        if (newAddrs.length) setDeletedAddrs(prev => new Set([...prev, ...newAddrs]));
+      },
+    });
+    subs.push(deletionSub);
+
     return () => {
       cancelled = true;
       for (const sub of subs) { try { sub.unsubscribe(); } catch {} }
@@ -789,8 +804,12 @@ export default function ProfilePage({
   }, [events, profileEvents, articleEvents, highlightEventsList, repostExtras]);
 
   const theirEvents = useMemo(
-    () => isMuted?.(pubkey) ? [] : mergedEvents.filter(e => e.pubkey === pubkey && (e.kind === 1 || e.kind === 6 || e.kind === 9802 || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311 || e.kind === 9041 || e.kind === 9735 || e.kind === 30023)),
-    [mergedEvents, pubkey, isMuted]
+    () => isMuted?.(pubkey) ? [] : mergedEvents.filter(e =>
+      e.pubkey === pubkey &&
+      (e.kind === 1 || e.kind === 6 || e.kind === 9802 || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311 || e.kind === 9041 || e.kind === 9735 || e.kind === 30023) &&
+      !deletedIds.has(e.id)
+    ),
+    [mergedEvents, pubkey, isMuted, deletedIds]
   );
 
   const topLevel = useMemo(
@@ -817,7 +836,9 @@ export default function ProfilePage({
     const byDTag = new Map();
     for (const e of mergedEvents) {
       if (e.pubkey !== pubkey || e.kind !== 30023) continue;
+      if (deletedIds.has(e.id)) continue;
       const d = e.tags.find(t => t[0] === "d")?.[1] ?? "";
+      if (deletedAddrs.has(`30023:${e.pubkey}:${d}`)) continue;
       if (!byDTag.has(d)) byDTag.set(d, []);
       byDTag.get(d).push(e);
     }
@@ -829,18 +850,25 @@ export default function ProfilePage({
       result.push(olderIds.length ? { ...latest, _olderIds: olderIds } : latest);
     }
     return result.sort((a, b) => b.created_at - a.created_at);
-  }, [mergedEvents, pubkey]);
+  }, [mergedEvents, pubkey, deletedIds, deletedAddrs]);
 
   const highlights = useMemo(
     () => mergedEvents
-      .filter(e => e.pubkey === pubkey && e.kind === 9802)
+      .filter(e => e.pubkey === pubkey && e.kind === 9802 && !deletedIds.has(e.id))
       .sort((a, b) => b.created_at - a.created_at),
-    [mergedEvents, pubkey]
+    [mergedEvents, pubkey, deletedIds]
   );
 
   const listings = useMemo(
-    () => [...listingEvents].sort((a, b) => b.created_at - a.created_at),
-    [listingEvents]
+    () => listingEvents
+      .filter(e => {
+        if (deletedIds.has(e.id)) return false;
+        const d = e.tags?.find(t => t[0] === "d")?.[1] ?? "";
+        if (deletedAddrs.has(`${e.kind}:${e.pubkey}:${d}`)) return false;
+        return true;
+      })
+      .sort((a, b) => b.created_at - a.created_at),
+    [listingEvents, deletedIds, deletedAddrs]
   );
 
   useEffect(() => { topLevelLenRef.current  = topLevel.length;  }, [topLevel.length]);

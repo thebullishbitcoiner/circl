@@ -20,12 +20,15 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const seen = useRef(new Set());
+  // pubkey → { ids: Set<eventId>, addrs: Set<"kind:pubkey:d"> }
+  const [deletionMap, setDeletionMap] = useState(new Map());
 
   useEffect(() => {
     const authors = (follows || []).filter(isHexPubkey);
     if (!authors.length) return;
     setLoading(true);
     setEvents([]);
+    setDeletionMap(new Map());
     seen.current = new Set();
 
     const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
@@ -52,6 +55,23 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap }) {
         seen.current.add(raw.id);
         setEvents(prev => sortFeedEventsChronological([raw, ...prev]));
         setLoading(false);
+      },
+    });
+
+    const deleteSub = pool.subscription(relayUrls, [{ kinds: [5], authors, since }]).subscribe({
+      next: raw => {
+        const newIds = raw.tags.filter(t => t[0] === "e" && t[1]).map(t => t[1]);
+        const newAddrs = raw.tags.filter(t => t[0] === "a" && t[1]).map(t => t[1]);
+        if (!newIds.length && !newAddrs.length) return;
+        setDeletionMap(prev => {
+          const next = new Map(prev);
+          const existing = next.get(raw.pubkey) ?? { ids: new Set(), addrs: new Set() };
+          next.set(raw.pubkey, {
+            ids: new Set([...existing.ids, ...newIds]),
+            addrs: new Set([...existing.addrs, ...newAddrs]),
+          });
+          return next;
+        });
       },
     });
 
@@ -95,6 +115,7 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap }) {
       for (const s of profileSubs) s.unsubscribe();
       mainSub.unsubscribe();
       metaSub.unsubscribe();
+      deleteSub.unsubscribe();
     };
   }, [(follows || []).filter(isHexPubkey).join(",")]);
 
@@ -104,5 +125,17 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap }) {
     setEvents(prev => sortFeedEventsChronological([e, ...prev]));
   }, []);
 
-  return { events, loading, prependEvent };
+  const isDeleted = useCallback((event) => {
+    if (!event) return false;
+    const record = deletionMap.get(event.pubkey);
+    if (!record) return false;
+    if (record.ids.has(event.id)) return true;
+    if (event.kind >= 30000 && event.kind < 40000) {
+      const d = event.tags?.find(t => t[0] === "d")?.[1] ?? "";
+      if (record.addrs.has(`${event.kind}:${event.pubkey}:${d}`)) return true;
+    }
+    return false;
+  }, [deletionMap]);
+
+  return { events, loading, prependEvent, isDeleted };
 }

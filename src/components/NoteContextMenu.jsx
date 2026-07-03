@@ -3,7 +3,7 @@ import { nip19 } from "../utils.js";
 import { broadcastEvent } from "../nostr.js";
 import { useNavigation } from "../context/NavigationContext.jsx";
 
-export default function NoteContextMenu({ event, onClose, onViewJson }) {
+export default function NoteContextMenu({ event, onClose, onViewJson, publishEvent, onDeleted }) {
   const { isMuted, onMuteUser, onUnmuteUser, myPubkey } = useNavigation();
   const menuRef = useRef(null);
 
@@ -41,6 +41,18 @@ export default function NoteContextMenu({ event, onClose, onViewJson }) {
     onClose();
   };
 
+  const handleRequestDelete = async () => {
+    if (!publishEvent) return;
+    onClose();
+    const tags = [["e", event.id]];
+    if (event.kind >= 30000 && event.kind < 40000) {
+      const dTag = event.tags?.find(t => t[0] === "d")?.[1] ?? "";
+      tags.unshift(["a", `${event.kind}:${event.pubkey}:${dTag}`]);
+    }
+    await publishEvent({ kind: 5, content: "", tags });
+    onDeleted?.();
+  };
+
   return (
     <div ref={menuRef} className="note-card-menu" onClick={e => e.stopPropagation()}>
       <button type="button" className="note-card-menu-item" onClick={copyText}>Copy Note Text</button>
@@ -50,6 +62,11 @@ export default function NoteContextMenu({ event, onClose, onViewJson }) {
       {!isOwnNote && (
         <button type="button" className="note-card-menu-item note-card-menu-item--danger" onClick={handleMute}>
           {authorMuted ? "Unmute User" : "Mute User"}
+        </button>
+      )}
+      {isOwnNote && publishEvent && (
+        <button type="button" className="note-card-menu-item note-card-menu-item--danger" onClick={handleRequestDelete}>
+          Request Delete
         </button>
       )}
     </div>
