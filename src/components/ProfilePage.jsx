@@ -1139,6 +1139,7 @@ export default function ProfilePage({
           {pinnedEvents.length > 0 && !profileLoading && (
             <PinnedNotesCarousel
               events={pinnedEvents}
+              profiles={profiles}
               onOpenThread={onOpenThread}
             />
           )}

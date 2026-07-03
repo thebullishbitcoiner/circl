@@ -1298,11 +1298,12 @@
   /* Pinned notes carousel */
   .pinned-carousel{padding:10px 0 4px;}
   .pinned-carousel-header{display:flex;align-items:center;gap:5px;padding:0 16px 8px;font-size:11px;font-weight:600;color:var(--text-faint);text-transform:uppercase;letter-spacing:.6px;}
-  .pinned-carousel-track{display:flex;gap:10px;overflow-x:auto;padding:0 16px 10px;scroll-snap-type:x mandatory;scrollbar-width:none;}
+  .pinned-carousel-track{display:flex;gap:10px;overflow-x:auto;padding:0 0 10px;scroll-snap-type:x mandatory;scroll-padding-left:16px;scrollbar-width:none;}
   .pinned-carousel-track::-webkit-scrollbar{display:none;}
-  .pin-card{flex:0 0 min(80vw,320px);scroll-snap-align:start;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;cursor:pointer;transition:background .15s;overflow:hidden;position:relative;height:calc(5 * 1.5 * 13px + 24px);}
+  .pin-card{flex:0 0 min(80vw,320px);scroll-snap-align:start;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:0;cursor:pointer;transition:background .15s;overflow:hidden;height:119px;display:flex;}
+  .pin-card:first-child{margin-left:16px;}
   .pin-card:hover{background:var(--surface2);}
-  .pin-card::after{content:"";position:absolute;bottom:0;left:0;right:0;height:2em;background:linear-gradient(to bottom,transparent,var(--surface));pointer-events:none;transition:background .15s;}
-  .pin-card:hover::after{background:linear-gradient(to bottom,transparent,var(--surface2));}
-  .pin-card-thumb{float:left;width:56px;height:56px;object-fit:cover;border-radius:8px;margin:0 10px 0 0;}
-  .pin-card-content{font-size:13px;color:var(--text-muted);line-height:1.5;word-break:break-word;}
+  .pin-card-thumb{aspect-ratio:4/5;flex-shrink:0;object-fit:cover;}
+  .pin-card-body{flex:1;min-width:0;padding:12px;overflow:hidden;}
+  .pin-card-time{font-size:11px;line-height:1;color:var(--text-faint);margin-bottom:4px;}
+  .pin-card-content{font-size:13px;color:var(--text-muted);line-height:1.5;word-break:break-word;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden;}
