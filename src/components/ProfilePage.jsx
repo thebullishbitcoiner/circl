@@ -37,7 +37,7 @@ import BadgeDetail from "./BadgeDetail.jsx";
 import LightningSheet from "./LightningSheet.jsx";
 import ZapAnimation from "./ZapAnimation.jsx";
 import PinnedNotesCarousel from "./PinnedNotesCarousel.jsx";
-import { readPinnedCache } from "../hooks/usePinnedNotes.js";
+import { readPinnedCache, writePinnedCache } from "../hooks/usePinnedNotes.js";
 
 // Persists across component mounts so returning to a profile doesn't refetch
 const mediaCache = new Map(); // pubkey → { items, until, exhausted }
@@ -633,6 +633,7 @@ export default function ProfilePage({
         eventStore.add(raw);
         const ids = (raw.tags || []).filter(t => t[0] === "e" && typeof t[1] === "string").map(t => t[1]);
         setPinnedNoteIds(ids);
+        writePinnedCache(pubkey, ids, raw.created_at, readPinnedCache(pubkey)?.events ?? []);
       },
     });
     const timer = setTimeout(() => { try { sub.unsubscribe(); } catch {} }, 8000);
@@ -645,17 +646,24 @@ export default function ProfilePage({
   useEffect(() => {
     if (!activePinnedIds.length) { setPinnedEvents([]); return; }
     let cancelled = false;
+    const cached = readPinnedCache(pubkey);
+    const cachedEvMap = {};
+    for (const ev of cached?.events ?? []) cachedEvMap[ev.id] = ev;
+    // Render immediately from cache — no relay wait on revisit
+    const immediate = activePinnedIds.map(id => cachedEvMap[id]).filter(Boolean);
+    if (immediate.length) setPinnedEvents(immediate);
     (async () => {
       const resolved = await Promise.all(
-        activePinnedIds.map(id => {
-          const local = profileEvents.find(e => e.id === id);
-          return local ? Promise.resolve(local) : resolveEventById(id);
-        })
+        activePinnedIds.map(id => cachedEvMap[id] ? Promise.resolve(cachedEvMap[id]) : resolveEventById(id))
       );
-      if (!cancelled) setPinnedEvents(resolved.filter(Boolean));
+      if (cancelled) return;
+      const valid = resolved.filter(Boolean);
+      setPinnedEvents(valid);
+      // Write resolved events back so next visit is instant
+      if (valid.length) writePinnedCache(pubkey, activePinnedIds, cached?.created_at ?? 0, valid);
     })();
     return () => { cancelled = true; };
-  }, [activePinnedIds, profileEvents]);
+  }, [activePinnedIds, pubkey]);
 
   // Podcasts: lazy-load shows + direct tracks when the podcasts tab is first opened
   useEffect(() => {

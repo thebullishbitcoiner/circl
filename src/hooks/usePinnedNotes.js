@@ -9,14 +9,14 @@ const CACHE_KEY = "circl_pins";
 export function readPinnedCache(pk) {
   try { return JSON.parse(localStorage.getItem(CACHE_KEY))?.[pk] ?? null; } catch { return null; }
 }
-const readCache = readPinnedCache;
-function writeCache(pk, items, created_at) {
+export function writePinnedCache(pk, items, created_at, events = []) {
   try {
     const store = JSON.parse(localStorage.getItem(CACHE_KEY) ?? "{}");
-    store[pk] = { created_at, items };
+    store[pk] = { created_at, items, events };
     localStorage.setItem(CACHE_KEY, JSON.stringify(store));
   } catch {}
 }
+const readCache = readPinnedCache;
 
 export default function usePinnedNotes({ pubkey, signAndPublish } = {}) {
   const [items, setItems] = useState(() => {
@@ -55,7 +55,7 @@ export default function usePinnedNotes({ pubkey, signAndPublish } = {}) {
       if (!cancelled && generation === gen) {
         setItems(ids);
         itemsRef.current = ids;
-        writeCache(pk, ids, ev.created_at);
+        writePinnedCache(pk, ids, ev.created_at, readCache(pk)?.events ?? []);
         knownCreatedAt = ev.created_at;
         settledRef.current = true;
       }
