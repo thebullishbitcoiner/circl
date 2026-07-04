@@ -85,7 +85,8 @@ export default function useAuth() {
     const publishRelays = outboxes.length > 0
       ? [...new Set([...RELAYS, ...outboxes])]
       : RELAYS;
-    await Promise.race([
+    // Fire-and-forget relay publish so callers get the signed event immediately
+    Promise.race([
       pool.publish(publishRelays, signed),
       new Promise(resolve => setTimeout(resolve, 8000)),
     ]).catch(() => null);

@@ -84,8 +84,9 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   const [isDragOver,      setIsDragOver]      = useState(false);
   const [excludedMentions, setExcludedMentions] = useState(new Set());
   const [showTagList,      setShowTagList]      = useState(false);
-  const fileRef   = useRef(null);
-  const editorRef = useRef(null);
+  const fileRef        = useRef(null);
+  const editorRef      = useRef(null);
+  const publishingRef  = useRef(false);
 
   const thisDraftId = computeDraftId(replyTo, quotedEvent);
   const draft = getDraft(thisDraftId);
@@ -189,7 +190,8 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   };
 
   const handlePost = async () => {
-    if (!canPost || publishing) return;
+    if (!canPost || publishingRef.current) return;
+    publishingRef.current = true;
     setPublishing(true);
 
     if (pollMode && publishEvent) {
@@ -226,7 +228,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
       if (goalClosedAt) tags.push(["closed_at", String(Math.floor(new Date(goalClosedAt).getTime() / 1000))]);
       if (goalImage.trim()) tags.push(["image", goalImage.trim()]);
       const published = await publishEvent({ kind: 9041, content: goalTitle.trim(), tags });
-      if (!published) { setUploadErr("Failed to publish — please try again."); setPublishing(false); return; }
+      if (!published) { setUploadErr("Failed to publish — please try again."); publishingRef.current = false; setPublishing(false); return; }
       onPrepend?.(published);
       deleteDraft(thisDraftId);
       onDismiss?.();
