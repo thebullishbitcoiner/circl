@@ -53,7 +53,7 @@ import FeedItem from "./components/FeedItem.jsx";
 import StreamCard from "./components/StreamCard.jsx";
 import StreamDetailView from "./components/StreamDetailView.jsx";
 import ComposeSheet from "./components/ComposeSheet.jsx";
-import DraftsSheet from "./components/DraftsSheet.jsx";
+import DraftsPage from "./components/DraftsPage.jsx";
 import { DraftsProvider } from "./contexts/DraftsContext.jsx";
 import useDrafts from "./hooks/useDrafts.js";
 import ProfilePage from "./components/ProfilePage.jsx";
@@ -296,15 +296,17 @@ export default function App() {
       setOpeningDraftId(null);
       if (!ev) return;
       setComposeReplyTo(ev);
+      handleOpenThread(ev);
     } else if (draftId.startsWith("quote-")) {
       const ev = await resolveEventById(draftId.slice(6));
       setOpeningDraftId(null);
       if (!ev) return;
       setComposeQuotedEvent(ev);
+      handleOpenThread(ev);
     } else {
       setOpeningDraftId(null);
+      clearNav();
     }
-    setDraftsOpen(false);
     setFloatingCompose(true);
   };
 
@@ -316,7 +318,6 @@ export default function App() {
   const [composeCircle, setComposeCircle] = useState(null);
   const [composeReplyTo, setComposeReplyTo] = useState(null);
   const [composeQuotedEvent, setComposeQuotedEvent] = useState(null);
-  const [draftsOpen, setDraftsOpen] = useState(false);
   const [openingDraftId, setOpeningDraftId] = useState(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const [panelModal, setPanelModal] = useState(null);
@@ -533,6 +534,13 @@ export default function App() {
               {item.label}
             </button>
           ))}
+          <button className={`nav-item ${!settingsOpen && topEntry?.type === "drafts" ? "active" : ""}`} onClick={() => { clearNav(); setSettingsOpen(false); setActiveNav(null); pushNav({ type: "drafts" }); }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="nav-icon">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+            </svg>
+            Drafts
+          </button>
           <button className={`nav-item ${!settingsOpen && topEntry?.type === "muted" ? "active" : ""}`} onClick={() => { clearNav(); setSettingsOpen(false); setActiveNav(null); pushNav({ type: "muted" }); }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="nav-icon">
               <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
@@ -558,15 +566,6 @@ export default function App() {
             Settings
           </button>
           <button className="compose-btn" onClick={() => setFloatingCompose(true)}>+ New Note</button>
-          {Object.keys(draftCtx.drafts).length > 0 && (
-            <button
-              className="compose-btn"
-              onClick={() => setDraftsOpen(true)}
-              style={{ background: "none", color: "var(--primary)", border: "1px solid color-mix(in srgb, var(--primary) 35%, transparent)", marginTop: 6, fontSize: 13 }}
-            >
-              Drafts ({Object.keys(draftCtx.drafts).length})
-            </button>
-          )}
           <div className="sidebar-profile" onClick={() => navigate("profile")}>
             <div className="sidebar-av">{myProfile?.picture ? <img src={myProfile.picture} alt="me" /> : avatarInitial(pubkey, profiles)}</div>
             <div><div className="sidebar-name">{myDisplayName}</div><div className="sidebar-npub">{myNpub}</div></div>
@@ -769,13 +768,6 @@ export default function App() {
                   blossomServers={blossomServers}
                 />
               )}
-              {draftsOpen && (
-                <DraftsSheet
-                  onDismiss={() => setDraftsOpen(false)}
-                  onOpen={handleOpenDraft}
-                  openingId={openingDraftId}
-                />
-              )}
 
 
 
@@ -937,6 +929,16 @@ export default function App() {
                         profiles={profiles}
                         onUnmute={handleUnmuteUser}
                         onOpenProfile={handleOpenProfile}
+                      />
+                    );
+                  }
+
+                  if (top.type === "drafts") {
+                    return (
+                      <DraftsPage
+                        key="drafts"
+                        onOpen={handleOpenDraft}
+                        openingId={openingDraftId}
                       />
                     );
                   }
@@ -1484,7 +1486,7 @@ export default function App() {
 
           <button
             type="button"
-            className={`bottom-settings-btn${settingsOpen || moreOpen || topEntry?.type === "muted" || topEntry?.type === "mycircles" || topEntry?.type === "circle-detail" ? " active" : ""}`}
+            className={`bottom-settings-btn${settingsOpen || moreOpen || topEntry?.type === "muted" || topEntry?.type === "mycircles" || topEntry?.type === "circle-detail" || topEntry?.type === "drafts" ? " active" : ""}`}
             onClick={() => setMoreOpen(true)}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
@@ -1502,6 +1504,15 @@ export default function App() {
         <div className="overlay" onClick={() => setMoreOpen(false)}>
           <div className="action-sheet" onClick={e => e.stopPropagation()}>
             <div className="action-sheet-handle" />
+            <button className="action-sheet-btn" onClick={() => { setMoreOpen(false); clearNav(); setSettingsOpen(false); setActiveNav(null); pushNav({ type: "drafts" }); }}>
+              <div className="action-sheet-btn-icon">
+                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                </svg>
+              </div>
+              Drafts
+            </button>
             <button className="action-sheet-btn" onClick={() => { setMoreOpen(false); clearNav(); setSettingsOpen(false); setActiveNav(null); pushNav({ type: "muted" }); }}>
               <div className="action-sheet-btn-icon">
                 <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
