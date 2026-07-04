@@ -134,7 +134,7 @@ export default function App() {
   const [bookmarkRefreshKey, setBookmarkRefreshKey] = useState(0);
   const { toggle: toggleBm, isBookmarked, bookmarkItems } = useBookmarks({ pubkey, signAndPublish, refreshKey: bookmarkRefreshKey });
   const { togglePin, isPinned, pinnedIds } = usePinnedNotes({ pubkey, signAndPublish });
-  const { mutes, muteEvent, mute: muteUser, unmute: unmuteUser, isMuted } = useMutes({ pubkey, signAndPublish });
+  const { mutes, hashtags: mutedHashtags, words: mutedWords, threads: mutedThreads, muteEvent, mute: muteUser, unmute: unmuteUser, muteHashtag, muteWord, unmuteHashtag, unmuteWord, unmuteThread, isMuted, isContentMuted } = useMutes({ pubkey, signAndPublish });
   const { circles, createCircle, renameCircle, deleteCircle, addMember: addCircleMember, removeMember: removeCircleMember } = useCircles({ pubkey, signAndPublish });
   const { emojis: customEmojis, sets: customEmojiSets, allCustomEmojis, addEmoji, removeEmoji, addSet: addEmojiSet, removeSet: removeEmojiSet, loading: customEmojiLoading } = useCustomEmojiList({ pubkey, signAndPublish });
   const { servers: blossomServers, saveServers: saveBlossomServers } = useBlossomServers({ pubkey, signAndPublish });
@@ -431,6 +431,51 @@ export default function App() {
     }
   };
 
+  const handleMuteHashtag = async tag => {
+    try {
+      await muteHashtag(tag);
+      showToast(`#${tag} muted`);
+    } catch (e) {
+      showToast(e?.message || "Could not update mute list");
+    }
+  };
+
+  const handleUnmuteHashtag = async tag => {
+    try {
+      await unmuteHashtag(tag);
+      showToast(`#${tag} unmuted`);
+    } catch (e) {
+      showToast(e?.message || "Could not update mute list");
+    }
+  };
+
+  const handleMuteWord = async word => {
+    try {
+      await muteWord(word);
+      showToast(`"${word}" muted`);
+    } catch (e) {
+      showToast(e?.message || "Could not update mute list");
+    }
+  };
+
+  const handleUnmuteWord = async word => {
+    try {
+      await unmuteWord(word);
+      showToast(`"${word}" unmuted`);
+    } catch (e) {
+      showToast(e?.message || "Could not update mute list");
+    }
+  };
+
+  const handleUnmuteThread = async id => {
+    try {
+      await unmuteThread(id);
+      showToast("Thread unmuted");
+    } catch (e) {
+      showToast(e?.message || "Could not update mute list");
+    }
+  };
+
   const handleDeleteCircle = async id => {
     try {
       await deleteCircle(id);
@@ -465,7 +510,7 @@ export default function App() {
     if (nav === "zaps" && activeNav !== "zaps") refreshWallet();
   };
 
-  const displayEvs = (activeNav === "bookmarks" ? bookmarkFeedEvents : events).filter(e => !isMuted(e.pubkey) && !isDeleted(e));
+  const displayEvs = (activeNav === "bookmarks" ? bookmarkFeedEvents : events).filter(e => !isMuted(e.pubkey) && !isContentMuted(e) && !isDeleted(e));
   const isLoading = fl || el;
   const anyPanelOpen = settingsOpen || !!openStreamEvent || navStack.length > 0;
   const myProfile = profiles[pubkey];
@@ -514,6 +559,7 @@ export default function App() {
       onOpenReposts: handleOpenReposts,
         onOpenPollVotes: handleOpenPollVotes,
       isMuted,
+      isContentMuted,
       onMuteUser: handleMuteUser,
       onUnmuteUser: handleUnmuteUser,
       myPubkey: pubkey,
@@ -683,13 +729,13 @@ export default function App() {
                     : (
                       <>
                         <NotificationsFeed
-                          items={notificationEvents.filter(e => !isMuted(e.pubkey)).slice(0, visibleCount)}
+                          items={notificationEvents.filter(e => !isMuted(e.pubkey) && !isContentMuted(e)).slice(0, visibleCount)}
                           profiles={profiles}
                           onOpenProfile={handleOpenProfile}
                           onOpenNotification={handleOpenNotification}
                           allEvents={mergedFeedPool}
                         />
-                        {visibleCount < notificationEvents.filter(e => !isMuted(e.pubkey)).length && (
+                        {visibleCount < notificationEvents.filter(e => !isMuted(e.pubkey) && !isContentMuted(e)).length && (
                           <div style={{ padding: "20px", textAlign: "center" }}>
                             <div style={{ width: 20, height: 20, border: "2px solid var(--border)", borderTopColor: "var(--primary)", borderRadius: "50%", animation: "spin .7s linear infinite", margin: "0 auto" }} />
                           </div>
@@ -808,9 +854,17 @@ export default function App() {
                       <div key="hidden-muted" style={{ display: "none", height: "100%" }}>
                         <MutedPage
                           mutes={mutes}
+                          hashtags={mutedHashtags}
+                          words={mutedWords}
+                          threads={mutedThreads}
                           muteEvent={muteEvent}
                           profiles={profiles}
                           onUnmute={handleUnmuteUser}
+                          onMuteHashtag={handleMuteHashtag}
+                          onUnmuteHashtag={handleUnmuteHashtag}
+                          onMuteWord={handleMuteWord}
+                          onUnmuteWord={handleUnmuteWord}
+                          onUnmuteThread={handleUnmuteThread}
                           onOpenProfile={handleOpenProfile}
                         />
                       </div>
@@ -926,9 +980,15 @@ export default function App() {
                       <MutedPage
                         key="muted"
                         mutes={mutes}
+                        hashtags={mutedHashtags}
+                        words={mutedWords}
+                        threads={mutedThreads}
                         muteEvent={muteEvent}
                         profiles={profiles}
                         onUnmute={handleUnmuteUser}
+                        onUnmuteHashtag={handleUnmuteHashtag}
+                        onUnmuteWord={handleUnmuteWord}
+                        onUnmuteThread={handleUnmuteThread}
                         onOpenProfile={handleOpenProfile}
                       />
                     );

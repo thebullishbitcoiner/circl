@@ -262,7 +262,7 @@ export default function ThreadView({
   resolveEventById, onOpenPollVotes,
   customEmojis,
 }) {
-  const { isMuted } = useNavigation();
+  const { isMuted, isContentMuted } = useNavigation();
   const containerRef = useRef(null);
   const focusRef     = useRef(null);
   const authorPk     = focusedEvent.pubkey;
@@ -380,7 +380,7 @@ export default function ThreadView({
 
   const otherReplies = allEvents.filter(e => {
     if ((e.kind !== 1 && e.kind !== 1111) || chainIds.has(e.id) || isQuoteRepost(e)) return false;
-    if (isMuted?.(e.pubkey)) return false;
+    if (isMuted?.(e.pubkey) || isContentMuted?.(e)) return false;
     return directReplyParentId(e) === focusedEvent.id;
   }).sort((a, b) => a.created_at - b.created_at);
 

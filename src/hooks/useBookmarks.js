@@ -46,6 +46,10 @@ function hasNip44() {
   );
 }
 
+function hasNip04() {
+  return typeof window !== "undefined" && typeof window.nostr?.nip04?.decrypt === "function";
+}
+
 // Cache stores decrypted bookmark tags per account — no crypto needed on reload
 function readCache(pk) {
   try { return JSON.parse(localStorage.getItem(CACHE_KEY))?.[pk] ?? null; } catch { return null; }
@@ -96,19 +100,30 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
       let decrypted = [];
       const content = (ev.content || "").trim();
       // On mobile the signer may not be injected yet — wait up to 3 s
-      if (content && !hasNip44()) {
+      if (content && !hasNip44() && !hasNip04()) {
         for (let i = 0; i < 6; i++) {
           await new Promise(r => setTimeout(r, 500));
-          if (cancelled || hasNip44()) break;
+          if (cancelled || hasNip44() || hasNip04()) break;
         }
       }
       if (cancelled || generation !== gen) return;
-      if (content && hasNip44()) {
-        try {
-          const plain = await window.nostr.nip44.decrypt(ev.pubkey, ev.content);
-          const parsed = JSON.parse(plain);
-          if (Array.isArray(parsed)) decrypted = parsed;
-        } catch {}
+      if (content && (hasNip44() || hasNip04())) {
+        let plain = null;
+        // NIP-51: detect encryption by presence of "?iv=" (NIP-04) vs its absence (NIP-44)
+        const looksLikeNip04 = content.includes("?iv=");
+        if (looksLikeNip04) {
+          if (hasNip04()) try { plain = await window.nostr.nip04.decrypt(ev.pubkey, ev.content); } catch {}
+          if (!plain && hasNip44()) try { plain = await window.nostr.nip44.decrypt(ev.pubkey, ev.content); } catch {}
+        } else {
+          if (hasNip44()) try { plain = await window.nostr.nip44.decrypt(ev.pubkey, ev.content); } catch {}
+          if (!plain && hasNip04()) try { plain = await window.nostr.nip04.decrypt(ev.pubkey, ev.content); } catch {}
+        }
+        if (plain) {
+          try {
+            const parsed = JSON.parse(plain);
+            if (Array.isArray(parsed)) decrypted = parsed;
+          } catch {}
+        }
       }
       if (!cancelled && generation === gen) {
         const merged = mergeBookmarkTags(decrypted, ev.tags);

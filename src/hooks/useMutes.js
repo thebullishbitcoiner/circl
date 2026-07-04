@@ -14,47 +14,93 @@ function hasNip44() {
   );
 }
 
-// Cache stores decrypted pubkeys per account — no crypto needed on reload
+function hasNip04() {
+  return typeof window !== "undefined" && typeof window.nostr?.nip04?.decrypt === "function";
+}
+
 function readCache(pk) {
   try { return JSON.parse(localStorage.getItem(CACHE_KEY))?.[pk] ?? null; } catch { return null; }
 }
-function writeCache(pk, pubkeys, created_at) {
+
+function writeCache(pk, data, created_at) {
   try {
     const store = JSON.parse(localStorage.getItem(CACHE_KEY) ?? "{}");
-    store[pk] = { created_at, pubkeys };
+    store[pk] = { created_at, ...data };
     localStorage.setItem(CACHE_KEY, JSON.stringify(store));
   } catch {}
 }
 
+function parseMuteTags(tags) {
+  const pubkeys = [], hashtags = [], words = [], threads = [];
+  for (const t of tags) {
+    if (!Array.isArray(t) || !t[1]) continue;
+    if (t[0] === "p" && isHexPubkey(normPubkey(t[1]))) {
+      const norm = normPubkey(t[1]);
+      if (!pubkeys.includes(norm)) pubkeys.push(norm);
+    } else if (t[0] === "t") {
+      const norm = t[1].toLowerCase().replace(/^#/, "");
+      if (norm && !hashtags.includes(norm)) hashtags.push(norm);
+    } else if (t[0] === "word") {
+      const norm = t[1].toLowerCase();
+      if (norm && !words.includes(norm)) words.push(norm);
+    } else if (t[0] === "e") {
+      if (!threads.includes(t[1])) threads.push(t[1]);
+    }
+  }
+  return { pubkeys, hashtags, words, threads };
+}
+
+function mergeUniq(a, b) {
+  const out = [...a];
+  for (const x of b) if (!out.includes(x)) out.push(x);
+  return out;
+}
+
 export default function useMutes({ pubkey, signAndPublish } = {}) {
-  const [mutes, setMutes] = useState(() => {
-    const pk = normPubkey(pubkey);
-    return isHexPubkey(pk) ? (readCache(pk)?.pubkeys ?? []) : [];
-  });
+  const cached0 = readCache(normPubkey(pubkey));
+
+  const [mutes, setMutes] = useState(cached0?.pubkeys ?? []);
+  const [hashtags, setHashtags] = useState(cached0?.hashtags ?? []);
+  const [words, setWords] = useState(cached0?.words ?? []);
+  const [threads, setThreads] = useState(cached0?.threads ?? []);
   const [muteEvent, setMuteEvent] = useState(null);
+
   const mutesRef = useRef(mutes);
+  const hashtagsRef = useRef(hashtags);
+  const wordsRef = useRef(words);
+  const threadsRef = useRef(threads);
+
   useEffect(() => { mutesRef.current = mutes; }, [mutes]);
+  useEffect(() => { hashtagsRef.current = hashtags; }, [hashtags]);
+  useEffect(() => { wordsRef.current = words; }, [words]);
+  useEffect(() => { threadsRef.current = threads; }, [threads]);
+
   const unreadableRef = useRef(false);
-  const settledRef = useRef(!!readCache(normPubkey(pubkey)));
+  const settledRef = useRef(!!cached0);
 
   useEffect(() => {
     const pk = normPubkey(pubkey);
-    if (!isHexPubkey(pk)) { setMutes([]); unreadableRef.current = false; return; }
+    if (!isHexPubkey(pk)) {
+      setMutes([]); setHashtags([]); setWords([]); setThreads([]);
+      unreadableRef.current = false;
+      return;
+    }
 
     let cancelled = false;
     let generation = 0;
     unreadableRef.current = false;
 
-    // Restore from decrypted cache immediately — no relay round-trip or crypto needed
     const cached = readCache(pk);
     if (cached) {
-      setMutes(cached.pubkeys);
+      setMutes(cached.pubkeys ?? []);
+      setHashtags(cached.hashtags ?? []);
+      setWords(cached.words ?? []);
+      setThreads(cached.threads ?? []);
     } else {
-      setMutes([]);
+      setMutes([]); setHashtags([]); setWords([]); setThreads([]);
       setMuteEvent(null);
     }
 
-    // Track the best event seen; skip relay events older than what we have cached
     let latestEvent = null;
     let knownCreatedAt = cached?.created_at ?? 0;
     let processTimer = null;
@@ -66,44 +112,70 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
       const gen = ++generation;
       const ev = latestEvent;
 
-      let pubkeys = [];
       let decryptFailed = false;
       const content = (ev.content || "").trim();
-      // On mobile the signer may not be injected yet — wait up to 3 s
-      if (content && !hasNip44()) {
+
+      if (content && !hasNip44() && !hasNip04()) {
         for (let i = 0; i < 6; i++) {
           await new Promise(r => setTimeout(r, 500));
-          if (cancelled || hasNip44()) break;
+          if (cancelled || hasNip44() || hasNip04()) break;
         }
       }
       if (cancelled || generation !== gen) return;
-      if (content && hasNip44()) {
-        try {
-          const plain = await window.nostr.nip44.decrypt(ev.pubkey, ev.content);
-          const parsed = JSON.parse(plain);
-          if (Array.isArray(parsed))
-            pubkeys = parsed.filter(p => typeof p === "string" && isHexPubkey(normPubkey(p))).map(normPubkey);
-        } catch { decryptFailed = true; }
+
+      let privateTags = [];
+      if (content && (hasNip44() || hasNip04())) {
+        let plain = null;
+        // NIP-51: detect encryption by presence of "?iv=" (NIP-04) vs its absence (NIP-44)
+        const looksLikeNip04 = content.includes("?iv=");
+        if (looksLikeNip04) {
+          if (hasNip04()) try { plain = await window.nostr.nip04.decrypt(ev.pubkey, ev.content); } catch {}
+          if (!plain && hasNip44()) try { plain = await window.nostr.nip44.decrypt(ev.pubkey, ev.content); } catch {}
+        } else {
+          if (hasNip44()) try { plain = await window.nostr.nip44.decrypt(ev.pubkey, ev.content); } catch {}
+          if (!plain && hasNip04()) try { plain = await window.nostr.nip04.decrypt(ev.pubkey, ev.content); } catch {}
+        }
+        if (plain) {
+          try {
+            const parsed = JSON.parse(plain);
+            if (Array.isArray(parsed)) {
+              if (parsed.length > 0 && Array.isArray(parsed[0])) {
+                // NIP-51 standard: array of tag arrays [["p","..."], ["t","nostr"], ...]
+                privateTags = parsed;
+              } else {
+                // Legacy Circl format: array of pubkey strings ["pk1", "pk2", ...]
+                privateTags = parsed
+                  .filter(p => typeof p === "string" && isHexPubkey(normPubkey(p)))
+                  .map(p => ["p", normPubkey(p)]);
+              }
+            }
+          } catch { decryptFailed = true; }
+        } else {
+          decryptFailed = true;
+        }
       } else if (content) {
         decryptFailed = true;
       }
-      if (!decryptFailed) {
-        for (const t of ev.tags || []) {
-          if (t[0] === "p" && isHexPubkey(normPubkey(t[1]))) {
-            const norm = normPubkey(t[1]);
-            if (!pubkeys.includes(norm)) pubkeys.push(norm);
-          }
-        }
-      }
+
       if (!cancelled && generation === gen) {
         unreadableRef.current = decryptFailed;
-        setMutes(pubkeys);
-        mutesRef.current = pubkeys;
-        setMuteEvent(ev);
         if (!decryptFailed) {
-          writeCache(pk, pubkeys, ev.created_at);
+          const pub = parseMuteTags(ev.tags || []);
+          const priv = parseMuteTags(privateTags);
+          const result = {
+            pubkeys: mergeUniq(priv.pubkeys, pub.pubkeys),
+            hashtags: mergeUniq(priv.hashtags, pub.hashtags),
+            words: mergeUniq(priv.words, pub.words),
+            threads: mergeUniq(priv.threads, pub.threads),
+          };
+          setMutes(result.pubkeys); mutesRef.current = result.pubkeys;
+          setHashtags(result.hashtags); hashtagsRef.current = result.hashtags;
+          setWords(result.words); wordsRef.current = result.words;
+          setThreads(result.threads); threadsRef.current = result.threads;
+          writeCache(pk, result, ev.created_at);
           knownCreatedAt = ev.created_at;
         }
+        setMuteEvent(ev);
         settledRef.current = true;
       }
     };
@@ -117,7 +189,9 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
           processTimer = setTimeout(process, 300);
         }
       },
-      error: () => { if (!cancelled && !cached) setMutes([]); },
+      error: () => {
+        if (!cancelled && !cached) { setMutes([]); setHashtags([]); setWords([]); setThreads([]); }
+      },
     });
 
     const cutoffTimer = setTimeout(() => { sub.unsubscribe(); settledRef.current = true; process(); }, 8000);
@@ -130,46 +204,75 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
     };
   }, [pubkey]);
 
-  const persist = useCallback(
-    async nextMutes => {
+  const persistAll = useCallback(
+    async (pks, hts, wds, ths) => {
       const pk = normPubkey(pubkey);
       if (!signAndPublish || !isHexPubkey(pk)) throw new Error("Sign in to update mute list");
       if (!hasNip44()) throw new Error("Your wallet does not support NIP-44 (update the extension)");
       if (!settledRef.current) throw new Error("Mute list is still syncing from relays, please try again in a moment");
       if (unreadableRef.current) throw new Error("Existing mute list was created by a different signer and cannot be safely modified");
-      const ciphertext = await window.nostr.nip44.encrypt(pk, JSON.stringify(nextMutes));
+      const allTags = [
+        ...pks.map(p => ["p", p]),
+        ...hts.map(t => ["t", t]),
+        ...wds.map(w => ["word", w]),
+        ...ths.map(e => ["e", e]),
+      ];
+      const ciphertext = await window.nostr.nip44.encrypt(pk, JSON.stringify(allTags));
       await signAndPublish({ kind: MUTE_LIST_KIND, content: ciphertext, tags: [] });
     },
     [signAndPublish, pubkey]
   );
 
-  const mute = useCallback(
-    async targetPk => {
-      const norm = normPubkey(targetPk);
-      if (!isHexPubkey(norm)) return;
-      const prev = mutesRef.current;
-      if (prev.includes(norm)) return;
-      const next = [...prev, norm];
-      mutesRef.current = next;
-      setMutes(next);
-      try { await persist(next); } catch (e) { mutesRef.current = prev; setMutes(prev); throw e; }
-    },
-    [persist]
-  );
+  const mute = useCallback(async targetPk => {
+    const norm = normPubkey(targetPk);
+    if (!isHexPubkey(norm)) return;
+    const prev = mutesRef.current;
+    if (prev.includes(norm)) return;
+    const next = [...prev, norm];
+    mutesRef.current = next; setMutes(next);
+    try { await persistAll(next, hashtagsRef.current, wordsRef.current, threadsRef.current); }
+    catch (e) { mutesRef.current = prev; setMutes(prev); throw e; }
+  }, [persistAll]);
 
-  const unmute = useCallback(
-    async targetPk => {
-      const norm = normPubkey(targetPk);
-      if (!isHexPubkey(norm)) return;
-      const prev = mutesRef.current;
-      const next = prev.filter(p => p !== norm);
-      if (next.length === prev.length) return;
-      mutesRef.current = next;
-      setMutes(next);
-      try { await persist(next); } catch (e) { mutesRef.current = prev; setMutes(prev); throw e; }
-    },
-    [persist]
-  );
+  const unmute = useCallback(async targetPk => {
+    const norm = normPubkey(targetPk);
+    if (!isHexPubkey(norm)) return;
+    const prev = mutesRef.current;
+    const next = prev.filter(p => p !== norm);
+    if (next.length === prev.length) return;
+    mutesRef.current = next; setMutes(next);
+    try { await persistAll(next, hashtagsRef.current, wordsRef.current, threadsRef.current); }
+    catch (e) { mutesRef.current = prev; setMutes(prev); throw e; }
+  }, [persistAll]);
+
+  const unmuteHashtag = useCallback(async hashtag => {
+    const norm = hashtag.toLowerCase().replace(/^#/, "");
+    const prev = hashtagsRef.current;
+    const next = prev.filter(h => h !== norm);
+    if (next.length === prev.length) return;
+    hashtagsRef.current = next; setHashtags(next);
+    try { await persistAll(mutesRef.current, next, wordsRef.current, threadsRef.current); }
+    catch (e) { hashtagsRef.current = prev; setHashtags(prev); throw e; }
+  }, [persistAll]);
+
+  const unmuteWord = useCallback(async word => {
+    const norm = word.toLowerCase().trim();
+    const prev = wordsRef.current;
+    const next = prev.filter(w => w !== norm);
+    if (next.length === prev.length) return;
+    wordsRef.current = next; setWords(next);
+    try { await persistAll(mutesRef.current, hashtagsRef.current, next, threadsRef.current); }
+    catch (e) { wordsRef.current = prev; setWords(prev); throw e; }
+  }, [persistAll]);
+
+  const unmuteThread = useCallback(async eventId => {
+    const prev = threadsRef.current;
+    const next = prev.filter(t => t !== eventId);
+    if (next.length === prev.length) return;
+    threadsRef.current = next; setThreads(next);
+    try { await persistAll(mutesRef.current, hashtagsRef.current, wordsRef.current, next); }
+    catch (e) { threadsRef.current = prev; setThreads(prev); throw e; }
+  }, [persistAll]);
 
   const isMuted = useCallback(
     targetPk => {
@@ -178,6 +281,27 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [mutes]
+  );
+
+  const isContentMuted = useCallback(
+    event => {
+      if (!event) return false;
+      if (hashtagsRef.current.length > 0) {
+        for (const t of event.tags || []) {
+          if (t[0] === "t" && t[1] && hashtagsRef.current.includes(t[1].toLowerCase().replace(/^#/, "")))
+            return true;
+        }
+      }
+      if (wordsRef.current.length > 0 && event.content) {
+        const lower = event.content.toLowerCase();
+        for (const word of wordsRef.current) {
+          if (lower.includes(word)) return true;
+        }
+      }
+      return false;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [hashtags, words]
   );
 
   const toggleMute = useCallback(
@@ -189,5 +313,31 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
     [mute, unmute]
   );
 
-  return { mutes, muteEvent, mute, unmute, isMuted, toggleMute };
+  const muteHashtag = useCallback(async tag => {
+    const norm = tag.toLowerCase().replace(/^#/, "");
+    if (!norm) return;
+    const prev = hashtagsRef.current;
+    if (prev.includes(norm)) return;
+    const next = [...prev, norm];
+    hashtagsRef.current = next; setHashtags(next);
+    try { await persistAll(mutesRef.current, next, wordsRef.current, threadsRef.current); }
+    catch (e) { hashtagsRef.current = prev; setHashtags(prev); throw e; }
+  }, [persistAll]);
+
+  const muteWord = useCallback(async word => {
+    const norm = word.toLowerCase().trim();
+    if (!norm) return;
+    const prev = wordsRef.current;
+    if (prev.includes(norm)) return;
+    const next = [...prev, norm];
+    wordsRef.current = next; setWords(next);
+    try { await persistAll(mutesRef.current, hashtagsRef.current, next, threadsRef.current); }
+    catch (e) { wordsRef.current = prev; setWords(prev); throw e; }
+  }, [persistAll]);
+
+  return {
+    mutes, hashtags, words, threads,
+    muteEvent, mute, unmute, muteHashtag, muteWord, unmuteHashtag, unmuteWord, unmuteThread,
+    isMuted, isContentMuted, toggleMute,
+  };
 }

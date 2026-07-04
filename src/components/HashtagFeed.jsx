@@ -17,7 +17,7 @@ export default function HashtagFeed({
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail, resolveEventById,
   customEmojis,
 }) {
-  const { isMuted } = useNavigation();
+  const { isMuted, isContentMuted } = useNavigation();
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const subRef = useRef(null);
@@ -77,7 +77,7 @@ export default function HashtagFeed({
         </div>
       )}
 
-      {notes.filter(ev => !isMuted?.(ev.pubkey)).map((ev, i) => (
+      {notes.filter(ev => !isMuted?.(ev.pubkey) && !isContentMuted?.(ev)).map((ev, i) => (
         <NoteCard
           key={ev.id}
           event={ev}
