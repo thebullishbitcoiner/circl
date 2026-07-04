@@ -373,7 +373,8 @@ export default function App() {
       return;
     }
     if (ev.kind === 7 || ev.kind === 9735) {
-      const id = ev.tags?.find(t => t[0] === "e")?.[1];
+      const eTags = ev.tags?.filter(t => t[0] === "e") ?? [];
+      const id = eTags[eTags.length - 1]?.[1];
       if (!id) {
         showToast("No note linked to this event");
         return;
