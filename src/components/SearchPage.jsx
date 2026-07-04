@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useMemo } from "react";
 import useProfiles from "../hooks/useProfiles.js";
 import useSearchRelays from "../hooks/useSearchRelays.js";
 import { pool, eventStore } from "../nostr.js";
-import { displayName, relativeTime, nip19, normPubkey, isHexPubkey } from "../utils.js";
+import { displayName, relativeTime, nip19, normPubkey, isHexPubkey, truncNpub } from "../utils.js";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 
@@ -51,7 +51,7 @@ function RecentSearchItem({ item, profiles, onSelect, onDelete }) {
     const pk  = item.pubkey;
     const p   = profiles?.[pk] || {};
     const name = p.display_name || p.name || "";
-    const sub  = p.nip05 || (() => { try { const n = nip19.npubEncode(pk); return n.slice(0, 11) + ":" + n.slice(-11); } catch { return ""; } })();
+    const sub  = p.nip05 || truncNpub(pk);
     return (
       <div className="search-result" role="button" tabIndex={0}
         onClick={() => onSelect(item)}
@@ -103,9 +103,7 @@ function ProfileSuggestion({ ev, onOpenProfile }) {
   const name = (typeof meta.display_name === "string" ? meta.display_name : "") || (typeof meta.name === "string" ? meta.name : "");
   const pk   = ev.pubkey;
   const nip05 = typeof meta.nip05 === "string" ? meta.nip05 : "";
-  const sub  = nip05 || (() => {
-    try { const n = nip19.npubEncode(pk); return n.slice(0, 11) + ":" + n.slice(-11); } catch { return ""; }
-  })();
+  const sub  = nip05 || truncNpub(pk);
 
   return (
     <div className="search-result" role="button" tabIndex={0}

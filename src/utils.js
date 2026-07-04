@@ -44,7 +44,7 @@ export const truncNpub = pk => {
   const h = normPubkey(pk);
   try {
     const npub = nip19.npubEncode(h);
-    return `${npub.slice(0, 11)}...${npub.slice(-11)}`;
+    return `${npub.slice(0, 11)}…${npub.slice(-11)}`;
   } catch { return (pk?.slice(0, 8) ?? "") + "…"; }
 };
 
