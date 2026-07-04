@@ -53,7 +53,9 @@ import FeedItem from "./components/FeedItem.jsx";
 import StreamCard from "./components/StreamCard.jsx";
 import StreamDetailView from "./components/StreamDetailView.jsx";
 import ComposeSheet from "./components/ComposeSheet.jsx";
+import DraftsSheet from "./components/DraftsSheet.jsx";
 import { DraftsProvider } from "./contexts/DraftsContext.jsx";
+import useDrafts from "./hooks/useDrafts.js";
 import ProfilePage from "./components/ProfilePage.jsx";
 import RelaysCard from "./components/RelaysCard.jsx";
 import ParticipantsCard from "./components/ParticipantsCard.jsx";
@@ -227,6 +229,7 @@ export default function App() {
   }, [mergedFeedPool, events, follows, pubkey, zapsByEvent, reactionsByEvent, notificationEvents, mutes, circles]);
   const { profiles } = useProfiles({ pubkeys: allPks });
   const { publish, publishEvent, publishHighlight } = usePublish({ signAndPublish, pubkey });
+  const draftCtx = useDrafts({ pubkey, signAndPublish });
   const isMobile = useIsMobile();
   const { dark, toggle: toggleDark } = useDarkMode();
   const { textSize, setTextSize } = useTextSize();
@@ -284,12 +287,37 @@ export default function App() {
     if (navStack.length > 0) popNav();
   };
 
+  const handleOpenDraft = async (draftId) => {
+    setOpeningDraftId(draftId);
+    setComposeReplyTo(null);
+    setComposeQuotedEvent(null);
+    if (draftId.startsWith("reply-")) {
+      const ev = await resolveEventById(draftId.slice(6));
+      setOpeningDraftId(null);
+      if (!ev) return;
+      setComposeReplyTo(ev);
+    } else if (draftId.startsWith("quote-")) {
+      const ev = await resolveEventById(draftId.slice(6));
+      setOpeningDraftId(null);
+      if (!ev) return;
+      setComposeQuotedEvent(ev);
+    } else {
+      setOpeningDraftId(null);
+    }
+    setDraftsOpen(false);
+    setFloatingCompose(true);
+  };
+
   const { wallet, saveWallet, disconnect: disconnectWallet } = useWallet();
   const { sendZap } = useZap(wallet);
   const { zapSettings, saveZapSettings } = useZapSettings();
   const { balance: walletBalance, transactions: walletTxs, flow24h: walletFlow24h, hasMore: walletHasMore, loadMore: walletLoadMore, loadingMore: walletLoadingMore, loading: walletLoading, error: walletError, refresh: refreshWallet } = useWalletData(wallet);
   const [floatingCompose, setFloatingCompose] = useState(false);
   const [composeCircle, setComposeCircle] = useState(null);
+  const [composeReplyTo, setComposeReplyTo] = useState(null);
+  const [composeQuotedEvent, setComposeQuotedEvent] = useState(null);
+  const [draftsOpen, setDraftsOpen] = useState(false);
+  const [openingDraftId, setOpeningDraftId] = useState(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const [panelModal, setPanelModal] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -469,7 +497,7 @@ export default function App() {
 
   return (
     <AudioProvider>
-    <DraftsProvider pubkey={pubkey} signAndPublish={signAndPublish}>
+    <DraftsProvider value={draftCtx}>
     <NavigationContext.Provider value={{
       onOpenThread: handleOpenThread,
       onOpenProfile: handleOpenProfile,
@@ -530,6 +558,15 @@ export default function App() {
             Settings
           </button>
           <button className="compose-btn" onClick={() => setFloatingCompose(true)}>+ New Note</button>
+          {Object.keys(draftCtx.drafts).length > 0 && (
+            <button
+              className="compose-btn"
+              onClick={() => setDraftsOpen(true)}
+              style={{ background: "none", color: "var(--primary)", border: "1px solid color-mix(in srgb, var(--primary) 35%, transparent)", marginTop: 6, fontSize: 13 }}
+            >
+              Drafts ({Object.keys(draftCtx.drafts).length})
+            </button>
+          )}
           <div className="sidebar-profile" onClick={() => navigate("profile")}>
             <div className="sidebar-av">{myProfile?.picture ? <img src={myProfile.picture} alt="me" /> : avatarInitial(pubkey, profiles)}</div>
             <div><div className="sidebar-name">{myDisplayName}</div><div className="sidebar-npub">{myNpub}</div></div>
@@ -717,17 +754,26 @@ export default function App() {
               )}
               {floatingCompose && (
                 <ComposeSheet
+                  replyTo={composeReplyTo}
+                  quotedEvent={composeQuotedEvent}
                   profiles={profiles}
                   myPubkey={pubkey}
                   myProfile={myProfile}
                   onPost={text => { publish(text).then(s => s && prependEvent(s)); }}
                   publishEvent={publishEvent}
                   onPrepend={prependEvent}
-                  onDismiss={() => { setFloatingCompose(false); setComposeCircle(null); }}
+                  onDismiss={() => { setFloatingCompose(false); setComposeCircle(null); setComposeReplyTo(null); setComposeQuotedEvent(null); }}
                   circles={circles}
                   initialCircle={composeCircle}
                   customEmojis={allCustomEmojis}
                   blossomServers={blossomServers}
+                />
+              )}
+              {draftsOpen && (
+                <DraftsSheet
+                  onDismiss={() => setDraftsOpen(false)}
+                  onOpen={handleOpenDraft}
+                  openingId={openingDraftId}
                 />
               )}
 

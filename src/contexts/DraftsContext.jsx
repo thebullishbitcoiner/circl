@@ -1,5 +1,4 @@
 import { createContext, useContext } from "react";
-import useDrafts from "../hooks/useDrafts.js";
 
 const DraftsContext = createContext({
   drafts: {},
@@ -9,8 +8,8 @@ const DraftsContext = createContext({
   getDraft: () => null,
 });
 
-export function DraftsProvider({ pubkey, signAndPublish, children }) {
-  const value = useDrafts({ pubkey, signAndPublish });
+// Accepts a pre-computed value so the parent can also access draft state directly.
+export function DraftsProvider({ value, children }) {
   return <DraftsContext.Provider value={value}>{children}</DraftsContext.Provider>;
 }
 
