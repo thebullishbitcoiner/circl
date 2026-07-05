@@ -5,6 +5,7 @@ import { pool, eventStore } from "../nostr.js";
 import { displayName, relativeTime, nip19, normPubkey, isHexPubkey, truncNpub } from "../utils.js";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
+import MutedNoteGate from "./MutedNoteGate.jsx";
 
 const DEFAULT_SEARCH_RELAYS = [
   "wss://relay.primal.net",
@@ -130,6 +131,7 @@ function ProfileSuggestion({ ev, onOpenProfile }) {
 
 function NoteResult({ ev, profiles, onOpenProfile, onOpenThread }) {
   return (
+    <MutedNoteGate event={ev}>
     <div className="search-result note" role="button" tabIndex={0}
       onClick={() => onOpenThread?.(ev)}
       onKeyDown={e => { if (e.key === "Enter" || e.key === " ") onOpenThread?.(ev); }}
@@ -145,6 +147,7 @@ function NoteResult({ ev, profiles, onOpenProfile, onOpenThread }) {
         <NoteContent content={ev.content} tags={ev.tags} profiles={profiles} allEvents={[]} allowEmbeds={false} className="search-note-text" />
       </div>
     </div>
+    </MutedNoteGate>
   );
 }
 

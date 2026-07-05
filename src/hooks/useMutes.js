@@ -285,20 +285,20 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
 
   const isContentMuted = useCallback(
     event => {
-      if (!event) return false;
+      if (!event) return null;
       if (hashtagsRef.current.length > 0) {
         for (const t of event.tags || []) {
           if (t[0] === "t" && t[1] && hashtagsRef.current.includes(t[1].toLowerCase().replace(/^#/, "")))
-            return true;
+            return `#${t[1].toLowerCase().replace(/^#/, "")}`;
         }
       }
       if (wordsRef.current.length > 0 && event.content) {
         const lower = event.content.toLowerCase();
         for (const word of wordsRef.current) {
-          if (lower.includes(word)) return true;
+          if (lower.includes(word)) return word;
         }
       }
-      return false;
+      return null;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [hashtags, words]

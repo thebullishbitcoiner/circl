@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useMemo } from "react";
 import { useNavigation } from "../context/NavigationContext.jsx";
+import MutedNoteGate from "./MutedNoteGate.jsx";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteActions from "./NoteActions.jsx";
@@ -262,7 +263,6 @@ export default function ThreadView({
   resolveEventById, onOpenPollVotes,
   customEmojis,
 }) {
-  const { isMuted, isContentMuted } = useNavigation();
   const containerRef = useRef(null);
   const focusRef     = useRef(null);
   const authorPk     = focusedEvent.pubkey;
@@ -380,7 +380,6 @@ export default function ThreadView({
 
   const otherReplies = allEvents.filter(e => {
     if ((e.kind !== 1 && e.kind !== 1111) || chainIds.has(e.id) || isQuoteRepost(e)) return false;
-    if (isMuted?.(e.pubkey) || isContentMuted?.(e)) return false;
     return directReplyParentId(e) === focusedEvent.id;
   }).sort((a, b) => a.created_at - b.created_at);
 
@@ -445,7 +444,9 @@ export default function ThreadView({
         <>
           <div className="thread-replies-label">{otherReplies.length} {otherReplies.length === 1 ? "reply" : "replies"}</div>
           {otherReplies.map(e => (
-            <ThreadNoteRow key={e.id} event={e} variant="reply" hasConnector={false} {...rowProps} />
+            <MutedNoteGate key={e.id} event={e}>
+              <ThreadNoteRow event={e} variant="reply" hasConnector={false} {...rowProps} />
+            </MutedNoteGate>
           ))}
         </>
       )}

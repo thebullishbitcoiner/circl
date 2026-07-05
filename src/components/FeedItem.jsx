@@ -1,3 +1,4 @@
+import { useState } from "react";
 import LongformCard from "./LongformCard.jsx";
 import NoteCard from "./NoteCard.jsx";
 import RepostCard from "./RepostCard.jsx";
@@ -8,6 +9,7 @@ import HighlightCard from "./HighlightCard.jsx";
 import ZapGoalCard from "./ZapGoalCard.jsx";
 import PodcastZapCard from "./PodcastZapCard.jsx";
 import { replyCount, repostAndQuoteCount } from "../utils.js";
+import { useNavigation } from "../context/NavigationContext.jsx";
 
 /**
  * Dispatches a Nostr event to the correct card component.
@@ -33,7 +35,47 @@ export default function FeedItem({
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
   customEmojis,
   delay = 0,
+  skipUserMuteGate = false,
 }) {
+  const { isMuted, isContentMuted } = useNavigation();
+  const [revealed, setRevealed] = useState(false);
+  const muteReason = revealed ? null : (isContentMuted?.(event) || (!skipUserMuteGate && isMuted?.(event?.pubkey) ? "user" : null));
+
+  if (muteReason) {
+    return (
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "10px 16px",
+        borderBottom: "1px solid var(--border)",
+        gap: 12,
+      }}>
+        <span style={{ fontSize: 13, color: "var(--text-muted)", fontFamily: "'DM Sans', sans-serif" }}>
+          {muteReason === "user" ? "Muted user" : <>Muted · <span style={{ color: "var(--text-faint)" }}>{muteReason}</span></>}
+        </span>
+        <button
+          type="button"
+          onClick={() => setRevealed(true)}
+          style={{
+            flexShrink: 0,
+            fontSize: 12,
+            fontFamily: "'DM Sans', sans-serif",
+            fontWeight: 600,
+            color: "var(--primary)",
+            background: "transparent",
+            border: "1px solid var(--primary)",
+            borderRadius: 20,
+            padding: "3px 12px",
+            cursor: "pointer",
+          }}
+        >
+          Show
+        </button>
+      </div>
+    );
+  }
+
   const like = getLike?.(event.id) ?? { liked: false, count: 0 };
 
   // Shared props for cards that use NoteActions internally

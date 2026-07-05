@@ -510,7 +510,7 @@ export default function App() {
     if (nav === "zaps" && activeNav !== "zaps") refreshWallet();
   };
 
-  const displayEvs = (activeNav === "bookmarks" ? bookmarkFeedEvents : events).filter(e => !isMuted(e.pubkey) && !isContentMuted(e) && !isDeleted(e));
+  const displayEvs = (activeNav === "bookmarks" ? bookmarkFeedEvents : events).filter(e => !isDeleted(e));
   const isLoading = fl || el;
   const anyPanelOpen = settingsOpen || !!openStreamEvent || navStack.length > 0;
   const myProfile = profiles[pubkey];
@@ -986,7 +986,9 @@ export default function App() {
                         muteEvent={muteEvent}
                         profiles={profiles}
                         onUnmute={handleUnmuteUser}
+                        onMuteHashtag={handleMuteHashtag}
                         onUnmuteHashtag={handleUnmuteHashtag}
+                        onMuteWord={handleMuteWord}
                         onUnmuteWord={handleUnmuteWord}
                         onUnmuteThread={handleUnmuteThread}
                         onOpenProfile={handleOpenProfile}

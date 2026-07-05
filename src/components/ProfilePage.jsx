@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteCard from "./NoteCard.jsx";
+import MutedNoteGate from "./MutedNoteGate.jsx";
 import PollCard from "./PollCard.jsx";
 import NoteActions from "./NoteActions.jsx";
 import ProfileText from "./ProfileText.jsx";
@@ -161,6 +162,8 @@ export default function ProfilePage({
   ownPinnedIds,
 }) {
   const { isMuted } = useNavigation();
+  const isProfileMuted = isMuted?.(pubkey);
+  const [mutedRevealed, setMutedRevealed] = useState(false);
 
   const [tab, setTab] = useState("notes");
 
@@ -859,12 +862,12 @@ export default function ProfilePage({
   }, [events, profileEvents, articleEvents, highlightEventsList, repostExtras]);
 
   const theirEvents = useMemo(
-    () => isMuted?.(pubkey) ? [] : mergedEvents.filter(e =>
+    () => mergedEvents.filter(e =>
       e.pubkey === pubkey &&
       (e.kind === 1 || e.kind === 6 || e.kind === 9802 || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311 || e.kind === 9041 || e.kind === 9735 || e.kind === 30023) &&
       !deletedIds.has(e.id)
     ),
-    [mergedEvents, pubkey, isMuted, deletedIds]
+    [mergedEvents, pubkey, deletedIds]
   );
 
   const topLevel = useMemo(
@@ -1151,82 +1154,95 @@ export default function ProfilePage({
               onOpenThread={onOpenThread}
             />
           )}
-          {profileLoading && topLevel.length === 0
-            ? [0, 1, 2].map(i => <SkelCard key={i} />)
-            : topLevel.length === 0
-              ? <div className="empty-state"><div className="empty-state-title">No notes yet</div><div className="empty-state-sub">Notes, reposts, and quote reposts will appear here</div></div>
-              : topLevel.slice(0, visibleNotes).map(e =>
-                <FeedItem
-                  key={e.id}
-                  event={e}
-                  profiles={profiles}
-                  myPubkey={myPubkey}
-                  myProfile={myProfile}
-                  events={mergedEvents}
-                  resolveEventById={resolveEventById}
-                  isBookmarked={isBookmarked}
-                  onBookmark={onBookmark}
-                  onOpenProfile={onOpenProfile}
-                  onOpenThread={onOpenThread}
-                  onOpenHashtag={onOpenHashtag}
-                  onOpenArticle={onOpenArticle}
-                  onOpenStream={onOpenStream}
-                  onOpenZaps={onOpenZaps}
-                  onOpenReactions={onOpenReactions}
-                  onOpenReposts={onOpenReposts}
-                  onOpenPollVotes={onOpenPollVotes}
-                  onPublish={onPublish}
-                  publishEvent={publishEvent}
-                  onPrepend={onPrepend}
-                  onRequestModal={onRequestModal}
-                  onDismissModal={onDismissModal}
-                  getLocalZaps={getLocalZaps}
-                  addLocalZap={addLocalZap}
-                  getLocalReactions={getLocalReactions}
-                  setLocalReaction={setLocalReaction}
-                  sendZap={sendZap}
-                  defaultZapAmount={defaultZapAmount}
-                  defaultZapMsg={defaultZapMsg}
-                  onZapFail={onZapFail}
-                  customEmojis={customEmojis}
-                  delay={0}
-                />
-              )
+          {isProfileMuted && !mutedRevealed
+            ? <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", gap: 12 }}>
+                <span style={{ fontSize: 13, color: "var(--text-muted)", fontFamily: "'DM Sans', sans-serif" }}>Muted user</span>
+                <button type="button" onClick={() => setMutedRevealed(true)} style={{ flexShrink: 0, fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: "var(--primary)", background: "transparent", border: "1px solid var(--primary)", borderRadius: 20, padding: "3px 12px", cursor: "pointer" }}>Show</button>
+              </div>
+            : profileLoading && topLevel.length === 0
+              ? [0, 1, 2].map(i => <SkelCard key={i} />)
+              : topLevel.length === 0
+                ? <div className="empty-state"><div className="empty-state-title">No notes yet</div><div className="empty-state-sub">Notes, reposts, and quote reposts will appear here</div></div>
+                : topLevel.slice(0, visibleNotes).map(e =>
+                  <FeedItem
+                    key={e.id}
+                    event={e}
+                    skipUserMuteGate
+                    profiles={profiles}
+                    myPubkey={myPubkey}
+                    myProfile={myProfile}
+                    events={mergedEvents}
+                    resolveEventById={resolveEventById}
+                    isBookmarked={isBookmarked}
+                    onBookmark={onBookmark}
+                    onOpenProfile={onOpenProfile}
+                    onOpenThread={onOpenThread}
+                    onOpenHashtag={onOpenHashtag}
+                    onOpenArticle={onOpenArticle}
+                    onOpenStream={onOpenStream}
+                    onOpenZaps={onOpenZaps}
+                    onOpenReactions={onOpenReactions}
+                    onOpenReposts={onOpenReposts}
+                    onOpenPollVotes={onOpenPollVotes}
+                    onPublish={onPublish}
+                    publishEvent={publishEvent}
+                    onPrepend={onPrepend}
+                    onRequestModal={onRequestModal}
+                    onDismissModal={onDismissModal}
+                    getLocalZaps={getLocalZaps}
+                    addLocalZap={addLocalZap}
+                    getLocalReactions={getLocalReactions}
+                    setLocalReaction={setLocalReaction}
+                    sendZap={sendZap}
+                    defaultZapAmount={defaultZapAmount}
+                    defaultZapMsg={defaultZapMsg}
+                    onZapFail={onZapFail}
+                    customEmojis={customEmojis}
+                    delay={0}
+                  />
+                )
           }
         </>
       )}
 
       {/* Replies tab */}
       {tab === "replies" && (
-        profileLoading && replies.length === 0
-          ? [0, 1, 2].map(i => <SkelCard key={i} />)
-          : replies.length === 0
-            ? <div className="empty-state"><div className="empty-state-title">No replies yet</div><div className="empty-state-sub">Replies to other notes will appear here</div></div>
-            : replies.slice(0, visibleReplies).map((e, i) => {
-              const parentId = directReplyParentId(e);
-              const parentEv = parentId
-                ? (mergedEvents.find(ev => ev.id === parentId) ?? parentEvents[parentId] ?? null)
-                : null;
-              const replyingToPk = parentEv?.pubkey ?? null;
-              return (
-                <NoteCard key={e.id} event={e} profiles={profiles}
-                  events={mergedEvents}
-                  resolveEventById={resolveEventById}
-                  replyingToPubkey={replyingToPk}
-                  liked={false} bookmarked={isBookmarked?.(e) || false} likeCount={0}
-                  replyCount={replyCount(e.id, mergedEvents)} repostCount={repostAndQuoteCount(e.id, mergedEvents)}
-                  myPubkey={myPubkey} myProfile={myProfile}
-                  onLike={() => {}} onBookmark={onBookmark}
-                  onOpenProfile={onOpenProfile} onOpenThread={onOpenThread}
-                  onOpenZaps={onOpenZaps} onOpenReactions={onOpenReactions} onOpenReposts={onOpenReposts}
-                  onPublish={onPublish} publishEvent={publishEvent} onPrepend={onPrepend}
-                  getLocalZaps={getLocalZaps} addLocalZap={addLocalZap}
-                  getLocalReactions={getLocalReactions} setLocalReaction={setLocalReaction}
-                  sendZap={sendZap} defaultZapAmount={defaultZapAmount}
-                  defaultZapMsg={defaultZapMsg} onZapFail={onZapFail}
-                  customEmojis={customEmojis}
-                  delay={0}
-                />
+        isProfileMuted && !mutedRevealed
+          ? <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", gap: 12 }}>
+              <span style={{ fontSize: 13, color: "var(--text-muted)", fontFamily: "'DM Sans', sans-serif" }}>Muted user</span>
+              <button type="button" onClick={() => setMutedRevealed(true)} style={{ flexShrink: 0, fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: "var(--primary)", background: "transparent", border: "1px solid var(--primary)", borderRadius: 20, padding: "3px 12px", cursor: "pointer" }}>Show</button>
+            </div>
+          : profileLoading && replies.length === 0
+            ? [0, 1, 2].map(i => <SkelCard key={i} />)
+            : replies.length === 0
+              ? <div className="empty-state"><div className="empty-state-title">No replies yet</div><div className="empty-state-sub">Replies to other notes will appear here</div></div>
+              : replies.slice(0, visibleReplies).map((e, i) => {
+                const parentId = directReplyParentId(e);
+                const parentEv = parentId
+                  ? (mergedEvents.find(ev => ev.id === parentId) ?? parentEvents[parentId] ?? null)
+                  : null;
+                const replyingToPk = parentEv?.pubkey ?? null;
+                return (
+                  <MutedNoteGate key={e.id} event={e} skipUserMute>
+                    <NoteCard event={e} profiles={profiles}
+                    events={mergedEvents}
+                    resolveEventById={resolveEventById}
+                    replyingToPubkey={replyingToPk}
+                    liked={false} bookmarked={isBookmarked?.(e) || false} likeCount={0}
+                    replyCount={replyCount(e.id, mergedEvents)} repostCount={repostAndQuoteCount(e.id, mergedEvents)}
+                    myPubkey={myPubkey} myProfile={myProfile}
+                    onLike={() => {}} onBookmark={onBookmark}
+                    onOpenProfile={onOpenProfile} onOpenThread={onOpenThread}
+                    onOpenZaps={onOpenZaps} onOpenReactions={onOpenReactions} onOpenReposts={onOpenReposts}
+                    onPublish={onPublish} publishEvent={publishEvent} onPrepend={onPrepend}
+                    getLocalZaps={getLocalZaps} addLocalZap={addLocalZap}
+                    getLocalReactions={getLocalReactions} setLocalReaction={setLocalReaction}
+                    sendZap={sendZap} defaultZapAmount={defaultZapAmount}
+                    defaultZapMsg={defaultZapMsg} onZapFail={onZapFail}
+                    customEmojis={customEmojis}
+                    delay={0}
+                  />
+                </MutedNoteGate>
               );
             })
       )}
