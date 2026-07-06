@@ -50,14 +50,14 @@ function hasNip04() {
   return typeof window !== "undefined" && typeof window.nostr?.nip04?.decrypt === "function";
 }
 
-// Cache stores decrypted bookmark tags per account — no crypto needed on reload
+// Cache stores decrypted bookmark tags + public key set per account
 function readCache(pk) {
   try { return JSON.parse(localStorage.getItem(CACHE_KEY))?.[pk] ?? null; } catch { return null; }
 }
-function writeCache(pk, items, created_at) {
+function writeCache(pk, items, publicKeys, created_at) {
   try {
     const store = JSON.parse(localStorage.getItem(CACHE_KEY) ?? "{}");
-    store[pk] = { created_at, items };
+    store[pk] = { created_at, items, publicKeys: [...publicKeys] };
     localStorage.setItem(CACHE_KEY, JSON.stringify(store));
   } catch {}
 }
@@ -70,6 +70,8 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
   const itemsRef = useRef(items);
   useEffect(() => { itemsRef.current = items; }, [items]);
   const settledRef = useRef(!!readCache(normPubkey(pubkey)));
+  // Tracks bookmark keys that live in public tags — preserved on publish, new additions always go private
+  const publicKeysRef = useRef(new Set(readCache(normPubkey(pubkey))?.publicKeys ?? []));
 
   useEffect(() => {
     const pk = normPubkey(pubkey);
@@ -127,9 +129,13 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
       }
       if (!cancelled && generation === gen) {
         const merged = mergeBookmarkTags(decrypted, ev.tags);
+        const publicKeys = new Set(
+          (ev.tags || []).filter(t => t[0] === "e" || t[0] === "a").map(t => bookmarkKey(t)).filter(Boolean)
+        );
         setItems(merged);
         itemsRef.current = merged;
-        writeCache(pk, merged, ev.created_at);
+        publicKeysRef.current = publicKeys;
+        writeCache(pk, merged, publicKeys, ev.created_at);
         knownCreatedAt = ev.created_at;
         settledRef.current = true;
       }
@@ -163,8 +169,13 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
       if (!signAndPublish || !isHexPubkey(pk)) throw new Error("Sign in to sync bookmarks");
       if (!hasNip44()) throw new Error("Your wallet does not support NIP-44 (update the extension)");
       if (!settledRef.current) throw new Error("Bookmarks are still syncing from relays, please try again in a moment");
-      const ciphertext = await window.nostr.nip44.encrypt(pk, JSON.stringify(nextItems));
-      await signAndPublish({ kind: BOOKMARK_LIST_KIND, content: ciphertext, tags: [] });
+      // Preserve existing public bookmarks in tags; everything else goes encrypted
+      const publicTags  = nextItems.filter(t => publicKeysRef.current.has(bookmarkKey(t)));
+      const privateTags = nextItems.filter(t => !publicKeysRef.current.has(bookmarkKey(t)));
+      const content = privateTags.length > 0
+        ? await window.nostr.nip44.encrypt(pk, JSON.stringify(privateTags))
+        : "";
+      await signAndPublish({ kind: BOOKMARK_LIST_KIND, content, tags: publicTags });
     },
     [signAndPublish, pubkey]
   );
