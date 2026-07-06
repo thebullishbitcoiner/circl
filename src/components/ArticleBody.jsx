@@ -62,7 +62,8 @@ export default function ArticleBody({
           p: ({ children }) => {
             const txt = toPlainText(children).trim();
             const isStandaloneNevent = /^nostr:nevent1[023456789acdefghjklmnpqrstuvwxyz]+$/i.test(txt);
-            if (isStandaloneNevent) {
+            const isStandaloneNaddr = /^nostr:naddr1[023456789acdefghjklmnpqrstuvwxyz]+$/i.test(txt);
+            if (isStandaloneNevent || isStandaloneNaddr) {
               return (
                 <NoteContent
                   content={txt}

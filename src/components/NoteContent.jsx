@@ -518,7 +518,18 @@ export default function NoteContent({
   const renderTextSegment = (seg, i) => {
     if (!seg.value || seg.value.trim() === "") return null;
     // Only render plain-text parts; nevent/naddr refs are lifted to bottom
-    const textParts = splitNostrEventRefs(seg.value).filter(p => p.type === "text");
+    const allParts = splitNostrEventRefs(seg.value);
+    const textParts = allParts.map((part, idx) => {
+      if (part.type !== "text") return part;
+      let val = part.value;
+      // Trim newlines adjacent to entity refs — otherwise the blank lines
+      // that surrounded the nostr: URI remain as visible whitespace (pre-wrap).
+      if (idx < allParts.length - 1 && allParts[idx + 1].type !== "text")
+        val = val.replace(/\n+$/, "");
+      if (idx > 0 && allParts[idx - 1].type !== "text")
+        val = val.replace(/^\n+/, "");
+      return { ...part, value: val };
+    }).filter(p => p.type === "text");
     return textParts.map((part, idx) => {
       if (!part.value || !part.value.trim()) return null;
       return (
