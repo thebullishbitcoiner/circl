@@ -444,7 +444,7 @@ export default function ThreadView({
         <>
           <div className="thread-replies-label">{otherReplies.length} {otherReplies.length === 1 ? "reply" : "replies"}</div>
           {otherReplies.map(e => (
-            <MutedNoteGate key={e.id} event={e}>
+            <MutedNoteGate key={e.id} event={e} profiles={mergedProfiles}>
               <ThreadNoteRow event={e} variant="reply" hasConnector={false} {...rowProps} />
             </MutedNoteGate>
           ))}

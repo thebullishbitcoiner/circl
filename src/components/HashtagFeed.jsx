@@ -77,7 +77,7 @@ export default function HashtagFeed({
       )}
 
       {notes.map((ev, i) => (
-        <MutedNoteGate key={ev.id} event={ev}>
+        <MutedNoteGate key={ev.id} event={ev} profiles={profiles}>
         <NoteCard
           key={ev.id}
           event={ev}

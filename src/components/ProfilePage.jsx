@@ -1155,9 +1155,10 @@ export default function ProfilePage({
             />
           )}
           {isProfileMuted && !mutedRevealed
-            ? <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", gap: 12 }}>
-                <span style={{ fontSize: 13, color: "var(--text-muted)", fontFamily: "'DM Sans', sans-serif" }}>Muted user</span>
-                <button type="button" onClick={() => setMutedRevealed(true)} style={{ flexShrink: 0, fontSize: 12, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: "var(--primary)", background: "transparent", border: "1px solid var(--primary)", borderRadius: 20, padding: "3px 12px", cursor: "pointer" }}>Show</button>
+            ? <div className="empty-state">
+                <div className="empty-state-title">Muted user</div>
+                <div className="empty-state-sub">You've muted this user</div>
+                <button type="button" onClick={() => setMutedRevealed(true)} style={{ marginTop: 12, background: "none", border: "none", padding: 0, color: "var(--primary)", fontSize: "var(--font-base)", fontFamily: "'DM Sans', sans-serif", cursor: "pointer", textDecoration: "underline" }}>Show notes</button>
               </div>
             : profileLoading && topLevel.length === 0
               ? [0, 1, 2].map(i => <SkelCard key={i} />)
@@ -1223,7 +1224,7 @@ export default function ProfilePage({
                   : null;
                 const replyingToPk = parentEv?.pubkey ?? null;
                 return (
-                  <MutedNoteGate key={e.id} event={e} skipUserMute>
+                  <MutedNoteGate key={e.id} event={e} profiles={profiles} skipUserMute>
                     <NoteCard event={e} profiles={profiles}
                     events={mergedEvents}
                     resolveEventById={resolveEventById}
