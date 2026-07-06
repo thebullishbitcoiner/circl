@@ -178,7 +178,7 @@ function Spinner() {
 
 export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThread, onOpenHashtag }) {
   const configuredRelays = useSearchRelays(pubkey);
-  const searchRelays = configuredRelays.length > 0 ? configuredRelays : DEFAULT_SEARCH_RELAYS;
+  const searchRelays = configuredRelays.length > 0 ? configuredRelays.map(r => r.url) : DEFAULT_SEARCH_RELAYS;
   const [query,          setQuery]          = useState("");
   const [suggestions,    setSuggestions]    = useState([]);
   const [noteResults,    setNoteResults]    = useState([]);

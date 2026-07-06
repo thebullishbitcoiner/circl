@@ -16,7 +16,7 @@ export default function RelaysCard({ profilePubkey, pubkey, activeNav }) {
   const [poolRelays, setPoolRelays] = useState(() => [...pool.relays.keys()]);
   const { inboxes } = useMailboxes(profilePubkey ?? null);
   const configuredSearchRelays = useSearchRelays(activeNav === "search" ? pubkey : null);
-  const searchRelays = configuredSearchRelays.length > 0 ? configuredSearchRelays : DEFAULT_SEARCH_RELAYS;
+  const searchRelays = configuredSearchRelays.length > 0 ? configuredSearchRelays.map(r => r.url) : DEFAULT_SEARCH_RELAYS;
 
   // Keep pool relay list current when not viewing a profile or search
   useEffect(() => {

@@ -2,7 +2,6 @@ import { useState } from "react";
 import useMailboxes from "../hooks/useMailboxes.js";
 import useSearchRelays from "../hooks/useSearchRelays.js";
 import { MailboxesFactory } from "applesauce-core";
-import { Factories } from "applesauce-common";
 import CustomEmojiSettingsPage from "./CustomEmojiSettingsPage.jsx";
 import useContentSettings from "../hooks/useContentSettings.js";
 
@@ -308,11 +307,17 @@ function RelayEditor({ pubkey, signAndPublish }) {
 
 // ── Search relay editor ───────────────────────────────────────────────────────
 
+function hasNip44ForSearch() {
+  return typeof window !== "undefined" &&
+    typeof window.nostr?.nip44?.encrypt === "function";
+}
+
 function SearchRelayEditor({ pubkey, signAndPublish }) {
-  const searchRelays = useSearchRelays(pubkey);
-  const [localRelays, setLocalRelays] = useState(null);
-  const [urlInput, setUrlInput] = useState("");
-  const [saving, setSaving] = useState(false);
+  const searchRelays = useSearchRelays(pubkey); // [{url, source}]
+  const [localRelays, setLocalRelays]   = useState(null); // null = use loaded
+  const [urlInput, setUrlInput]         = useState("");
+  const [saving, setSaving]             = useState(false);
+  const [newVisibility, setNewVisibility] = useState("private"); // "private" | "public"
 
   const effective = localRelays ?? searchRelays;
 
@@ -320,31 +325,47 @@ function SearchRelayEditor({ pubkey, signAndPublish }) {
     if (!signAndPublish) return;
     setSaving(true);
     try {
-      let factory = Factories.SearchRelaysFactory.create();
-      for (const url of nextRelays) factory = factory.addRelay(url);
-      const template = await factory;
-      await signAndPublish(template);
+      const publicUrls    = nextRelays.filter(r => r.source === "public").map(r => r.url);
+      const privateUrls   = nextRelays.filter(r => r.source === "encrypted").map(r => r.url);
+      const tags          = publicUrls.map(url => ["relay", url]);
+      let content         = "";
+      if (privateUrls.length > 0) {
+        if (!hasNip44ForSearch()) throw new Error("Your signer does not support NIP-44 encryption");
+        content = await window.nostr.nip44.encrypt(
+          pubkey,
+          JSON.stringify(privateUrls.map(url => ["relay", url]))
+        );
+      }
+      await signAndPublish({ kind: 10007, tags, content });
     } finally {
       setSaving(false);
     }
   }
 
+  function toggleSource(url) {
+    const next = effective.map(r =>
+      r.url === url ? { ...r, source: r.source === "encrypted" ? "public" : "encrypted" } : r
+    );
+    setLocalRelays(next);
+    publish(next);
+  }
+
   function remove(url) {
-    const next = effective.filter(r => r !== url);
+    const next = effective.filter(r => r.url !== url);
     setLocalRelays(next);
     publish(next);
   }
 
   function add() {
     const url = normalizeRelayUrl(urlInput);
-    if (!url || effective.includes(url)) return;
-    const next = [...effective, url];
+    if (!url || effective.some(r => r.url === url)) return;
+    const source = newVisibility === "private" ? "encrypted" : "public";
+    const next = [...effective, { url, source }];
     setLocalRelays(next);
     setUrlInput("");
     publish(next);
   }
 
-  const removeW = 26;
   const inputH = "calc(var(--font-base) + 20px)";
 
   return (
@@ -353,18 +374,29 @@ function SearchRelayEditor({ pubkey, signAndPublish }) {
         <div style={{ fontSize: "calc(var(--font-base) - 2px)", color: "var(--text-faint)", fontFamily: "monospace", padding: "6px 0" }}>None configured</div>
       )}
       {effective.map((r, i) => (
-        <div key={r} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: i < effective.length - 1 ? "1px solid var(--border)" : "none" }}>
+        <div key={r.url} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: i < effective.length - 1 ? "1px solid var(--border)" : "none" }}>
           <span style={{ fontFamily: "monospace", fontSize: "calc(var(--font-base) - 2px)", color: "var(--text)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {_fmtRelayUrl(r)}
+            {_fmtRelayUrl(r.url)}
           </span>
-          <button onClick={() => remove(r)} disabled={saving}
-            style={{ width: removeW, padding: 0, borderRadius: 6, border: "1px solid var(--border)", background: "transparent", color: "var(--text-faint)", fontSize: "calc(var(--font-base) + 2px)", fontFamily: "'DM Sans',sans-serif", cursor: saving ? "default" : "pointer", lineHeight: 1, flexShrink: 0, opacity: saving ? 0.5 : 1, height: "calc(var(--font-base) + 14px)" }}>×</button>
+          <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: saving ? "default" : "pointer", flexShrink: 0, opacity: saving ? 0.5 : 1 }}>
+            <input type="checkbox" checked={r.source === "encrypted"} disabled={saving}
+              onChange={() => toggleSource(r.url)}
+              style={{ cursor: saving ? "default" : "pointer" }} />
+            <span style={{ fontSize: "calc(var(--font-base) - 2px)", color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif" }}>Private</span>
+          </label>
+          <button onClick={() => remove(r.url)} disabled={saving}
+            style={{ width: 26, padding: 0, borderRadius: 6, border: "1px solid var(--border)", background: "transparent", color: "var(--text-faint)", fontSize: "calc(var(--font-base) + 2px)", fontFamily: "'DM Sans',sans-serif", cursor: saving ? "default" : "pointer", lineHeight: 1, flexShrink: 0, opacity: saving ? 0.5 : 1, height: "calc(var(--font-base) + 14px)" }}>×</button>
         </div>
       ))}
-      <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 8 }}>
+
+      <div style={{ marginTop: effective.length > 0 ? 14 : 8, display: "flex", alignItems: "center", gap: 8 }}>
         <input value={urlInput} onChange={e => setUrlInput(e.target.value)} onKeyDown={e => e.key === "Enter" && add()}
           placeholder="search.relay.example.com" disabled={saving}
           style={{ flex: 1, padding: "0 10px", borderRadius: 8, border: "1.5px solid var(--border)", background: "var(--bg)", color: "var(--text)", fontFamily: "monospace", fontSize: "calc(var(--font-base) - 2px)", outline: "none", opacity: saving ? 0.5 : 1, height: inputH, boxSizing: "border-box" }} />
+        <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer", flexShrink: 0 }}>
+          <input type="checkbox" checked={newVisibility === "private"} onChange={e => setNewVisibility(e.target.checked ? "private" : "public")} style={{ cursor: "pointer" }} />
+          <span style={{ fontSize: "calc(var(--font-base) - 2px)", color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", whiteSpace: "nowrap" }}>Private</span>
+        </label>
         <button onClick={add} disabled={saving || !urlInput.trim()}
           style={{ padding: "0 18px", borderRadius: 8, border: "none", background: "var(--primary)", color: "white", fontFamily: "'DM Sans',sans-serif", fontSize: "var(--font-base)", fontWeight: 600, cursor: (saving || !urlInput.trim()) ? "default" : "pointer", opacity: (saving || !urlInput.trim()) ? 0.6 : 1, flexShrink: 0, height: inputH }}>Add</button>
       </div>

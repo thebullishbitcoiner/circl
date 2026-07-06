@@ -14,6 +14,7 @@ function hasNip04() {
     typeof window.nostr?.nip04?.decrypt === "function";
 }
 
+// Returns [{url: string, source: "public"|"encrypted"}]
 export default function useSearchRelays(pubkey) {
   const [relays, setRelays] = useState([]);
 
@@ -35,17 +36,19 @@ export default function useSearchRelays(pubkey) {
       const gen = ++generation;
       const ev = latestEvent;
 
-      // Always collect public relay tags first
       const seen = new Set();
       const all = [];
-      const push = url => { if (url && !seen.has(url)) { seen.add(url); all.push(url); } };
+
+      // Public relay tags first
       for (const t of ev.tags || []) {
-        if (t[0] === "relay" && typeof t[1] === "string") push(t[1]);
+        if (t[0] === "relay" && typeof t[1] === "string" && !seen.has(t[1])) {
+          seen.add(t[1]);
+          all.push({ url: t[1], source: "public" });
+        }
       }
 
       const content = (ev.content || "").trim();
       if (content) {
-        // Wait up to 3s for signer on mobile
         if (!hasNip44() && !hasNip04()) {
           for (let i = 0; i < 6; i++) {
             await new Promise(r => setTimeout(r, 500));
@@ -54,7 +57,6 @@ export default function useSearchRelays(pubkey) {
         }
         if (!cancelled && generation === gen) {
           let plain = null;
-          // NIP-51: detect encryption by presence of "?iv=" (NIP-04) vs its absence (NIP-44)
           const looksLikeNip04 = content.includes("?iv=");
           if (looksLikeNip04) {
             if (hasNip04()) try { plain = await window.nostr.nip04.decrypt(ev.pubkey, content); } catch {}
@@ -68,7 +70,10 @@ export default function useSearchRelays(pubkey) {
               const parsed = JSON.parse(plain);
               if (Array.isArray(parsed)) {
                 for (const t of parsed) {
-                  if (Array.isArray(t) && t[0] === "relay" && typeof t[1] === "string") push(t[1]);
+                  if (Array.isArray(t) && t[0] === "relay" && typeof t[1] === "string" && !seen.has(t[1])) {
+                    seen.add(t[1]);
+                    all.push({ url: t[1], source: "encrypted" });
+                  }
                 }
               }
             } catch {}
