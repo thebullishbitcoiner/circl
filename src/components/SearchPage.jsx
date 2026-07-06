@@ -129,7 +129,7 @@ function ProfileSuggestion({ ev, onOpenProfile }) {
   );
 }
 
-function NoteResult({ ev, profiles, onOpenProfile, onOpenThread }) {
+export function NoteResult({ ev, profiles, onOpenProfile, onOpenThread }) {
   return (
     <MutedNoteGate event={ev} profiles={profiles} onOpenProfile={onOpenProfile}>
     <div className="search-result note" role="button" tabIndex={0}

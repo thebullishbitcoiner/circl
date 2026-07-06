@@ -160,6 +160,7 @@ export default function ProfilePage({
   customEmojis,
   onEditProfile,
   ownPinnedIds,
+  onOpenProfileSearch,
 }) {
   const { isMuted } = useNavigation();
   const isProfileMuted = isMuted?.(pubkey);
@@ -1047,20 +1048,26 @@ export default function ProfilePage({
           {isOwn && (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {(p.lud16 || p.lud06 || p.clink_noffer) && (
-                <button className="profile-lightning-btn" onClick={() => setShowLightningSheet(true)} aria-label="Lightning payment">
+                <button className="profile-icon-btn" onClick={() => setShowLightningSheet(true)} aria-label="Lightning payment">
                   <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                 </button>
               )}
+              <button className="profile-icon-btn" onClick={() => onOpenProfileSearch?.(pubkey)} aria-label="Search notes">
+                <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </button>
               <button className="profile-edit-btn" onClick={onEditProfile}>Edit profile</button>
             </div>
           )}
           {!isOwn && (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {(p.lud16 || p.lud06 || p.clink_noffer) && (
-                <button className="profile-lightning-btn" onClick={() => setShowLightningSheet(true)} aria-label="Lightning payment">
+                <button className="profile-icon-btn" onClick={() => setShowLightningSheet(true)} aria-label="Lightning payment">
                   <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                 </button>
               )}
+              <button className="profile-icon-btn" onClick={() => onOpenProfileSearch?.(pubkey)} aria-label="Search notes">
+                <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </button>
               {follows?.includes(pubkey)
                 ? <button className="profile-unfollow-btn" onClick={() => onUnfollow?.(pubkey)}>Unfollow</button>
                 : <button className="profile-follow-btn"  onClick={() => onFollow?.(pubkey)}>Follow</button>

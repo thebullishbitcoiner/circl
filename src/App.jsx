@@ -57,6 +57,7 @@ import DraftsPage from "./components/DraftsPage.jsx";
 import { DraftsProvider } from "./contexts/DraftsContext.jsx";
 import useDrafts from "./hooks/useDrafts.js";
 import ProfilePage from "./components/ProfilePage.jsx";
+import ProfileSearchPage from "./components/ProfileSearchPage.jsx";
 import RelaysCard from "./components/RelaysCard.jsx";
 import ParticipantsCard from "./components/ParticipantsCard.jsx";
 import CirclePage from "./components/CirclePage.jsx";
@@ -266,6 +267,7 @@ export default function App() {
   })();
 
   const handleOpenProfile     = pk => { if (pk === pubkey) refreshFollows(); pushNav({ type: "profile", payload: pk }); };
+  const handleOpenProfileSearch = pk => pushNav({ type: "profile-search", payload: pk });
   const handleEditProfile     = () => pushNav({ type: "edit-profile" });
   const handleOpenTransaction = tx => pushNav({ type: "transaction", payload: tx });
   const handleOpenCircle = ({ pubkey: cpk, follows: cFollows }) =>
@@ -952,6 +954,7 @@ export default function App() {
                         customEmojis={allCustomEmojis}
                         onEditProfile={profileEntry.payload === pubkey ? handleEditProfile : undefined}
                         ownPinnedIds={profileEntry.payload === pubkey ? pinnedIds : undefined}
+                        onOpenProfileSearch={handleOpenProfileSearch}
                       />
                     </div>
                   );
@@ -960,6 +963,21 @@ export default function App() {
                   const top = navStack[navStack.length - 1];
 
                   if (top.type === "profile") return null; // rendered persistently above
+
+                  if (top.type === "profile-search") {
+                    return (
+                      <div key={`profile-search-${top.payload}`} style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                        <ProfileSearchPage
+                          pubkeys={[top.payload]}
+                          myPubkey={pubkey}
+                          profiles={profiles}
+                          onBack={handleBack}
+                          onOpenProfile={handleOpenProfile}
+                          onOpenThread={handleOpenThread}
+                        />
+                      </div>
+                    );
+                  }
 
                   if (top.type === "edit-profile") {
                     return (
