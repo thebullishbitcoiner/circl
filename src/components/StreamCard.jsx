@@ -29,12 +29,14 @@ export default function StreamCard({ event, profiles, liked, bookmarked, likeCou
           <Avatar pk={hostPk} profiles={profiles} size={36} />
         </div>
         <div className="note-meta">
-          <span className="note-name" style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); onOpenProfile?.(hostPk); }}>
-            {displayName(hostPk, profiles)}
-          </span>
+          <div className="note-meta-top">
+            <span className="note-name" style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); onOpenProfile?.(hostPk); }}>
+              {displayName(hostPk, profiles)}
+            </span>
+            <span className="meta-dot" aria-hidden="true">·</span>
+            <span className="note-time">{relativeTime(event.created_at)}</span>
+          </div>
           <span className="note-npub">{nip05OrNpub(hostPk, profiles)}</span>
-          <span className="meta-dot" aria-hidden="true">·</span>
-          <span className="note-time">{relativeTime(event.created_at)}</span>
         </div>
         <button
           type="button"

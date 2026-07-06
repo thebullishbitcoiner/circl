@@ -1224,7 +1224,7 @@ export default function ProfilePage({
                   : null;
                 const replyingToPk = parentEv?.pubkey ?? null;
                 return (
-                  <MutedNoteGate key={e.id} event={e} profiles={profiles} skipUserMute>
+                  <MutedNoteGate key={e.id} event={e} profiles={profiles} skipUserMute onOpenProfile={onOpenProfile}>
                     <NoteCard event={e} profiles={profiles}
                     events={mergedEvents}
                     resolveEventById={resolveEventById}

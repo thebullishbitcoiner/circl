@@ -131,7 +131,7 @@ function ProfileSuggestion({ ev, onOpenProfile }) {
 
 function NoteResult({ ev, profiles, onOpenProfile, onOpenThread }) {
   return (
-    <MutedNoteGate event={ev} profiles={profiles}>
+    <MutedNoteGate event={ev} profiles={profiles} onOpenProfile={onOpenProfile}>
     <div className="search-result note" role="button" tabIndex={0}
       onClick={() => onOpenThread?.(ev)}
       onKeyDown={e => { if (e.key === "Enter" || e.key === " ") onOpenThread?.(ev); }}

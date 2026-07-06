@@ -59,11 +59,14 @@ export default function RepostCard({
             <Avatar pk={original.pubkey} profiles={profiles} size={36} />
           </div>
           <div className="note-meta">
-            <span className="note-name" style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); onOpenProfile?.(original.pubkey); }}>
-              {displayName(original.pubkey, profiles)}
-            </span>
+            <div className="note-meta-top">
+              <span className="note-name" style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); onOpenProfile?.(original.pubkey); }}>
+                {displayName(original.pubkey, profiles)}
+              </span>
+              <span className="meta-dot" aria-hidden="true">·</span>
+              <span className="note-time">{relativeTime(original.created_at)}</span>
+            </div>
             <span className="note-npub">{nip05OrNpub(original.pubkey, profiles)}</span>
-            <span className="note-time">{relativeTime(original.created_at)}</span>
           </div>
           <button
             type="button"

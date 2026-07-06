@@ -46,14 +46,16 @@ export default function FeedItem({
     return (
       <div className="note-card" style={{ animationDelay: `${delay}s` }}>
         <div className="note-header">
-          <div style={{ flexShrink: 0 }}>
+          <div style={{ flexShrink: 0, cursor: "pointer" }} onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }}>
             <Avatar pk={event.pubkey} profiles={profiles} size={36} />
           </div>
           <div className="note-meta">
-            <span className="note-name">{displayName(event.pubkey, profiles)}</span>
+            <div className="note-meta-top">
+              <span className="note-name" style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }}>{displayName(event.pubkey, profiles)}</span>
+              <span className="meta-dot" aria-hidden="true">·</span>
+              <span className="note-time">{relativeTime(event.created_at)}</span>
+            </div>
             <span className="note-npub">{nip05OrNpub(event.pubkey, profiles)}</span>
-            <span className="meta-dot" aria-hidden="true">·</span>
-            <span className="note-time">{relativeTime(event.created_at)}</span>
           </div>
           <button type="button" className="note-card-menu-btn" style={{ opacity: 0.3, cursor: "default" }} disabled>
             <span /><span /><span />

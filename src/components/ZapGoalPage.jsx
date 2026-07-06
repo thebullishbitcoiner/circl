@@ -56,12 +56,14 @@ export default function ZapGoalPage({
             <Avatar pk={event.pubkey} profiles={profiles} size={36} />
           </div>
           <div className="note-meta">
-            <span className="note-name" style={{ cursor: "pointer" }} onClick={() => onOpenProfile?.(event.pubkey)}>
-              {displayName(event.pubkey, profiles)}
-            </span>
+            <div className="note-meta-top">
+              <span className="note-name" style={{ cursor: "pointer" }} onClick={() => onOpenProfile?.(event.pubkey)}>
+                {displayName(event.pubkey, profiles)}
+              </span>
+              <span className="meta-dot" aria-hidden="true">·</span>
+              <span className="note-time">{relativeTime(event.created_at)}</span>
+            </div>
             <span className="note-npub">{nip05OrNpub(event.pubkey, profiles)}</span>
-            <span className="meta-dot" aria-hidden="true">·</span>
-            <span className="note-time">{relativeTime(event.created_at)}</span>
           </div>
         </div>
 

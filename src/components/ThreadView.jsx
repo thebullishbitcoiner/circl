@@ -56,13 +56,15 @@ function ThreadNoteRow({
           <Avatar pk={event.pubkey} profiles={profiles} size={focused ? 40 : 34} />
         </div>
         <div className="note-meta">
-          <span className="note-name" style={{ cursor: "pointer", fontSize: focused ? 14 : 13 }}
-            onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }}>
-            {displayName(event.pubkey, profiles)}
-          </span>
+          <div className="note-meta-top">
+            <span className="note-name" style={{ cursor: "pointer", fontSize: focused ? 14 : 13 }}
+              onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }}>
+              {displayName(event.pubkey, profiles)}
+            </span>
+            <span className="meta-dot" aria-hidden="true">·</span>
+            <span className="note-time">{relativeTime(event.created_at)}</span>
+          </div>
           <span className="note-npub">{nip05OrNpub(event.pubkey, profiles)}</span>
-          <span className="meta-dot" aria-hidden="true">·</span>
-          <span className="note-time">{relativeTime(event.created_at)}</span>
         </div>
         <button
           type="button"
@@ -444,7 +446,7 @@ export default function ThreadView({
         <>
           <div className="thread-replies-label">{otherReplies.length} {otherReplies.length === 1 ? "reply" : "replies"}</div>
           {otherReplies.map(e => (
-            <MutedNoteGate key={e.id} event={e} profiles={mergedProfiles}>
+            <MutedNoteGate key={e.id} event={e} profiles={mergedProfiles} onOpenProfile={onOpenProfile}>
               <ThreadNoteRow event={e} variant="reply" hasConnector={false} {...rowProps} />
             </MutedNoteGate>
           ))}
