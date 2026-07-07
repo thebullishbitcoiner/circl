@@ -48,12 +48,12 @@ export default function NoteDetailsModal({ event, onClose }) {
           <div className="note-details-section-label">
             Received from{querying && <span className="relay-querying"> — querying…</span>}
           </div>
-          {relays.length > 0
-            ? relays.map(url => <div key={url} className="relay-pill">{url}</div>)
-            : <div className="relay-empty">
-                {querying ? "Checking relays…" : "No relays responded"}
-              </div>
-          }
+          <textarea
+            className="relay-textarea"
+            readOnly
+            value={relays.length > 0 ? relays.join("\n") : (querying ? "" : "No relays responded")}
+            placeholder={querying ? "Checking relays…" : ""}
+          />
         </div>
       </div>
     </div>,
