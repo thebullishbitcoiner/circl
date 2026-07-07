@@ -452,8 +452,8 @@
   .lf-time{font-size:10.5px;color:var(--text-faint);}
   .lf-inner{background:var(--surface);border-radius:14px;overflow:hidden;border:1px solid var(--border);transition:box-shadow .2s,transform .2s;}
   .longform-card:hover .lf-inner{box-shadow:0 4px 18px var(--shadow-md);transform:translateY(-1px);}
-  .lf-placeholder{width:100%;height:130px;background:linear-gradient(135deg,var(--surface2) 0%,var(--primary-soft) 100%);display:flex;align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;font-size:28px;color:var(--primary);opacity:.4;}
-  .lf-image{width:100%;height:130px;object-fit:cover;display:block;}
+  .lf-placeholder{width:100%;aspect-ratio:2/1;background:linear-gradient(135deg,var(--surface2) 0%,var(--primary-soft) 100%);display:flex;align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;font-size:28px;color:var(--primary);opacity:.4;}
+  .lf-image{width:100%;aspect-ratio:2/1;object-fit:cover;display:block;}
   .lf-body{padding:11px 13px;}
   .lf-tag{display:inline-block;font-size:9px;font-weight:500;color:var(--primary);background:rgba(109,40,217,.1);padding:2px 7px;border-radius:50px;margin-bottom:4px;letter-spacing:.3px;text-transform:uppercase;}
   .lf-hashtags{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px;}
@@ -502,7 +502,7 @@
   .read-progress{position:fixed;top:0;left:0;height:3px;background:var(--primary);transition:width .1s linear;z-index:100;border-radius:0 2px 2px 0;}
 
   /* Reader hero */
-  .reader-hero{width:100%;height:200px;background:linear-gradient(160deg,var(--surface2) 0%,var(--primary-soft) 60%,#C4B5FD 100%);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;flex-shrink:0;}
+  .reader-hero{width:100%;aspect-ratio:16/9;background:linear-gradient(160deg,var(--surface2) 0%,var(--primary-soft) 60%,#C4B5FD 100%);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;flex-shrink:0;}
   .reader-hero-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
   .reader-hero-glyph{font-family:'DM Sans',sans-serif;font-size:120px;color:rgba(109,40,217,.14);user-select:none;line-height:1;}
   .reader-hero-tag{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);font-size:9.5px;font-weight:500;color:var(--primary);background:rgba(247,245,252,.92);padding:3px 11px;border-radius:50px;letter-spacing:.8px;text-transform:uppercase;backdrop-filter:blur(8px);border:1px solid var(--border);}
@@ -1095,8 +1095,6 @@
     .feed-scroll { padding-bottom: calc(var(--bottom-nav-h) + var(--audio-bar-h, 0px)); }
     .slide-panel-scroll { padding-bottom: calc(var(--bottom-nav-h) + var(--audio-bar-h, 0px)); }
     .search-shell { padding-bottom: calc(var(--bottom-nav-h) + var(--audio-bar-h, 0px)); }
-    /* Smaller hero on mobile */
-    .reader-hero { height: 160px; }
     .reader-hero-glyph { font-size: 90px; }
     .reader-title { font-size: 24px; }
     .toast { bottom: calc(var(--bottom-nav-h) + var(--audio-bar-h, 0px) + 14px); }
@@ -1165,7 +1163,7 @@
   .zap-goal-badge-row{display:flex;align-items:center;gap:6px;margin-bottom:6px;}
   .zap-goal-badge-closed{background:var(--surface2);color:var(--text-faint);}
   .zap-goal-image{border-radius:12px;overflow:hidden;border:1px solid var(--border);margin-bottom:10px;}
-  .zap-goal-image img{display:block;width:100%;max-height:220px;object-fit:cover;}
+  .zap-goal-image img{display:block;width:100%;aspect-ratio:2/1;object-fit:cover;}
   .listing-tile{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:opacity .15s;}
   .listing-tile:hover{opacity:.85;}
   .listing-tile-image{position:relative;aspect-ratio:1/1;background:var(--surface2);overflow:hidden;}
@@ -1194,7 +1192,7 @@
   /* ── Calendar card ── */
   .calendar-card{padding:13px 18px;border-bottom:1px solid var(--border);cursor:pointer;animation:fadeUp .3s ease both;position:relative;}
   .cal-inner{background:var(--surface);border-radius:14px;overflow:hidden;border:1px solid var(--border);transition:box-shadow .2s,transform .2s;}
-  .cal-cover-image{width:100%;height:130px;object-fit:cover;display:block;}
+  .cal-cover-image{width:100%;aspect-ratio:2/1;object-fit:cover;display:block;}
   .calendar-card:hover .cal-inner{box-shadow:0 4px 18px var(--shadow-md);transform:translateY(-1px);}
   .cal-body{padding:11px 13px;}
   .cal-title{font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;color:var(--text);line-height:1.3;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
