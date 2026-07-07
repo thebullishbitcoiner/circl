@@ -1,11 +1,13 @@
-import { useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { nip19 } from "../utils.js";
 import { broadcastEvent } from "../nostr.js";
 import { useNavigation } from "../context/NavigationContext.jsx";
+import NoteDetailsModal from "./NoteDetailsModal.jsx";
 
 export default function NoteContextMenu({ event, onClose, onViewJson, publishEvent, onDeleted }) {
   const { isMuted, onMuteUser, onUnmuteUser, myPubkey, onTogglePin, isPinned } = useNavigation();
   const menuRef = useRef(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
     if (!menuRef.current) return;
@@ -15,6 +17,7 @@ export default function NoteContextMenu({ event, onClose, onViewJson, publishEve
       menuRef.current.style.bottom = "100%";
     }
   }, []);
+
   const copyText = () => {
     navigator.clipboard?.writeText(event.content || "").catch(() => {});
     onClose();
@@ -53,11 +56,16 @@ export default function NoteContextMenu({ event, onClose, onViewJson, publishEve
     onDeleted?.();
   };
 
+  if (detailsOpen) {
+    return <NoteDetailsModal event={event} onClose={() => { setDetailsOpen(false); onClose(); }} />;
+  }
+
   return (
     <div ref={menuRef} className="note-card-menu" onClick={e => e.stopPropagation()}>
       <button type="button" className="note-card-menu-item" onClick={copyText}>Copy Note Text</button>
       <button type="button" className="note-card-menu-item" onClick={copyId}>Copy Note ID</button>
       <button type="button" className="note-card-menu-item" onClick={handleBroadcast}>Broadcast</button>
+      <button type="button" className="note-card-menu-item" onClick={() => setDetailsOpen(true)}>Post Details</button>
       <button type="button" className="note-card-menu-item" onClick={() => { onClose(); onViewJson(event); }}>View JSON</button>
       {!isOwnNote && (
         <button type="button" className="note-card-menu-item note-card-menu-item--danger" onClick={handleMute}>
