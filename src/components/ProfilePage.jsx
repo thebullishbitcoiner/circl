@@ -31,6 +31,7 @@ import ListingCard from "./ListingCard.jsx";
 import ListingDetail from "./ListingDetail.jsx";
 import PodcastShowCard from "./PodcastShowCard.jsx";
 import PodcastEpisodeRow from "./PodcastEpisodeRow.jsx";
+import VoiceMessageRow from "./VoiceMessageRow.jsx";
 import { useAudio } from "../contexts/AudioContext.jsx";
 import CreateListingSheet from "./CreateListingSheet.jsx";
 import BadgeCard from "./BadgeCard.jsx";
@@ -225,6 +226,10 @@ export default function ProfilePage({
   const [podcastEpisodes,      setPodcastEpisodes]      = useState([]);
   const [episodesLoading,      setEpisodesLoading]      = useState(false);
   const podcastsFetchedRef = useRef(false);
+
+  const [voiceMessages,        setVoiceMessages]        = useState([]);
+  const [voiceMessagesLoading, setVoiceMessagesLoading] = useState(false);
+  const voiceFetchedRef = useRef(false);
   const { playingEpisode, setPlayingEpisode, setPlayingShowMeta, isPlaying: audioIsPlaying } = useAudio();
 
   const handleBadgeAccept = async (awardEvent) => {
@@ -747,6 +752,33 @@ export default function ProfilePage({
     return () => { cancelled = true; };
   }, [pubkey, tab]);
 
+  // Voice Messages (NIP-A0): lazy-load kind 1222 + 1244 when voice tab is first opened
+  useEffect(() => {
+    if (!pubkey || tab !== "voice" || voiceFetchedRef.current) return;
+    voiceFetchedRef.current = true;
+    let cancelled = false;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+
+    setVoiceMessagesLoading(true);
+    const accum = [];
+    pool.request(relayUrls, [{ kinds: [1222], authors: [pubkey], limit: 100 }]).subscribe({
+      next: raw => {
+        if (cancelled) return;
+        try { eventStore.add(raw); } catch {}
+        if (!accum.some(e => e.id === raw.id)) accum.push(raw);
+      },
+      complete: () => {
+        if (cancelled) return;
+        accum.sort((a, b) => b.created_at - a.created_at);
+        setVoiceMessages(accum);
+        setVoiceMessagesLoading(false);
+      },
+      error: () => { if (!cancelled) setVoiceMessagesLoading(false); },
+    });
+
+    return () => { cancelled = true; };
+  }, [pubkey, tab]);
+
   // Podcasts: load episodes (kind 54) and audio tracks (kind 1063) when a show is selected
   useEffect(() => {
     if (!selectedPodcast?.pubkey) return;
@@ -1149,6 +1181,9 @@ export default function ProfilePage({
         <div className={`profile-stat ${tab === "podcasts" ? "active" : ""}`} onClick={() => switchTab("podcasts")}>
           <div className="profile-stat-label">Podcasts</div>
         </div>
+        <div className={`profile-stat ${tab === "voice" ? "active" : ""}`} onClick={() => switchTab("voice")}>
+          <div className="profile-stat-label">Voice</div>
+        </div>
       </div>
 
       {/* Notes tab */}
@@ -1462,6 +1497,35 @@ export default function ProfilePage({
             </>
           );
         })()
+      )}
+
+      {/* Voice Messages tab */}
+      {tab === "voice" && (
+        voiceMessagesLoading && voiceMessages.length === 0
+          ? [0, 1, 2].map(i => <SkelCard key={i} />)
+          : voiceMessages.length === 0
+            ? (
+              <div className="empty-state">
+                <div className="empty-state-title">No voice messages yet</div>
+                <div className="empty-state-sub">Voice messages will appear here when published</div>
+              </div>
+            )
+            : voiceMessages.map(e => (
+                <VoiceMessageRow
+                  key={e.id} event={e}
+                  onOpenThread={onOpenThread}
+                  profiles={profiles} myPubkey={myPubkey} myProfile={myProfile} allEvents={events}
+                  onOpenZaps={onOpenZaps} onOpenReactions={onOpenReactions} onOpenReposts={onOpenReposts}
+                  onPublish={onPublish} publishEvent={publishEvent} onPrepend={onPrepend}
+                  onBookmark={onBookmark} isBookmarked={isBookmarked}
+                  getLocalZaps={getLocalZaps} addLocalZap={addLocalZap}
+                  getLocalReactions={getLocalReactions} setLocalReaction={setLocalReaction}
+                  onRequestModal={onRequestModal} onDismissModal={onDismissModal}
+                  sendZap={sendZap} defaultZapAmount={defaultZapAmount}
+                  defaultZapMsg={defaultZapMsg} onZapFail={onZapFail}
+                  customEmojis={customEmojis}
+                />
+              ))
       )}
 
       {/* Listings tab */}

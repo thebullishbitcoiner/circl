@@ -13,10 +13,158 @@ import useProfiles from "../hooks/useProfiles.js";
 import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
 import { pool, eventStore } from "../nostr.js";
+import { claimPlayback, releasePlayback, takePendingResume } from "../voicePlayback.js";
 import { RELAYS } from "../constants.js";
 import PollInline from "./PollInline.jsx";
 import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
 import CalendarInlineCard from "./CalendarInlineCard.jsx";
+
+function ThreadVoiceScrubZone({ amplitudes, progress, onScrub }) {
+  const zoneRef  = useRef(null);
+  const dragging = useRef(false);
+
+  const bars = useMemo(() => {
+    if (amplitudes && amplitudes.length > 0) {
+      const max  = Math.max(...amplitudes, 1);
+      const step = Math.max(1, Math.floor(amplitudes.length / 40));
+      const out  = [];
+      for (let i = 0; i < amplitudes.length; i += step) out.push(amplitudes[i] / max);
+      return out;
+    }
+    return Array.from({ length: 30 }, (_, i) =>
+      0.25 + 0.5 * Math.abs(Math.sin(i * 0.45)) + 0.25 * Math.abs(Math.sin(i * 0.9))
+    );
+  }, [amplitudes]);
+
+  const scrub = (clientX) => {
+    const rect = zoneRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    onScrub(Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)));
+  };
+
+  return (
+    <div
+      ref={zoneRef}
+      className="voice-scrub-zone"
+      onClick={e => e.stopPropagation()}
+      onMouseDown={e => { e.stopPropagation(); dragging.current = true; scrub(e.clientX); }}
+      onMouseMove={e => { if (dragging.current) scrub(e.clientX); }}
+      onMouseUp={() => { dragging.current = false; }}
+      onMouseLeave={() => { dragging.current = false; }}
+      onTouchStart={e => { e.stopPropagation(); dragging.current = true; scrub(e.touches[0].clientX); }}
+      onTouchMove={e => { if (dragging.current) { e.stopPropagation(); scrub(e.touches[0].clientX); } }}
+      onTouchEnd={() => { dragging.current = false; }}
+    >
+      <div className="voice-waveform">
+        {bars.map((h, i) => (
+          <div key={i}
+            className={`voice-waveform-bar${i / bars.length < progress ? " played" : ""}`}
+            style={{ height: `${Math.max(15, h * 100)}%` }}
+          />
+        ))}
+      </div>
+      <div className="voice-scrubber">
+        <div className="voice-scrubber-fill" style={{ width: `${progress * 100}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function ThreadVoicePlayer({ event }) {
+  const [playing, setPlaying]   = useState(false);
+  const [progress, setProgress] = useState(0);
+  const audioRef = useRef(null);
+
+  const audioUrl = event.content || null;
+
+  const imetaTag = event.tags?.find(t => t[0] === "imeta");
+  let imetaDuration    = null;
+  let waveformAmplitudes = null;
+  if (imetaTag) {
+    const entries = imetaTag.slice(1);
+    const durEntry = entries.find(v => typeof v === "string" && v.startsWith("duration "));
+    if (durEntry) imetaDuration = parseInt(durEntry.split(" ")[1], 10);
+    const wvEntry = entries.find(v => typeof v === "string" && v.startsWith("waveform "));
+    if (wvEntry) waveformAmplitudes = wvEntry.split(" ").slice(1).map(Number).filter(n => !isNaN(n));
+  }
+
+  const formatDur = (s) => {
+    if (!s || isNaN(s)) return "≤1:00";
+    return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  };
+
+  // Resume playback if user navigated here from a playing VoiceMessageRow
+  useEffect(() => {
+    const resumeTime = takePendingResume(event.id);
+    if (resumeTime === null) return;
+    const audio = audioRef.current;
+    if (!audio) return;
+    const start = () => {
+      audio.currentTime = resumeTime;
+      claimPlayback(audio, event.id);
+      audio.play().catch(() => {});
+    };
+    if (audio.readyState >= 1) start();
+    else audio.addEventListener("loadedmetadata", start, { once: true });
+  }, []);
+
+  const togglePlay = (e) => {
+    e.stopPropagation();
+    const audio = audioRef.current;
+    if (!audio || !audioUrl) return;
+    if (playing) { audio.pause(); }
+    else { claimPlayback(audio, event.id); audio.play().catch(() => {}); }
+  };
+
+  const handleScrub = (ratio) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const dur = (audio.duration && isFinite(audio.duration)) ? audio.duration : imetaDuration;
+    if (dur) { audio.currentTime = ratio * dur; setProgress(ratio); }
+  };
+
+  return (
+    <div className="voice-inline-player">
+      <button
+        type="button"
+        className={`audio-play-btn voice-play-btn${playing ? " playing" : ""}`}
+        onClick={togglePlay}
+        disabled={!audioUrl}
+        aria-label={playing ? "Pause" : "Play"}
+      >
+        {playing ? (
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor">
+            <rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" />
+          </svg>
+        ) : (
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5,3 19,12 5,21" />
+          </svg>
+        )}
+      </button>
+      <div className="voice-message-body">
+        <ThreadVoiceScrubZone amplitudes={waveformAmplitudes} progress={progress} onScrub={handleScrub} />
+        <div className="voice-message-meta">
+          <span className="voice-duration">{formatDur(imetaDuration)}</span>
+        </div>
+      </div>
+      {audioUrl && (
+        <audio
+          ref={audioRef}
+          src={audioUrl}
+          preload="metadata"
+          onPlay={() => setPlaying(true)}
+          onPause={() => { setPlaying(false); releasePlayback(audioRef.current); }}
+          onEnded={() => { setPlaying(false); setProgress(0); releasePlayback(audioRef.current); }}
+          onTimeUpdate={() => {
+            const a = audioRef.current;
+            if (a?.duration && isFinite(a.duration)) setProgress(a.currentTime / a.duration);
+          }}
+        />
+      )}
+    </div>
+  );
+}
 
 function ThreadNoteRow({
   event, variant = "normal", profiles, allEvents, onOpenProfile, onOpenThread, onOpenHashtag,
@@ -96,6 +244,9 @@ function ThreadNoteRow({
             />
           )}
           {(() => {
+            if (event.kind === 1222 || event.kind === 1244) {
+              return <ThreadVoicePlayer event={event} />;
+            }
             const isGoal    = event.kind === 9041;
             const isPoll    = event.kind === 1068 || event.kind === 6969;
             const isQuote   = isQuoteRepost(event);
