@@ -15,8 +15,11 @@ function formatDuration(seconds) {
 
 // memo: only re-renders when amplitudes/progress/onScrub actually change.
 const VoiceScrubZone = memo(function VoiceScrubZone({ amplitudes, progress, onScrub }) {
-  const zoneRef  = useRef(null);
-  const dragging = useRef(false);
+  const zoneRef     = useRef(null);
+  const dragging    = useRef(false);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  const gestureSet  = useRef(false);
 
   const bars = useMemo(() => {
     if (amplitudes && amplitudes.length > 0) {
@@ -46,9 +49,25 @@ const VoiceScrubZone = memo(function VoiceScrubZone({ amplitudes, progress, onSc
       onMouseMove={e => { if (dragging.current) scrub(e.clientX); }}
       onMouseUp={() => { dragging.current = false; }}
       onMouseLeave={() => { dragging.current = false; }}
-      onTouchStart={e => { e.stopPropagation(); dragging.current = true; scrub(e.touches[0].clientX); }}
-      onTouchMove={e => { if (dragging.current) { e.stopPropagation(); scrub(e.touches[0].clientX); } }}
-      onTouchEnd={() => { dragging.current = false; }}
+      onTouchStart={e => {
+        e.stopPropagation();
+        dragging.current = false;
+        gestureSet.current = false;
+        touchStartX.current = e.touches[0].clientX;
+        touchStartY.current = e.touches[0].clientY;
+      }}
+      onTouchMove={e => {
+        const dx = Math.abs(e.touches[0].clientX - touchStartX.current);
+        const dy = Math.abs(e.touches[0].clientY - touchStartY.current);
+        if (!gestureSet.current) {
+          if (dx < 6 && dy < 6) return;
+          gestureSet.current = true;
+          dragging.current = dx > dy;
+        }
+        if (dragging.current) { e.stopPropagation(); scrub(e.touches[0].clientX); }
+      }}
+      onTouchEnd={() => { dragging.current = false; gestureSet.current = false; }}
+      onTouchCancel={() => { dragging.current = false; gestureSet.current = false; }}
     >
       <div className="voice-waveform">
         {bars.map((h, i) => (

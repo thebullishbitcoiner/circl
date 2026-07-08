@@ -229,7 +229,10 @@ export default function ProfilePage({
 
   const [voiceMessages,        setVoiceMessages]        = useState([]);
   const [voiceMessagesLoading, setVoiceMessagesLoading] = useState(false);
-  const voiceFetchedRef = useRef(false);
+  const [voiceHasMore,         setVoiceHasMore]         = useState(false);
+  const [voiceLoadingMore,     setVoiceLoadingMore]     = useState(false);
+  const voiceFetchedRef  = useRef(false);
+  const voiceUntilRef    = useRef(null);
   const { playingEpisode, setPlayingEpisode, setPlayingShowMeta, isPlaying: audioIsPlaying } = useAudio();
 
   const handleBadgeAccept = async (awardEvent) => {
@@ -752,17 +755,17 @@ export default function ProfilePage({
     return () => { cancelled = true; };
   }, [pubkey, tab]);
 
-  // Voice Messages (NIP-A0): lazy-load kind 1222 + 1244 when voice tab is first opened
+  const VOICE_PAGE = 21;
+
+  // Voice Messages (NIP-A0): lazy-load kind 1222 when voice tab is first opened
   useEffect(() => {
     if (!pubkey || tab !== "voice" || voiceFetchedRef.current) return;
     voiceFetchedRef.current = true;
     let cancelled = false;
     const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
-
     setVoiceMessagesLoading(true);
     const accum = [];
-    const oneYearAgo = Math.floor(Date.now() / 1000) - 365 * 24 * 60 * 60;
-    pool.request(relayUrls, [{ kinds: [1222], authors: [pubkey], limit: 30, since: oneYearAgo }]).subscribe({
+    pool.request(relayUrls, [{ kinds: [1222], authors: [pubkey], limit: VOICE_PAGE }]).subscribe({
       next: raw => {
         if (cancelled) return;
         try { eventStore.add(raw); } catch {}
@@ -773,12 +776,40 @@ export default function ProfilePage({
         accum.sort((a, b) => b.created_at - a.created_at);
         setVoiceMessages(accum);
         setVoiceMessagesLoading(false);
+        if (accum.length >= VOICE_PAGE) {
+          voiceUntilRef.current = accum[accum.length - 1].created_at - 1;
+          setVoiceHasMore(true);
+        }
       },
       error: () => { if (!cancelled) setVoiceMessagesLoading(false); },
     });
-
     return () => { cancelled = true; };
   }, [pubkey, tab]);
+
+  const loadMoreVoice = () => {
+    if (voiceLoadingMore || !voiceHasMore || !voiceUntilRef.current || !pubkey) return;
+    setVoiceLoadingMore(true);
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const accum = [];
+    pool.request(relayUrls, [{ kinds: [1222], authors: [pubkey], limit: VOICE_PAGE, until: voiceUntilRef.current }]).subscribe({
+      next: raw => {
+        try { eventStore.add(raw); } catch {}
+        if (!accum.some(e => e.id === raw.id)) accum.push(raw);
+      },
+      complete: () => {
+        accum.sort((a, b) => b.created_at - a.created_at);
+        setVoiceMessages(prev => [...prev, ...accum]);
+        setVoiceLoadingMore(false);
+        if (accum.length >= VOICE_PAGE) {
+          voiceUntilRef.current = accum[accum.length - 1].created_at - 1;
+          setVoiceHasMore(true);
+        } else {
+          setVoiceHasMore(false);
+        }
+      },
+      error: () => setVoiceLoadingMore(false),
+    });
+  };
 
   // Podcasts: load episodes (kind 54) and audio tracks (kind 1063) when a show is selected
   useEffect(() => {
@@ -1511,22 +1542,35 @@ export default function ProfilePage({
                 <div className="empty-state-sub">Voice messages will appear here when published</div>
               </div>
             )
-            : voiceMessages.map(e => (
-                <VoiceMessageRow
-                  key={e.id} event={e}
-                  onOpenThread={onOpenThread}
-                  profiles={profiles} myPubkey={myPubkey} myProfile={myProfile} allEvents={events}
-                  onOpenZaps={onOpenZaps} onOpenReactions={onOpenReactions} onOpenReposts={onOpenReposts}
-                  onPublish={onPublish} publishEvent={publishEvent} onPrepend={onPrepend}
-                  onBookmark={onBookmark} isBookmarked={isBookmarked}
-                  getLocalZaps={getLocalZaps} addLocalZap={addLocalZap}
-                  getLocalReactions={getLocalReactions} setLocalReaction={setLocalReaction}
-                  onRequestModal={onRequestModal} onDismissModal={onDismissModal}
-                  sendZap={sendZap} defaultZapAmount={defaultZapAmount}
-                  defaultZapMsg={defaultZapMsg} onZapFail={onZapFail}
-                  customEmojis={customEmojis}
-                />
-              ))
+            : <>
+                {voiceMessages.map(e => (
+                  <VoiceMessageRow
+                    key={e.id} event={e}
+                    onOpenThread={onOpenThread}
+                    profiles={profiles} myPubkey={myPubkey} myProfile={myProfile} allEvents={events}
+                    onOpenZaps={onOpenZaps} onOpenReactions={onOpenReactions} onOpenReposts={onOpenReposts}
+                    onPublish={onPublish} publishEvent={publishEvent} onPrepend={onPrepend}
+                    onBookmark={onBookmark} isBookmarked={isBookmarked}
+                    getLocalZaps={getLocalZaps} addLocalZap={addLocalZap}
+                    getLocalReactions={getLocalReactions} setLocalReaction={setLocalReaction}
+                    onRequestModal={onRequestModal} onDismissModal={onDismissModal}
+                    sendZap={sendZap} defaultZapAmount={defaultZapAmount}
+                    defaultZapMsg={defaultZapMsg} onZapFail={onZapFail}
+                    customEmojis={customEmojis}
+                  />
+                ))}
+                {voiceHasMore && (
+                  <div style={{ padding: "12px 16px", textAlign: "center" }}>
+                    <button
+                      onClick={loadMoreVoice}
+                      disabled={voiceLoadingMore}
+                      style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: "var(--primary)", background: "none", border: "none", cursor: "pointer", padding: "4px 0" }}
+                    >
+                      {voiceLoadingMore ? "Loading…" : "Load more"}
+                    </button>
+                  </div>
+                )}
+              </>
       )}
 
       {/* Listings tab */}
