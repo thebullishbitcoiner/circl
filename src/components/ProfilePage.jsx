@@ -761,7 +761,8 @@ export default function ProfilePage({
 
     setVoiceMessagesLoading(true);
     const accum = [];
-    pool.request(relayUrls, [{ kinds: [1222], authors: [pubkey], limit: 100 }]).subscribe({
+    const oneYearAgo = Math.floor(Date.now() / 1000) - 365 * 24 * 60 * 60;
+    pool.request(relayUrls, [{ kinds: [1222], authors: [pubkey], limit: 30, since: oneYearAgo }]).subscribe({
       next: raw => {
         if (cancelled) return;
         try { eventStore.add(raw); } catch {}
