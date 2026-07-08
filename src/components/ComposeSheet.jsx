@@ -10,6 +10,7 @@ import EmojiPicker from "./EmojiPicker.jsx";
 import PollCompose from "./PollCompose.jsx";
 import GoalCompose from "./GoalCompose.jsx";
 import { uploadToBlossom } from "../utils/blossom.js";
+import { VoiceRecorderBody } from "./VoiceRecorderSheet.jsx";
 
 const TAGGING_FONT = "12.5px 'DM Sans', sans-serif";
 let _measureCanvas = null;
@@ -84,9 +85,12 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   const [isDragOver,      setIsDragOver]      = useState(false);
   const [excludedMentions, setExcludedMentions] = useState(new Set());
   const [showTagList,      setShowTagList]      = useState(false);
+  const [activeTab, setActiveTab]   = useState(() => (replyTo?.kind === 1222 || replyTo?.kind === 1244) ? "voice" : "text");
+  const [voicePhase, setVoicePhase] = useState("idle");
   const fileRef        = useRef(null);
   const editorRef      = useRef(null);
   const publishingRef  = useRef(false);
+  const voiceSendRef   = useRef(null);
 
   const thisDraftId = computeDraftId(replyTo, quotedEvent);
   const draft = getDraft(thisDraftId);
@@ -109,7 +113,8 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     }
   }, [draft, circles]);
 
-  const isNip22Reply = replyTo?.kind === 1068 || replyTo?.kind === 6969 || replyTo?.kind === 1111 || replyTo?.kind === 30023;
+  const isNip22Reply  = replyTo?.kind === 1068 || replyTo?.kind === 6969 || replyTo?.kind === 1111 || replyTo?.kind === 30023;
+  const isVoiceReply  = replyTo?.kind === 1222 || replyTo?.kind === 1244;
   const mentionedPubkeys = (replyTo && !isNip22Reply)
     ? [...new Set(replyTagsForPublish(replyTo, events).filter(t => t[0] === "p").map(t => t[1]))]
     : [];
@@ -547,8 +552,38 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
         <div className="compose-sheet-bar">
           <button className="compose-sheet-cancel" onClick={handleDismiss}>Cancel</button>
           <span className="compose-sheet-title">{title}</span>
-          <button className="compose-sheet-post" disabled={!canPost || publishing} onClick={handlePost}>{publishing ? "Publishing…" : "Publish"}</button>
+          <button
+            className="compose-sheet-post"
+            disabled={isVoiceReply && activeTab === "voice" ? voicePhase !== "preview" : !canPost || publishing}
+            onClick={isVoiceReply && activeTab === "voice" ? () => voiceSendRef.current?.() : handlePost}
+          >
+            {isVoiceReply && activeTab === "voice"
+              ? (voicePhase === "uploading" ? "Publishing…" : "Send")
+              : (publishing ? "Publishing…" : "Publish")}
+          </button>
         </div>
+
+        {isVoiceReply && (
+          <div className="compose-tabs">
+            <button
+              className={`compose-tab${activeTab === "voice" ? " active" : ""}`}
+              onClick={() => setActiveTab("voice")}
+            >
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="currentColor" style={{ marginRight: 5 }}>
+                <rect x="9" y="2" width="6" height="11" rx="3" />
+                <path d="M5 10a7 7 0 0 0 14 0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+              Voice
+            </button>
+            <button
+              className={`compose-tab${activeTab === "text" ? " active" : ""}`}
+              onClick={() => setActiveTab("text")}
+            >
+              Text
+            </button>
+          </div>
+        )}
 
         {replyTo && (
           <div className="compose-sheet-context">
@@ -557,12 +592,15 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
               <Avatar pk={replyTo.pubkey} profiles={profiles} size={24} />
               <div style={{ minWidth: 0, flex: 1 }}>
                 <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted)" }}>{displayName(replyTo.pubkey, profiles)}</span>
-                <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12.5, color: "var(--text-muted)", margin: "2px 0 0", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "break-word", overflowWrap: "anywhere" }}>
-                  {replyTo.content}
-                </p>
+                {isVoiceReply
+                  ? <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12.5, color: "var(--text-faint)", margin: "2px 0 0", lineHeight: 1.4 }}>🎙 Voice message</p>
+                  : <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12.5, color: "var(--text-muted)", margin: "2px 0 0", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "break-word", overflowWrap: "anywhere" }}>
+                      {replyTo.content}
+                    </p>
+                }
               </div>
             </div>
-            {mentionedPubkeys.length > 0 && (
+            {!isVoiceReply && mentionedPubkeys.length > 0 && (
               <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 6 }}>
                 <span className="compose-sheet-context-label" style={{ margin: 0 }}>Tagging</span>
                 <TaggingLink pubkeys={mentionedPubkeys} excludedMentions={excludedMentions} profiles={profiles} onClick={() => setShowTagList(true)} />
@@ -571,8 +609,18 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
           </div>
         )}
 
+        {isVoiceReply && activeTab === "voice" && (
+          <VoiceRecorderBody
+            replyTo={replyTo} myPubkey={myPubkey}
+            publishEvent={publishEvent} onPrepend={onPrepend} onDismiss={handleDismiss}
+            blossomServers={blossomServers}
+            onPhaseChange={setVoicePhase}
+            onSendReady={fn => { voiceSendRef.current = fn; }}
+          />
+        )}
+
         {/* Scrollable area: text editor + image previews + quoted event scroll together */}
-        <div className="compose-sheet-scroll">
+        {(!isVoiceReply || activeTab === "text") && <div className="compose-sheet-scroll">
           {!goalMode && <div className="compose-sheet-body">
             <div className="compose-sheet-av">
               {myProfile?.picture
@@ -645,8 +693,9 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
               </div>
             </div>
           )}
-        </div>
+        </div>}
 
+        {(!isVoiceReply || activeTab === "text") && <>
         {pollMode && (
           <PollCompose
             pollType={pollType}
@@ -889,6 +938,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
             </button>
           )}
         </div>
+        </>}
       </div>
     </Overlay>
   );

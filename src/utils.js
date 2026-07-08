@@ -165,7 +165,7 @@ export const directReplyParentId = event => {
 
 export const replyCount = (eventId, pool) =>
   pool.filter(e =>
-    (e.kind === 1 || e.kind === 1111) &&
+    (e.kind === 1 || e.kind === 1111 || e.kind === 1244) &&
     e.id !== eventId &&
     !isQuoteRepost(e) &&
     directReplyParentId(e) === eventId
@@ -241,6 +241,38 @@ export const kind1111TagsForPublish = (replyTo, pool = []) => {
     tags.push(["E", replyTo.id, "", pk]);
     tags.push(["P", pk]);
     tags.push(["k", String(replyTo.kind)]);
+    tags.push(["e", replyTo.id, "", pk]);
+    tags.push(["p", pk]);
+  }
+
+  return tags;
+};
+
+/** NIP-A0 + NIP-22 tags for publishing a kind 1244 voice reply. */
+export const kind1244TagsForPublish = (replyTo) => {
+  if (!replyTo?.id) return [];
+  const tags = [];
+
+  if (replyTo.kind === 1244) {
+    // Replying to a voice reply — inherit root from upstream uppercase tags.
+    const rootKind     = replyTo.tags?.find(t => t[0] === "K")?.[1] ?? "1222";
+    const rootAuthorPk = replyTo.tags?.find(t => t[0] === "P")?.[1] ?? "";
+    const ETag         = replyTo.tags?.find(t => t[0] === "E");
+
+    tags.push(["K", rootKind]);
+    if (ETag) tags.push(["E", ETag[1], ETag[2] ?? "", rootAuthorPk]);
+    if (rootAuthorPk) tags.push(["P", rootAuthorPk]);
+
+    tags.push(["k", "1244"]);
+    tags.push(["e", replyTo.id, "", replyTo.pubkey ?? ""]);
+    if (replyTo.pubkey) tags.push(["p", replyTo.pubkey]);
+  } else {
+    // Replying to a root voice message (kind 1222).
+    const pk = replyTo.pubkey ?? "";
+    tags.push(["K", "1222"]);
+    tags.push(["E", replyTo.id, "", pk]);
+    tags.push(["P", pk]);
+    tags.push(["k", "1222"]);
     tags.push(["e", replyTo.id, "", pk]);
     tags.push(["p", pk]);
   }

@@ -475,7 +475,7 @@ export default function ThreadView({
 
     // Subscribe to replies (kind 1) and NIP-22 comments (kind 1111)
     const replySub = pool.subscription(relayUrls, [{
-      kinds: [1, 1111],
+      kinds: [1, 1111, 1244],
       "#e": [focusedEvent.id],
       since: focusedEvent.created_at,
     }]).subscribe({
@@ -532,7 +532,7 @@ export default function ThreadView({
   ]);
 
   const otherReplies = allEvents.filter(e => {
-    if ((e.kind !== 1 && e.kind !== 1111) || chainIds.has(e.id) || isQuoteRepost(e)) return false;
+    if ((e.kind !== 1 && e.kind !== 1111 && e.kind !== 1244) || chainIds.has(e.id) || isQuoteRepost(e)) return false;
     return directReplyParentId(e) === focusedEvent.id;
   }).sort((a, b) => a.created_at - b.created_at);
 
