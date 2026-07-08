@@ -132,7 +132,7 @@ function VoicePlayerControls({ event }) {
         <audio
           ref={audioRef}
           src={audioUrl}
-          preload="metadata"
+          preload="none"
           onPlay={() => setPlaying(true)}
           onPause={() => { setPlaying(false); releasePlayback(audioRef.current); }}
           onEnded={() => { setPlaying(false); setProgress(0); releasePlayback(audioRef.current); }}
