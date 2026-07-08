@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useCallback, memo } from "react";
 import NoteJsonModal from "./NoteJsonModal.jsx";
 import NoteActions from "./NoteActions.jsx";
 import { relativeTime, nip19 } from "../utils.js";
@@ -13,9 +13,8 @@ function formatDuration(seconds) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-// Unified waveform + scrubber zone: click anywhere to seek, drag to scrub.
-// Stops propagation so the parent row's thread-open handler is not triggered.
-function VoiceScrubZone({ amplitudes, progress, onScrub }) {
+// memo: only re-renders when amplitudes/progress/onScrub actually change.
+const VoiceScrubZone = memo(function VoiceScrubZone({ amplitudes, progress, onScrub }) {
   const zoneRef  = useRef(null);
   const dragging = useRef(false);
 
@@ -65,27 +64,37 @@ function VoiceScrubZone({ amplitudes, progress, onScrub }) {
       </div>
     </div>
   );
-}
+});
 
-// Isolated sub-component: playing/progress state lives here so onTimeUpdate
-// re-renders only this, not the parent VoiceMessageRow/NoteActions/ZapBadges.
-function VoicePlayerControls({ event }) {
+// memo: event reference is stable from the voiceMessages array — only re-renders
+// when the event itself changes or audio plays/scrubs (internal state).
+const VoicePlayerControls = memo(function VoicePlayerControls({ event }) {
   const [playing, setPlaying]   = useState(false);
   const [progress, setProgress] = useState(0);
   const audioRef = useRef(null);
 
   const audioUrl = event.content || null;
 
-  const imetaTag = event.tags?.find(t => t[0] === "imeta");
-  let imetaDuration    = null;
-  let waveformAmplitudes = null;
-  if (imetaTag) {
-    const entries = imetaTag.slice(1);
+  // Memoized by event.id — prevents VoiceScrubZone from seeing new array references
+  // on every parent re-render, which would invalidate its useMemo and re-render all bars.
+  const { imetaDuration, waveformAmplitudes } = useMemo(() => {
+    const imetaTag = event.tags?.find(t => t[0] === "imeta");
+    if (!imetaTag) return { imetaDuration: null, waveformAmplitudes: null };
+    const entries  = imetaTag.slice(1);
     const durEntry = entries.find(v => typeof v === "string" && v.startsWith("duration "));
-    if (durEntry) imetaDuration = parseInt(durEntry.split(" ")[1], 10);
-    const wvEntry = entries.find(v => typeof v === "string" && v.startsWith("waveform "));
-    if (wvEntry) waveformAmplitudes = wvEntry.split(" ").slice(1).map(Number).filter(n => !isNaN(n));
-  }
+    const wvEntry  = entries.find(v => typeof v === "string" && v.startsWith("waveform "));
+    return {
+      imetaDuration:      durEntry ? parseInt(durEntry.split(" ")[1], 10) : null,
+      waveformAmplitudes: wvEntry  ? wvEntry.split(" ").slice(1).map(Number).filter(n => !isNaN(n)) : null,
+    };
+  }, [event.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleScrub = useCallback((ratio) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const dur = (audio.duration && isFinite(audio.duration)) ? audio.duration : imetaDuration;
+    if (dur) { audio.currentTime = ratio * dur; setProgress(ratio); }
+  }, [imetaDuration]);
 
   const togglePlay = (e) => {
     e.stopPropagation();
@@ -93,13 +102,6 @@ function VoicePlayerControls({ event }) {
     if (!audio || !audioUrl) return;
     if (playing) { audio.pause(); }
     else { claimPlayback(audio, event.id); audio.play().catch(() => {}); }
-  };
-
-  const handleScrub = (ratio) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const dur = (audio.duration && isFinite(audio.duration)) ? audio.duration : imetaDuration;
-    if (dur) { audio.currentTime = ratio * dur; setProgress(ratio); }
   };
 
   return (
@@ -144,7 +146,7 @@ function VoicePlayerControls({ event }) {
       )}
     </>
   );
-}
+});
 
 function VoiceContextMenu({ event, onClose, onViewJson }) {
   const { isMuted, onMuteUser, onUnmuteUser, myPubkey } = useNavigation();
