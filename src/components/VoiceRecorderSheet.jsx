@@ -76,6 +76,7 @@ export function VoiceRecorderBody({
   const [liveBars, setLiveBars]     = useState(makeFlatBars);
   const [frozenBars, setFrozenBars] = useState(makeFlatBars);
   const [blob, setBlob]             = useState(null);
+  const [title, setTitle]           = useState("");
   const [previewPlay, setPreviewPlay] = useState(false);
   const [previewProg, setPreviewProg] = useState(0);
   const [previewDur, setPreviewDur]   = useState(0);
@@ -252,8 +253,10 @@ export function VoiceRecorderBody({
       const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: blob.type });
       try {
         const audioUrl  = await uploadFile(file);
-        const tags      = kind1244TagsForPublish(replyTo);
-        const published = await publishEvent({ kind: 1244, content: audioUrl, tags });
+        const kind      = replyTo ? 1244 : 1222;
+        const tags      = replyTo ? kind1244TagsForPublish(replyTo) : [];
+        if (title.trim()) tags.push(["title", title.trim()]);
+        const published = await publishEvent({ kind, content: audioUrl, tags });
         if (published) {
           onPrepend?.(published);
           onDismiss?.();
@@ -274,6 +277,17 @@ export function VoiceRecorderBody({
 
   return (
     <div className="vrs-body">
+      {(phase === "idle" || phase === "preview") && (
+        <input
+          className="vrs-title-input"
+          type="text"
+          placeholder="Add a title (optional)"
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          maxLength={100}
+        />
+      )}
+
       {phase === "preview" ? (
         <div className="vrs-preview">
           <button

@@ -96,6 +96,8 @@ const VoicePlayerControls = memo(function VoicePlayerControls({ event }) {
 
   // Memoized by event.id — prevents VoiceScrubZone from seeing new array references
   // on every parent re-render, which would invalidate its useMemo and re-render all bars.
+  const title = event.tags?.find(t => t[0] === "title")?.[1] || null;
+
   const { imetaDuration, waveformAmplitudes } = useMemo(() => {
     const imetaTag = event.tags?.find(t => t[0] === "imeta");
     if (!imetaTag) return { imetaDuration: null, waveformAmplitudes: null };
@@ -143,6 +145,7 @@ const VoicePlayerControls = memo(function VoicePlayerControls({ event }) {
         )}
       </button>
       <div className="voice-message-body">
+        {title && <div className="voice-title">{title}</div>}
         <VoiceScrubZone amplitudes={waveformAmplitudes} progress={progress} onScrub={handleScrub} />
         <div className="voice-message-meta">
           <span className="voice-duration">{formatDuration(imetaDuration) ?? "≤1:00"}</span>

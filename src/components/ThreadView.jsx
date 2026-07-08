@@ -95,6 +95,7 @@ function ThreadVoicePlayer({ event }) {
   const audioRef = useRef(null);
 
   const audioUrl = event.content || null;
+  const title    = event.tags?.find(t => t[0] === "title")?.[1] || null;
 
   const imetaTag = event.tags?.find(t => t[0] === "imeta");
   let imetaDuration    = null;
@@ -162,6 +163,7 @@ function ThreadVoicePlayer({ event }) {
         )}
       </button>
       <div className="voice-message-body">
+        {title && <div className="voice-title">{title}</div>}
         <ThreadVoiceScrubZone amplitudes={waveformAmplitudes} progress={progress} onScrub={handleScrub} />
         <div className="voice-message-meta">
           <span className="voice-duration">{formatDur(imetaDuration)}</span>

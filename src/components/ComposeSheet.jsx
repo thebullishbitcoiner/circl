@@ -87,6 +87,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   const [showTagList,      setShowTagList]      = useState(false);
   const [activeTab, setActiveTab]   = useState(() => (replyTo?.kind === 1222 || replyTo?.kind === 1244) ? "voice" : "text");
   const [voicePhase, setVoicePhase] = useState("idle");
+  const [voiceMode,  setVoiceMode]  = useState(false);
   const fileRef        = useRef(null);
   const editorRef      = useRef(null);
   const publishingRef  = useRef(false);
@@ -165,7 +166,8 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     onDismiss?.();
   }, [saveDraft, onDismiss, thisDraftId, collectDraftState, media]);
 
-  const title   = quotedEvent ? "Quote repost" : replyTo ? "Reply" : goalMode ? "New Goal" : pollMode ? "New Poll" : "New note";
+  const isVoiceActive = voiceMode || (isVoiceReply && activeTab === "voice");
+  const title   = quotedEvent ? "Quote repost" : replyTo ? "Reply" : goalMode ? "New Goal" : pollMode ? "New Poll" : voiceMode ? "Voice note" : "New note";
   const pollValid = pollMode && pollOptions.filter(o => o.trim()).length >= 2;
   const goalValid = goalMode && goalTitle.trim().length > 0 && Number(goalAmount) > 0;
   const canPost = goalMode ? goalValid : pollMode ? pollValid : (hasText || media.length > 0);
@@ -554,10 +556,10 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
           <span className="compose-sheet-title">{title}</span>
           <button
             className="compose-sheet-post"
-            disabled={isVoiceReply && activeTab === "voice" ? voicePhase !== "preview" : !canPost || publishing}
-            onClick={isVoiceReply && activeTab === "voice" ? () => voiceSendRef.current?.() : handlePost}
+            disabled={isVoiceActive ? voicePhase !== "preview" : !canPost || publishing}
+            onClick={isVoiceActive ? () => voiceSendRef.current?.() : handlePost}
           >
-            {isVoiceReply && activeTab === "voice"
+            {isVoiceActive
               ? (voicePhase === "uploading" ? "Publishing…" : "Send")
               : (publishing ? "Publishing…" : "Publish")}
           </button>
@@ -609,10 +611,11 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
           </div>
         )}
 
-        {isVoiceReply && activeTab === "voice" && (
+        {(voiceMode || (isVoiceReply && activeTab === "voice")) && (
           <VoiceRecorderBody
-            replyTo={replyTo} myPubkey={myPubkey}
-            publishEvent={publishEvent} onPrepend={onPrepend} onDismiss={handleDismiss}
+            replyTo={voiceMode ? null : replyTo} myPubkey={myPubkey}
+            publishEvent={publishEvent} onPrepend={onPrepend}
+            onDismiss={voiceMode ? () => setVoiceMode(false) : handleDismiss}
             blossomServers={blossomServers}
             onPhaseChange={setVoicePhase}
             onSendReady={fn => { voiceSendRef.current = fn; }}
@@ -620,7 +623,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
         )}
 
         {/* Scrollable area: text editor + image previews + quoted event scroll together */}
-        {(!isVoiceReply || activeTab === "text") && <div className="compose-sheet-scroll">
+        {!voiceMode && (!isVoiceReply || activeTab === "text") && <div className="compose-sheet-scroll">
           {!goalMode && <div className="compose-sheet-body">
             <div className="compose-sheet-av">
               {myProfile?.picture
@@ -695,7 +698,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
           )}
         </div>}
 
-        {(!isVoiceReply || activeTab === "text") && <>
+        {!voiceMode && (!isVoiceReply || activeTab === "text") && <>
         {pollMode && (
           <PollCompose
             pollType={pollType}
@@ -888,6 +891,23 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
             style={showGif ? { color: "var(--primary)", background: "var(--surface)" } : {}}>
             <span style={{ fontSize: 11, fontWeight: 700, fontFamily: "'DM Sans',sans-serif", letterSpacing: "-.5px" }}>GIF</span>
           </button>
+          {!replyTo && !quotedEvent && (
+            <button
+              type="button"
+              className="compose-media-btn"
+              title="Voice note"
+              onClick={() => { setShowEmoji(false); setShowGif(false); setPollMode(false); setGoalMode(false); setVoiceMode(v => !v); }}
+              style={voiceMode ? { color: "var(--primary)", background: "var(--surface)" } : {}}
+              aria-pressed={voiceMode}
+            >
+              <svg width={18} height={18} viewBox="0 0 24 24" fill="currentColor">
+                <rect x="9" y="2" width="6" height="11" rx="3" />
+                <path d="M5 10a7 7 0 0 0 14 0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
           {!replyTo && !quotedEvent && (
             <button
               type="button"

@@ -327,6 +327,7 @@
   .voice-waveform-bar.played{background:var(--primary);opacity:1;}
   .voice-scrubber{height:3px;border-radius:2px;background:var(--border);cursor:pointer;position:relative;margin-top:2px;}
   .voice-scrubber-fill{height:100%;border-radius:2px;background:var(--primary);transition:width .1s linear;pointer-events:none;}
+  .voice-title{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .voice-message-meta{display:flex;align-items:center;justify-content:space-between;margin-top:3px;}
   .voice-duration{font-size:11px;font-weight:600;color:var(--primary);}
   .voice-timestamp{font-size:11px;color:var(--text-faint);}
@@ -359,6 +360,8 @@
   .vrs-play{flex-shrink:0;}
   .vrs-preview{display:flex;align-items:center;gap:10px;width:100%;}
   .vrs-hint{font-size:12px;color:var(--text-faint);}
+  .vrs-title-input{width:100%;box-sizing:border-box;border:none;border-bottom:1px solid var(--border);background:transparent;font-family:'DM Sans',sans-serif;font-size:15px;color:var(--text);padding:8px 0;outline:none;text-align:left;margin-bottom:12px;}
+  .vrs-title-input::placeholder{color:var(--text-faint);}
   .vrs-spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite;}
   @keyframes spin{to{transform:rotate(360deg)}}
   .note-audio-attachment{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin:6px 0;}
