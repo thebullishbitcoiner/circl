@@ -1,14 +1,12 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import Overlay from "./Overlay.jsx";
-
-const FREQUENCIES = ["", "hour", "day", "week", "month", "year"];
 
 export default function CreateListingSheet({ publishEvent, onCreated, onDismiss }) {
   const [title,         setTitle]         = useState("");
   const [summary,       setSummary]       = useState("");
   const [priceAmt,      setPriceAmt]      = useState("");
-  const [priceCurrency, setPriceCurrency] = useState("USD");
-  const [priceFreq,     setPriceFreq]     = useState("");
+  const [priceCurrency, setPriceCurrency] = useState("sats");
   const [location,      setLocation]      = useState("");
   const [image,         setImage]         = useState("");
   const [description,   setDescription]   = useState("");
@@ -27,9 +25,7 @@ export default function CreateListingSheet({ publishEvent, onCreated, onDismiss 
     if (location)      tags.push(["location", location.trim()]);
     if (image.trim())  tags.push(["image", image.trim()]);
     if (priceAmt.trim()) {
-      const price = ["price", priceAmt.trim(), priceCurrency.trim()];
-      if (priceFreq) price.push(priceFreq);
-      tags.push(price);
+      tags.push(["price", priceAmt.trim(), priceCurrency.trim()]);
     }
     for (const tag of hashtags.split(",").map(s => s.trim()).filter(Boolean)) {
       tags.push(["t", tag]);
@@ -52,13 +48,14 @@ export default function CreateListingSheet({ publishEvent, onCreated, onDismiss 
     onDismiss?.();
   };
 
-  return (
-    <Overlay onDismiss={onDismiss} centered>
-      <div className="action-sheet highlight-sheet" style={{ maxWidth: 480, width: "100%" }} onClick={e => e.stopPropagation()}>
+  return createPortal(
+    <Overlay onDismiss={onDismiss} compose>
+      <div style={{ width: "100%", maxWidth: 700, background: "var(--bg)", borderRadius: "20px 20px 0 0", paddingTop: 8, maxHeight: "90vh", display: "flex", flexDirection: "column", animation: "slideUp .22s cubic-bezier(.4,0,.2,1)" }} onClick={e => e.stopPropagation()}>
         <div className="action-sheet-handle" />
         <div className="highlight-sheet-title">New Listing</div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "0 16px" }}>
+        {/* Scrollable content — inputs use highlight-sheet-comment class which handles its own margin */}
+        <div style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
           <input
             className="highlight-sheet-comment"
             style={{ padding: "8px 10px" }}
@@ -83,10 +80,11 @@ export default function CreateListingSheet({ publishEvent, onCreated, onDismiss 
             rows={4}
           />
 
-          <div style={{ display: "flex", gap: 8 }}>
+          {/* Price row — wrapper provides the 16px inset; items reset class margin/width for flex layout */}
+          <div style={{ display: "flex", gap: 8, margin: "0 16px 12px" }}>
             <input
               className="highlight-sheet-comment"
-              style={{ padding: "8px 10px", flex: "1 1 80px", minWidth: 0 }}
+              style={{ padding: "8px 10px", flex: "1 1 80px", minWidth: 0, margin: 0, width: "auto" }}
               placeholder="Price"
               type="number"
               min="0"
@@ -95,23 +93,12 @@ export default function CreateListingSheet({ publishEvent, onCreated, onDismiss 
             />
             <input
               className="highlight-sheet-comment"
-              style={{ padding: "8px 10px", flex: "1 1 60px", minWidth: 0 }}
+              style={{ padding: "8px 10px", flex: "1 1 60px", minWidth: 0, margin: 0, width: "auto" }}
               placeholder="Currency"
               value={priceCurrency}
               onChange={e => setPriceCurrency(e.target.value)}
               maxLength={10}
             />
-            <select
-              className="highlight-sheet-comment"
-              style={{ padding: "8px 10px", flex: "1 1 80px", minWidth: 0, cursor: "pointer" }}
-              value={priceFreq}
-              onChange={e => setPriceFreq(e.target.value)}
-            >
-              <option value="">One-time</option>
-              {FREQUENCIES.filter(Boolean).map(f => (
-                <option key={f} value={f}>{f.charAt(0).toUpperCase() + f.slice(1)}ly</option>
-              ))}
-            </select>
           </div>
 
           <input
@@ -136,24 +123,23 @@ export default function CreateListingSheet({ publishEvent, onCreated, onDismiss 
             value={hashtags}
             onChange={e => setHashtags(e.target.value)}
           />
+
+          {error && <div className="highlight-sheet-error">{error}</div>}
         </div>
 
-        {error && <div className="highlight-sheet-error" style={{ margin: "8px 16px 0" }}>{error}</div>}
-
-        <div style={{ display: "flex", gap: 8, padding: "12px 16px 0" }}>
+        <div style={{ display: "flex", margin: "12px 16px 0", flexShrink: 0, borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)" }}>
           <button
             type="button"
-            className="action-sheet-btn highlight-sheet-submit"
-            style={{ flex: 1 }}
+            style={{ flex: 1, padding: "13px 16px", background: "var(--primary)", color: "#fff", border: "none", fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 600, cursor: "pointer", opacity: busy ? 0.6 : 1 }}
             onClick={() => handleSubmit(30402)}
             disabled={busy}
           >
             {busy ? "Publishing…" : "Publish"}
           </button>
+          <div style={{ width: 1, background: "var(--border)", flexShrink: 0 }} />
           <button
             type="button"
-            className="action-sheet-btn"
-            style={{ flex: 1, background: "var(--surface-2, var(--border))", color: "var(--text)" }}
+            style={{ flex: 1, padding: "13px 16px", background: "var(--surface)", color: "var(--text)", border: "none", fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 500, cursor: "pointer", opacity: busy ? 0.6 : 1 }}
             onClick={() => handleSubmit(30403)}
             disabled={busy}
           >
@@ -162,6 +148,7 @@ export default function CreateListingSheet({ publishEvent, onCreated, onDismiss 
         </div>
         <button type="button" className="action-sheet-cancel" onClick={onDismiss}>Cancel</button>
       </div>
-    </Overlay>
+    </Overlay>,
+    document.body
   );
 }

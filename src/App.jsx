@@ -955,6 +955,7 @@ export default function App() {
                         onEditProfile={profileEntry.payload === pubkey ? handleEditProfile : undefined}
                         ownPinnedIds={profileEntry.payload === pubkey ? pinnedIds : undefined}
                         onOpenProfileSearch={handleOpenProfileSearch}
+                        blossomServers={blossomServers}
                       />
                     </div>
                   );

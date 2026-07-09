@@ -34,8 +34,10 @@ import PodcastEpisodeRow from "./PodcastEpisodeRow.jsx";
 import VoiceMessageRow from "./VoiceMessageRow.jsx";
 import { useAudio } from "../contexts/AudioContext.jsx";
 import CreateListingSheet from "./CreateListingSheet.jsx";
+import CreateBadgeSheet from "./CreateBadgeSheet.jsx";
 import BadgeCard from "./BadgeCard.jsx";
 import BadgeDetail from "./BadgeDetail.jsx";
+import BadgeDefDetail from "./BadgeDefDetail.jsx";
 import LightningSheet from "./LightningSheet.jsx";
 import ZapAnimation from "./ZapAnimation.jsx";
 import PinnedNotesCarousel from "./PinnedNotesCarousel.jsx";
@@ -162,6 +164,7 @@ export default function ProfilePage({
   onEditProfile,
   ownPinnedIds,
   onOpenProfileSearch,
+  blossomServers = [],
 }) {
   const { isMuted } = useNavigation();
   const isProfileMuted = isMuted?.(pubkey);
@@ -216,6 +219,10 @@ export default function ProfilePage({
   const [allAwardEvents,     setAllAwardEvents]     = useState([]);   // all kind 8 received (own only)
   const [badgesLoading,      setBadgesLoading]      = useState(false);
   const [selectedBadge,      setSelectedBadge]      = useState(null);
+  const [createdBadgeDefs,   setCreatedBadgeDefs]   = useState([]);
+  const [createBadgeOpen,    setCreateBadgeOpen]    = useState(false);
+  const [selectedBadgeDef,   setSelectedBadgeDef]   = useState(null);
+  const [createdBadgesOpen,  setCreatedBadgesOpen]  = useState(true);
   const [notAcceptedOpen,    setNotAcceptedOpen]    = useState(false);
 
   const [podcastsLoading,      setPodcastsLoading]      = useState(false);
@@ -346,6 +353,10 @@ export default function ProfilePage({
     setAllAwardEvents([]);
     setBadgesLoading(false);
     setSelectedBadge(null);
+    setCreatedBadgeDefs([]);
+    setCreateBadgeOpen(false);
+    setSelectedBadgeDef(null);
+    setCreatedBadgesOpen(true);
     setNotAcceptedOpen(false);
     setPodcastShows([]);
     setDirectTracks([]);
@@ -616,6 +627,19 @@ export default function ProfilePage({
       error: () => { if (!cancelled) setBadgesLoading(false); },
     });
     activeSubs.push(badgesSub);
+
+    // Fetch badge definitions (kind 30009) authored by this user so "Created badges" tab section works
+    if (isOwn) {
+      const defsSub = pool.request(relayUrls, [{ kinds: [30009], authors: [pubkey], limit: 100 }]).subscribe({
+        next: raw => {
+          if (cancelled) return;
+          try { eventStore.add(raw); } catch {}
+          setCreatedBadgeDefs(prev => prev.some(e => e.id === raw.id) ? prev : [...prev, raw]);
+        },
+        error: () => {},
+      });
+      activeSubs.push(defsSub);
+    }
 
     // Phase 7 — goals (kind 9041), fetched last
     const goalsSub = pool.request(relayUrls, [{ kinds: [9041], authors: [pubkey], limit: 100 }]).subscribe({
@@ -1660,6 +1684,15 @@ export default function ProfilePage({
 
       {/* Badges tab */}
       {tab === "badges" && (() => {
+        if (selectedBadgeDef) {
+          return (
+            <BadgeDefDetail
+              defEvent={selectedBadgeDef}
+              onBack={() => setSelectedBadgeDef(null)}
+            />
+          );
+        }
+
         if (selectedBadge) {
           const aTag = selectedBadge.tags?.find(t => t[0] === "a")?.[1] || "";
           const parts = aTag.split(":");
@@ -1679,22 +1712,67 @@ export default function ProfilePage({
           );
         }
 
-        const acceptedIds = new Set(acceptedPairs.map(p => p.eTag));
-        const unaccepted  = isOwn ? allAwardEvents.filter(e => !acceptedIds.has(e.id)).sort((a, b) => b.created_at - a.created_at) : [];
-        const hasAny      = acceptedPairs.length > 0 || unaccepted.length > 0;
+        const acceptedIds   = new Set(acceptedPairs.map(p => p.eTag));
+        const unaccepted    = isOwn ? allAwardEvents.filter(e => !acceptedIds.has(e.id)).sort((a, b) => b.created_at - a.created_at) : [];
+        const sortedCreated = [...createdBadgeDefs].sort((a, b) => b.created_at - a.created_at);
+        const hasAny        = acceptedPairs.length > 0 || unaccepted.length > 0 || sortedCreated.length > 0;
 
         if (badgesLoading && !hasAny) return [0, 1, 2].map(i => <SkelCard key={i} />);
-        if (!hasAny) return (
-          <div className="empty-state">
-            <div className="empty-state-title">No badges yet</div>
-            <div className="empty-state-sub">{isOwn ? "Badges you accept will appear here" : "Accepted badges will appear here"}</div>
-          </div>
-        );
 
         return (
           <>
+            {isOwn && (
+              <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 12px 0" }}>
+                <button
+                  type="button"
+                  className="profile-follow-btn"
+                  style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, flexShrink: 0 }}
+                  onClick={() => setCreateBadgeOpen(true)}
+                >
+                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                  New badge
+                </button>
+              </div>
+            )}
+
+            {!hasAny && (
+              <div className="empty-state">
+                <div className="empty-state-title">No badges yet</div>
+                <div className="empty-state-sub">{isOwn ? "Create a badge or accept awarded ones" : "Accepted badges will appear here"}</div>
+              </div>
+            )}
+
+            {/* Created badges — own profile only */}
+            {sortedCreated.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setCreatedBadgesOpen(v => !v)}
+                  style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "8px 16px", background: "none", border: "none", cursor: "pointer", color: "var(--text-faint)", fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", textTransform: "uppercase", letterSpacing: "0.05em" }}
+                >
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{ transition: "transform .2s", transform: createdBadgesOpen ? "rotate(90deg)" : "rotate(0deg)" }}><polyline points="9 18 15 12 9 6" /></svg>
+                  Created
+                  <span style={{ marginLeft: "auto", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>{sortedCreated.length}</span>
+                </button>
+                {createdBadgesOpen && (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: "4px 12px 20px" }}>
+                    {sortedCreated.map((def, i) => (
+                      <BadgeCard
+                        key={def.id}
+                        defEvent={def}
+                        awardEvent={null}
+                        onClick={() => setSelectedBadgeDef(def)}
+                        delay={i * 0.03}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Accepted badges */}
             {acceptedPairs.length > 0 && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: "12px 12px 20px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: "12px 12px 20px", borderTop: sortedCreated.length > 0 ? "1px solid var(--border)" : "none" }}>
                 {acceptedPairs.map((pair, i) => {
                   const [, issuerPk, dTag] = pair.aTag.split(":");
                   const defEvent  = badgeDefMap.get(`30009:${issuerPk}:${dTag}`);
@@ -1714,6 +1792,8 @@ export default function ProfilePage({
                 })}
               </div>
             )}
+
+            {/* Not accepted */}
             {unaccepted.length > 0 && (
               <>
                 <button
@@ -1745,6 +1825,16 @@ export default function ProfilePage({
                   </div>
                 )}
               </>
+            )}
+
+            {createBadgeOpen && (
+              <CreateBadgeSheet
+                publishEvent={publishEvent}
+                blossomServers={blossomServers}
+                myPubkey={myPubkey}
+                onCreated={ev => setCreatedBadgeDefs(prev => prev.some(e => e.id === ev.id) ? prev : [ev, ...prev])}
+                onDismiss={() => setCreateBadgeOpen(false)}
+              />
             )}
           </>
         );
