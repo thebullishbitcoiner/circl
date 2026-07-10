@@ -1154,7 +1154,7 @@
     .toast { bottom: calc(var(--bottom-nav-h) + var(--audio-bar-h, 0px) + 14px); }
   }
 
-  @media (min-width: 650px) and (max-width: 1149px) {
+  @media (min-width: 650px) and (max-width: 1074px) {
     /* Slim sidebar: absolute so hover-expand overlays feed instead of squishing it */
     .sidebar{position:absolute;top:0;bottom:0;left:0;z-index:200;background:var(--bg);width:56px;min-width:56px;padding-left:0;padding-right:0;overflow:hidden;}
     .sidebar:hover{width:225px;min-width:225px;padding-left:12px;padding-right:12px;}
@@ -1179,7 +1179,7 @@
     .feed-main{border-right:none;}
   }
 
-  @media (min-width: 1150px) {
+  @media (min-width: 1075px) {
     /* Desktop: full layout — audio player is in the sidebar card, not the fixed bar */
     .right-panel{width:300px;}
     .toast{bottom:26px;}
