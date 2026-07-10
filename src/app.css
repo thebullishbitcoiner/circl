@@ -1137,7 +1137,7 @@
   }
 
   /* ── RESPONSIVE ── */
-  @media (max-width: 767px) {
+  @media (max-width: 649px) {
     /* Show bottom nav, hide sidebar */
     .bottom-nav { display: block; }
     .sidebar { display: none; }
@@ -1154,17 +1154,36 @@
     .toast { bottom: calc(var(--bottom-nav-h) + var(--audio-bar-h, 0px) + 14px); }
   }
 
-  @media (min-width: 768px) and (max-width: 1023px) {
-    /* Tablet: show sidebar but hide right panel */
-    .right-panel { display: none; }
-    .feed-main { border-right: none; }
-    .sidebar { width: 200px; }
+  @media (min-width: 650px) and (max-width: 1149px) {
+    /* Slim sidebar: absolute so hover-expand overlays feed instead of squishing it */
+    .sidebar{position:absolute;top:0;bottom:0;left:0;z-index:200;background:var(--bg);width:56px;min-width:56px;padding-left:0;padding-right:0;overflow:hidden;}
+    .sidebar:hover{width:225px;min-width:225px;padding-left:12px;padding-right:12px;}
+    .view-container{margin-left:56px;}
+    .sidebar .compose-btn{display:none;}
+    .sidebar:hover .compose-btn{display:block;}
+    .sidebar .logout-btn{display:none;}
+    .sidebar:hover .logout-btn{display:block;}
+    .sidebar .nav-label{display:none;}
+    .sidebar:hover .nav-label{display:inline;}
+    .sidebar .nav-item{padding:9px 0;justify-content:center;}
+    .sidebar:hover .nav-item{padding:9px 11px;justify-content:flex-start;}
+    .sidebar .sidebar-profile{padding:9px 0;justify-content:center;}
+    .sidebar:hover .sidebar-profile{padding:9px 11px;justify-content:flex-start;}
+    .sidebar .sidebar-profile>div:last-child{display:none;}
+    .sidebar:hover .sidebar-profile>div:last-child{display:block;}
   }
 
-  @media (min-width: 1024px) {
+  @media (min-width: 650px) and (max-width: 899px) {
+    /* Slim sidebar only — right panel not until 900px */
+    .right-panel{display:none;}
+    .feed-main{border-right:none;}
+  }
+
+  @media (min-width: 1150px) {
     /* Desktop: full layout — audio player is in the sidebar card, not the fixed bar */
-    .toast { bottom: 26px; }
-    .audio-player-bar { display: none; }
+    .right-panel{width:300px;}
+    .toast{bottom:26px;}
+    .audio-player-bar{display:none;}
   }
 
   /* ── Poll card ── */
