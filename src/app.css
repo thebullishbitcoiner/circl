@@ -893,7 +893,9 @@
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .15s ease;}
   .overlay.centered{align-items:center;}
   #sheet-portal{position:absolute;inset:0;pointer-events:none;}
-  #sheet-portal .overlay:not(.centered){position:absolute;overflow:hidden;}
+  .overlay-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;animation:fadeIn .15s ease;}
+  .overlay-positioner{position:absolute;inset:0;z-index:301;display:flex;align-items:flex-end;justify-content:center;overflow:hidden;pointer-events:none;}
+  .overlay-positioner>*{pointer-events:auto;}
   .overlay.profile-json-overlay{z-index:420;}
   @keyframes spin{to{transform:rotate(360deg);}}
   @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
