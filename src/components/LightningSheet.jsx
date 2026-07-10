@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import Overlay from "./Overlay.jsx";
+import { sheetPortal } from "../utils/sheetPortal.js";
 import ZapModal from "./ZapModal.jsx";
 import NofferModal from "./NofferModal.jsx";
 import { displayName, haptic } from "../utils.js";
@@ -160,6 +161,6 @@ export default function LightningSheet({
         <NofferModal value={nofferValue} onDismiss={() => setShowNoffer(false)} />
       )}
     </>,
-    document.body
+    sheetPortal()
   );
 }

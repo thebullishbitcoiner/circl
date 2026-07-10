@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { uploadToBlossom } from "../utils/blossom.js";
+import { sheetPortal } from "../utils/sheetPortal.js";
 import Overlay from "./Overlay.jsx";
 
 const NOSTR_BUILD_URL = "https://nostr.build/api/v2/upload/files";
@@ -199,6 +200,6 @@ export default function CreateBadgeSheet({ publishEvent, onCreated, onDismiss, b
         <button type="button" className="action-sheet-cancel" onClick={onDismiss}>Cancel</button>
       </div>
     </Overlay>,
-    document.body
+    sheetPortal()
   );
 }

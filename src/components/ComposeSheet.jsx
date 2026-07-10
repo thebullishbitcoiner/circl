@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { draftId as computeDraftId } from "../hooks/useDrafts.js";
 import { useDraftsContext } from "../contexts/DraftsContext.jsx";
 import Overlay from "./Overlay.jsx";
+import { sheetPortal } from "../utils/sheetPortal.js";
 import Avatar from "./Avatar.jsx";
 import { displayName, avatarInitial, replyTagsForPublish, kind1111TagsForPublish, nip19 } from "../utils.js";
 import { GIPHY_KEY, RELAYS } from "../constants.js";
@@ -548,7 +550,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     setHasText(true);
   };
 
-  return (
+  return createPortal(
     <Overlay onDismiss={handleDismiss} compose>
       <div className="compose-sheet" onClick={e => e.stopPropagation()}>
         <div className="compose-sheet-bar">
@@ -960,6 +962,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
         </div>
         </>}
       </div>
-    </Overlay>
+    </Overlay>,
+    sheetPortal()
   );
 }

@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import Overlay from "./Overlay.jsx";
+import { sheetPortal } from "../utils/sheetPortal.js";
 import Avatar from "./Avatar.jsx";
 import { displayName, kind1244TagsForPublish } from "../utils.js";
 import { uploadToBlossom } from "../utils/blossom.js";
@@ -375,7 +377,7 @@ export default function VoiceRecorderSheet({
   const [voicePhase, setVoicePhase] = useState("idle");
   const voiceSendRef = useRef(null);
 
-  return (
+  return createPortal(
     <Overlay onDismiss={voicePhase !== "uploading" ? onDismiss : undefined} compose>
       <div className="compose-sheet vrs-sheet">
         <div className="compose-sheet-bar">
@@ -402,6 +404,7 @@ export default function VoiceRecorderSheet({
           onSendReady={fn => { voiceSendRef.current = fn; }}
         />
       </div>
-    </Overlay>
+    </Overlay>,
+    sheetPortal()
   );
 }

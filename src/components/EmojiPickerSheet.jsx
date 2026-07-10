@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import Overlay from "./Overlay.jsx";
+import { sheetPortal } from "../utils/sheetPortal.js";
 import EmojiPicker from "./EmojiPicker.jsx";
 
 function DesktopPopover({ triggerRect, onDismiss, children }) {
@@ -58,11 +59,12 @@ export default function EmojiPickerSheet({ onPick, onDismiss, customEmojis, trig
     );
   }
 
-  return (
+  return createPortal(
     <Overlay onDismiss={onDismiss}>
       <div className="emoji-reaction-sheet" onClick={e => e.stopPropagation()}>
         {picker}
       </div>
-    </Overlay>
+    </Overlay>,
+    sheetPortal()
   );
 }

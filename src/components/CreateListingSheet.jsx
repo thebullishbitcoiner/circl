@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import Overlay from "./Overlay.jsx";
+import { sheetPortal } from "../utils/sheetPortal.js";
 
 export default function CreateListingSheet({ publishEvent, onCreated, onDismiss }) {
   const [title,         setTitle]         = useState("");
@@ -149,6 +150,6 @@ export default function CreateListingSheet({ publishEvent, onCreated, onDismiss 
         <button type="button" className="action-sheet-cancel" onClick={onDismiss}>Cancel</button>
       </div>
     </Overlay>,
-    document.body
+    sheetPortal()
   );
 }

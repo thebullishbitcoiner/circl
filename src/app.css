@@ -892,6 +892,8 @@
   /* ── Overlays & Modals ── */
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:300;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .15s ease;}
   .overlay.centered{align-items:center;}
+  #sheet-portal{position:absolute;inset:0;pointer-events:none;}
+  #sheet-portal .overlay:not(.centered){position:absolute;overflow:hidden;}
   .overlay.profile-json-overlay{z-index:420;}
   @keyframes spin{to{transform:rotate(360deg);}}
   @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
@@ -1155,16 +1157,12 @@
     .right-panel { display: none; }
     .feed-main { border-right: none; }
     .sidebar { width: 200px; }
-    /* Constrain bottom sheets to content area (left sidebar only) */
-    .overlay:not(.centered) { padding-left: 200px; }
   }
 
   @media (min-width: 1024px) {
     /* Desktop: full layout — audio player is in the sidebar card, not the fixed bar */
     .toast { bottom: 26px; }
     .audio-player-bar { display: none; }
-    /* Constrain bottom sheets to the middle content area (between equal sidebars) */
-    .overlay:not(.centered) { padding-left: 250px; padding-right: 250px; }
   }
 
   /* ── Poll card ── */

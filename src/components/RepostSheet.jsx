@@ -1,6 +1,8 @@
+import { createPortal } from "react-dom";
 import Overlay from "./Overlay.jsx";
 import { Rpi } from "./icons.jsx";
 import ComposeSheet from "./ComposeSheet.jsx";
+import { sheetPortal } from "../utils/sheetPortal.js";
 
 export default function RepostSheet({ event, profiles, onQuoteRepost, onDismiss, publishEvent, onPrepend }) {
   const handleRepost = async () => {
@@ -14,7 +16,7 @@ export default function RepostSheet({ event, profiles, onQuoteRepost, onDismiss,
     if (published) onPrepend?.(published);
   };
 
-  return (
+  return createPortal(
     <Overlay onDismiss={onDismiss}>
       <div className="action-sheet" onClick={e => e.stopPropagation()}>
         <div className="action-sheet-handle" />
@@ -39,6 +41,7 @@ export default function RepostSheet({ event, profiles, onQuoteRepost, onDismiss,
         </button>
         <button className="action-sheet-cancel" onClick={onDismiss}>Cancel</button>
       </div>
-    </Overlay>
+    </Overlay>,
+    sheetPortal()
   );
 }

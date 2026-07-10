@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import Overlay from "./Overlay.jsx";
+import { sheetPortal } from "../utils/sheetPortal.js";
 
 export default function HighlightSheet({ text, context, sourceEvent, onDismiss, publishHighlight, onPrepend }) {
   const [comment, setComment] = useState("");
@@ -20,7 +22,7 @@ export default function HighlightSheet({ text, context, sourceEvent, onDismiss, 
     onDismiss?.();
   };
 
-  return (
+  return createPortal(
     <Overlay onDismiss={onDismiss}>
       <div className="action-sheet highlight-sheet" onClick={e => e.stopPropagation()}>
         <div className="action-sheet-handle" />
@@ -47,6 +49,7 @@ export default function HighlightSheet({ text, context, sourceEvent, onDismiss, 
         </button>
         <button type="button" className="action-sheet-cancel" onClick={onDismiss}>Cancel</button>
       </div>
-    </Overlay>
+    </Overlay>,
+    sheetPortal()
   );
 }
