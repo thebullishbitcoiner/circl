@@ -6,6 +6,14 @@ import { RELAYS } from "../constants.js";
 const EMOJI_LIST_KIND = 10030;
 const EMOJI_SET_KIND  = 30030;
 
+function hasNip44() {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.nostr?.nip44?.encrypt === "function" &&
+    typeof window.nostr?.nip44?.decrypt === "function"
+  );
+}
+
 export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
   const [emojis,  setEmojis]  = useState([]);  // individual ["emoji"] tags
   const [sets,    setSets]    = useState([]);  // resolved bookmarked sets [{aTag,title,emojis}]
@@ -13,7 +21,9 @@ export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
 
   const emojisRef    = useRef([]);
   const setsRef      = useRef([]);
-  const hasMutated   = useRef(false);  // prevents initial fetch from overwriting optimistic state
+  // Gates publish() until the initial relay fetch (+ decrypt) has resolved, so a mutation
+  // fired before load can't publish a list containing only the new item and wipe the rest.
+  const settledRef   = useRef(false);
   useEffect(() => { emojisRef.current = emojis; }, [emojis]);
   useEffect(() => { setsRef.current   = sets;   }, [sets]);
 
@@ -21,7 +31,7 @@ export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
     const pk = normPubkey(pubkey);
     if (!isHexPubkey(pk)) { setEmojis([]); setSets([]); return; }
 
-    hasMutated.current = false;
+    settledRef.current = false;
     let cancelled = false;
     setLoading(true);
     setEmojis([]);
@@ -32,7 +42,7 @@ export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
 
     const sub = pool.request(relayUrls, [{ kinds: [EMOJI_LIST_KIND], authors: [pk] }]).subscribe({
       next: raw => { eventStore.add(raw); received.push(raw); },
-      complete: () => {
+      complete: async () => {
         if (cancelled) return;
 
         // pick latest event
@@ -41,26 +51,44 @@ export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
           if (!latest || ev.created_at > latest.created_at) latest = ev;
         }
 
-        if (!latest) { setLoading(false); return; }
+        if (!latest) { settledRef.current = true; setLoading(false); return; }
 
-        // A mutation already updated local state; don't overwrite with stale relay data.
-        // The published event is already on the relay and will be loaded on next mount.
-        if (hasMutated.current) { setLoading(false); return; }
+        // New format: tags are NIP-44 encrypted into content. Legacy events (published
+        // before encryption was added) carry plaintext tags with empty content.
+        let tags = latest.tags || [];
+        const content = (latest.content || "").trim();
+        if (content) {
+          if (!hasNip44()) {
+            // Signer may not be injected yet (common on mobile) — wait up to 3s
+            for (let i = 0; i < 6; i++) {
+              await new Promise(r => setTimeout(r, 500));
+              if (cancelled || hasNip44()) break;
+            }
+          }
+          if (cancelled) return;
+          if (hasNip44()) {
+            try {
+              const plain = await window.nostr.nip44.decrypt(latest.pubkey, latest.content);
+              const parsed = JSON.parse(plain);
+              if (Array.isArray(parsed)) tags = parsed;
+            } catch { /* leave tags empty on decrypt failure */ }
+          }
+        }
 
         // individual emojis
-        const parsedEmojis = (latest.tags || [])
+        const parsedEmojis = tags
           .filter(t => t[0] === "emoji" && t[1] && t[2])
           .map(t => ({ name: t[1], url: t[2] }));
 
         // bookmarked set a-tags: "30030:<pubkey>:<d>"
-        const aTags = (latest.tags || [])
+        const aTags = tags
           .filter(t => t[0] === "a" && typeof t[1] === "string" && t[1].startsWith(`${EMOJI_SET_KIND}:`))
           .map(t => t[1]);
 
         if (!cancelled) setEmojis(parsedEmojis);
 
         if (aTags.length === 0) {
-          if (!cancelled) { setSets([]); setLoading(false); }
+          if (!cancelled) { setSets([]); settledRef.current = true; setLoading(false); }
           return;
         }
 
@@ -91,15 +119,15 @@ export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
               ).values()];
               return { aTag, title, emojis: setEmojis };
             });
-            if (!cancelled) { setSets(resolved); setLoading(false); }
+            if (!cancelled) { setSets(resolved); settledRef.current = true; setLoading(false); }
           },
-          error: () => { if (!cancelled) setLoading(false); },
+          error: () => { if (!cancelled) { settledRef.current = true; setLoading(false); } },
         });
 
         // store cleanup ref so outer cleanup can reach it
         cleanupSetSub = () => setSub.unsubscribe();
       },
-      error: () => { if (!cancelled) setLoading(false); },
+      error: () => { if (!cancelled) { settledRef.current = true; setLoading(false); } },
     });
 
     let cleanupSetSub = null;
@@ -121,11 +149,14 @@ export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
   const publish = useCallback(async (nextEmojis, nextSets) => {
     const pk = normPubkey(pubkey);
     if (!signAndPublish || !isHexPubkey(pk)) throw new Error("Sign in to manage custom emoji");
+    if (!hasNip44()) throw new Error("Your signer does not support NIP-44 (update the extension)");
+    if (!settledRef.current) throw new Error("Custom emoji list is still syncing from relays, please try again in a moment");
     const tags = [
       ...nextEmojis.map(({ name, url }) => ["emoji", name, url]),
       ...nextSets.map(({ aTag }) => ["a", aTag]),
     ];
-    await signAndPublish({ kind: EMOJI_LIST_KIND, content: "", tags });
+    const ciphertext = await window.nostr.nip44.encrypt(pk, JSON.stringify(tags));
+    await signAndPublish({ kind: EMOJI_LIST_KIND, content: ciphertext, tags: [] });
   }, [signAndPublish, pubkey]);
 
   // ── individual emoji mutations ───────────────────────────────────────────────
@@ -134,7 +165,6 @@ export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
     const trimName = name.trim(), trimUrl = url.trim();
     if (!trimName || !trimUrl) return;
     if (emojisRef.current.some(e => e.name === trimName)) return;
-    hasMutated.current = true;
     const prev = emojisRef.current;
     const next = [...prev, { name: trimName, url: trimUrl }];
     emojisRef.current = next;
@@ -144,7 +174,6 @@ export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
   }, [publish]);
 
   const removeEmoji = useCallback(async (name) => {
-    hasMutated.current = true;
     const prev = emojisRef.current;
     const next = prev.filter(e => e.name !== name);
     if (next.length === prev.length) return;
@@ -158,7 +187,6 @@ export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
 
   // setEvent is the raw kind 30030 event object
   const addSet = useCallback(async (setEvent) => {
-    hasMutated.current = true;
     const dTag = setEvent.tags?.find(t => t[0] === "d")?.[1];
     if (!dTag) return;
     const aTag = `${EMOJI_SET_KIND}:${setEvent.pubkey}:${dTag}`;
@@ -177,7 +205,6 @@ export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
   }, [publish]);
 
   const removeSet = useCallback(async (aTag) => {
-    hasMutated.current = true;
     const prev = setsRef.current;
     const next = prev.filter(s => s.aTag !== aTag);
     if (next.length === prev.length) return;
