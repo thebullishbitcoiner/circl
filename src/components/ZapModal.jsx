@@ -3,7 +3,7 @@ import Overlay from "./Overlay.jsx";
 import { displayName, haptic } from "../utils.js";
 import { getZapPresets } from "../hooks/useZapSettings.js";
 
-export default function ZapModal({ event, profiles, onZap, onDismiss, defaultAmount = 21, defaultMsg = "" }) {
+export default function ZapModal({ event, profiles, onZap, onDismiss, defaultAmount = 21, defaultMsg = "", title = "" }) {
   const presetSats = getZapPresets();
   const isPreset   = presetSats.includes(defaultAmount);
 
@@ -26,7 +26,7 @@ export default function ZapModal({ event, profiles, onZap, onDismiss, defaultAmo
       <div className="zap-modal" onClick={e => e.stopPropagation()}>
         <div className="zap-modal-header">
           <div>
-            <div className="zap-modal-title">Zap {displayName(event.pubkey, profiles)}</div>
+            <div className="zap-modal-title">{title || `Zap ${displayName(event.pubkey, profiles)}`}</div>
             <div className="zap-modal-sub">How many sats?</div>
           </div>
           <button type="button" className="zap-modal-close" onClick={onDismiss} aria-label="Close">×</button>

@@ -1,3 +1,5 @@
+import { decode } from "nostr-tools/nip19";
+
 /** NIP-89-style `client` tag on all events published by this app */
 export const NOSTR_CLIENT_TAG = ["client", "Circl"];
 
@@ -18,3 +20,8 @@ export const ZAP_PRESETS = [
 ];
 
 export const GIPHY_KEY = "IOwWNUHzMmRh28umCJjJhKmaoOg71esr";
+
+/** Lightning address + pubkey for "Zap the dev" CTA in Settings (NIP-57 zap) */
+export const DEV_LUD16 = "bullish@rizful.com";
+export const DEV_NPUB = "npub15ypxpg429uyjmp0zczuza902chuvvr4pn35wfzv8rx6cej4z8clq6jmpcx";
+export const DEV_PUBKEY = decode(DEV_NPUB).data;

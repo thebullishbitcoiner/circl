@@ -1,9 +1,13 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import useMailboxes from "../hooks/useMailboxes.js";
 import useSearchRelays from "../hooks/useSearchRelays.js";
 import { MailboxesFactory } from "applesauce-core";
 import CustomEmojiSettingsPage from "./CustomEmojiSettingsPage.jsx";
 import useContentSettings from "../hooks/useContentSettings.js";
+import ZapModal from "./ZapModal.jsx";
+import { displayName } from "../utils.js";
+import { DEV_LUD16, DEV_PUBKEY } from "../constants.js";
 
 // ── Wallet helpers ────────────────────────────────────────────────────────────
 
@@ -889,8 +893,17 @@ export default function SettingsPage({
   signAndPublish,
   customEmojis, sets = [], addEmoji, removeEmoji, addSet, removeSet, customEmojiLoading,
   blossomServers = [], saveBlossomServers,
+  profiles, sendZap, onZapFail,
 }) {
   const [subPage, setSubPage] = useState(null);
+  const [showDevZap, setShowDevZap] = useState(false);
+
+  const devZapMsg = `Circl support from ${displayName(pubkey, profiles)}`;
+  const doSendDevZap = async ({ amount, msg }) => {
+    if (!sendZap) { onZapFail?.("no_wallet"); return; }
+    const result = await sendZap({ amountSats: amount, recipientLnAddr: DEV_LUD16, recipientPubkey: DEV_PUBKEY, msg: msg || devZapMsg });
+    if (!result.ok) onZapFail?.(result.reason);
+  };
 
   if (subPage === "wallet") {
     return <WalletSubPage onBack={() => setSubPage(null)} pubkey={pubkey} wallet={wallet} onWalletConnected={onWalletConnected} onWalletDisconnect={onWalletDisconnect} />;
@@ -1007,6 +1020,14 @@ export default function SettingsPage({
         <div style={{ color: "var(--text-muted)", fontSize: 18 }}>›</div>
       </div>
 
+      <div className="settings-zap-dev-cta" onClick={() => setShowDevZap(true)}>
+        <div className="settings-zap-dev-cta-icon">⚡</div>
+        <div>
+          <div className="settings-zap-dev-cta-title">Enjoying Circl?</div>
+          <div className="settings-zap-dev-cta-sub">ZAP THE DEV!</div>
+        </div>
+      </div>
+
       <div className="settings-section-title" style={{ marginTop: 16 }}>Account</div>
       <div className="settings-row" onClick={onLogout}>
         <div className="settings-row-label" style={{ color: "#E05C8A" }}>Sign out</div>
@@ -1015,6 +1036,17 @@ export default function SettingsPage({
       <div style={{ position: "sticky", bottom: 0, padding: "12px 16px", fontSize: 11, color: "var(--text-muted)", fontFamily: "'DM Sans', sans-serif", background: "var(--bg)" }}>
         {__APP_VERSION__}
       </div>
+
+      {showDevZap && createPortal(
+        <ZapModal
+          title="Zap the dev"
+          defaultAmount={zapSettings.amount}
+          defaultMsg={devZapMsg}
+          onZap={doSendDevZap}
+          onDismiss={() => setShowDevZap(false)}
+        />,
+        document.body
+      )}
     </div>
   );
 }

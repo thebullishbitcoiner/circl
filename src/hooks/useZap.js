@@ -43,10 +43,11 @@ export default function useZap(wallet) {
       if (!callback) throw new Error("No LNURL callback");
       let pr;
 
-      // Try NIP-57 zap request if the endpoint supports Nostr and we have a signer.
+      // Try NIP-57 zap request if the endpoint supports Nostr, we have a signer, and a
+      // recipient pubkey to put in the zap request's "p" tag (required by NIP-57).
       // Use `!== false` like Jumble — treats missing allowsNostr as supported.
       let signed = null;
-      if (allowsNostr !== false && window.nostr) {
+      if (allowsNostr !== false && window.nostr && recipientPubkey) {
         try {
           let zapRequestTemplate;
           if (aTag) {

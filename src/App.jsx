@@ -1512,6 +1512,13 @@ export default function App() {
                   customEmojiLoading={customEmojiLoading}
                   blossomServers={blossomServers}
                   saveBlossomServers={saveBlossomServers}
+                  profiles={profiles}
+                  sendZap={sendZap}
+                  onZapFail={reason => showToast(
+                    reason === "no_lud16"  ? "⚡ No lightning address" :
+                    reason === "no_wallet" ? "⚡ No wallet connected" :
+                    `⚡ Zap failed: ${reason}`
+                  )}
                 />
               </SwipePanel>
 
