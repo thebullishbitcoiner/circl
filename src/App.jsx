@@ -855,6 +855,7 @@ export default function App() {
                     return (
                       <div key="hidden-muted" style={{ display: "none", height: "100%" }}>
                         <MutedPage
+                          pubkey={pubkey}
                           mutes={mutes}
                           hashtags={mutedHashtags}
                           words={mutedWords}
@@ -862,6 +863,7 @@ export default function App() {
                           muteEvent={muteEvent}
                           profiles={profiles}
                           onUnmute={handleUnmuteUser}
+                          onMuteUser={handleMuteUser}
                           onMuteHashtag={handleMuteHashtag}
                           onUnmuteHashtag={handleUnmuteHashtag}
                           onMuteWord={handleMuteWord}
@@ -998,6 +1000,7 @@ export default function App() {
                     return (
                       <MutedPage
                         key="muted"
+                        pubkey={pubkey}
                         mutes={mutes}
                         hashtags={mutedHashtags}
                         words={mutedWords}
@@ -1005,6 +1008,7 @@ export default function App() {
                         muteEvent={muteEvent}
                         profiles={profiles}
                         onUnmute={handleUnmuteUser}
+                        onMuteUser={handleMuteUser}
                         onMuteHashtag={handleMuteHashtag}
                         onUnmuteHashtag={handleUnmuteHashtag}
                         onMuteWord={handleMuteWord}
