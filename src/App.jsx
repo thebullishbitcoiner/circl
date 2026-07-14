@@ -81,7 +81,7 @@ import { AudioProvider, useAudio } from "./contexts/AudioContext.jsx";
 import AudioPlayer from "./components/AudioPlayer.jsx";
 import AudioPlayerCard from "./components/AudioPlayerCard.jsx";
 export default function App() {
-  const { pubkey, status, error, login, logout, signAndPublish } = useAuth();
+  const { pubkey, status, error, login, logout, signAndPublish, privateRelayUrls } = useAuth();
   const { follows, loading: fl, follow: followPk, unfollow: unfollowPk, refresh: refreshFollows } = useFollows({ pubkey, signAndPublish });
 
   const [likes, setLikes] = useState({});
@@ -230,7 +230,7 @@ export default function App() {
   }, [mergedFeedPool, events, follows, pubkey, zapsByEvent, reactionsByEvent, notificationEvents, mutes, circles]);
   const { profiles } = useProfiles({ pubkeys: allPks });
   const { publish, publishEvent, publishHighlight } = usePublish({ signAndPublish, pubkey });
-  const draftCtx = useDrafts({ pubkey, signAndPublish });
+  const draftCtx = useDrafts({ pubkey, signAndPublish, privateRelayUrls });
   const isMobile = useIsMobile();
   const { dark, toggle: toggleDark } = useDarkMode();
   const { textSize, setTextSize } = useTextSize();

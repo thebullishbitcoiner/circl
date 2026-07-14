@@ -3,6 +3,8 @@ import { RELAYS, NOSTR_CLIENT_TAG } from "../constants.js";
 import { isHexPubkey, normPubkey } from "../utils.js";
 import { pool, validRelays } from "../nostr.js";
 import useMailboxes from "./useMailboxes.js";
+import useBlockedRelays from "./useBlockedRelays.js";
+import usePrivateRelays from "./usePrivateRelays.js";
 
 function withTimeout(promise, ms, message) {
   let timer;
@@ -59,6 +61,9 @@ export default function useAuth() {
     sessionStorage.removeItem("circl_pk");
   }, []);
 
+  // Keep the pool's blocked-relay set in sync (NIP-51 kind 10006)
+  useBlockedRelays(pubkey);
+
   // Connect to own outbox relays once kind 10002 is fetched
   const { outboxes } = useMailboxes(pubkey);
   useEffect(() => {
@@ -66,7 +71,15 @@ export default function useAuth() {
     for (const url of validRelays(outboxes)) pool.relay(url);
   }, [pubkey, outboxes]);
 
-  const signAndPublish = useCallback(async tmpl => {
+  // Connect to own private relays once kind 10013 is fetched (used for drafts)
+  const privateRelays = usePrivateRelays(pubkey);
+  const privateRelayUrls = privateRelays.map(r => r.url);
+  useEffect(() => {
+    if (!pubkey || !privateRelayUrls.length) return;
+    for (const url of validRelays(privateRelayUrls)) pool.relay(url);
+  }, [pubkey, privateRelayUrls.join(",")]);
+
+  const signAndPublish = useCallback(async (tmpl, opts = {}) => {
     if (!pubkey || !window.nostr) throw new Error("Not connected");
     const { tags: incomingTags, ...rest } = tmpl;
     const tags = [...(incomingTags || []).filter(t => t?.[0] !== "client"), NOSTR_CLIENT_TAG];
@@ -81,10 +94,13 @@ export default function useAuth() {
       10000,
       "Extension did not sign in time."
     );
-    // Publish to own outboxes if known, union with bootstrap relays as fallback
-    const publishRelays = outboxes.length > 0
-      ? [...new Set([...RELAYS, ...outboxes])]
-      : RELAYS;
+    // Explicit relay override (e.g. private relays for drafts) takes priority;
+    // otherwise publish to own outboxes, union with bootstrap relays as fallback
+    const publishRelays = opts.relays?.length > 0
+      ? opts.relays
+      : outboxes.length > 0
+        ? [...new Set([...RELAYS, ...outboxes])]
+        : RELAYS;
     // Fire-and-forget relay publish so callers get the signed event immediately
     Promise.race([
       pool.publish(publishRelays, signed),
@@ -93,5 +109,5 @@ export default function useAuth() {
     return signed;
   }, [pubkey, outboxes]);
 
-  return { pubkey, status, error, login, logout, signAndPublish };
+  return { pubkey, status, error, login, logout, signAndPublish, privateRelayUrls };
 }

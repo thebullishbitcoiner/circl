@@ -7,7 +7,7 @@ export function draftId(replyTo, quotedEvent) {
   return "new-note";
 }
 
-export default function useDrafts({ pubkey, signAndPublish }) {
+export default function useDrafts({ pubkey, signAndPublish, privateRelayUrls = [] }) {
   const [drafts, setDrafts] = useState({});
   const [hasNip44, setHasNip44] = useState(false);
 
@@ -61,16 +61,20 @@ export default function useDrafts({ pubkey, signAndPublish }) {
     ];
     if (id.startsWith("reply-")) tags.push(["e", id.slice(6)]);
     else if (id.startsWith("quote-")) tags.push(["e", id.slice(6)]);
-    try { await signAndPublish({ kind: 31234, content: encrypted, tags }); } catch {}
-  }, [pubkey, hasNip44, signAndPublish]);
+    // Route to private relays when configured, so draft content never
+    // touches the user's normal (public) outbox relays.
+    const publishOpts = privateRelayUrls.length > 0 ? { relays: privateRelayUrls } : {};
+    try { await signAndPublish({ kind: 31234, content: encrypted, tags }, publishOpts); } catch {}
+  }, [pubkey, hasNip44, signAndPublish, privateRelayUrls]);
 
   const deleteDraft = useCallback(async (id) => {
     if (!pubkey || !signAndPublish) return;
     setDrafts(prev => { const next = { ...prev }; delete next[id]; return next; });
+    const publishOpts = privateRelayUrls.length > 0 ? { relays: privateRelayUrls } : {};
     try {
-      await signAndPublish({ kind: 31234, content: "", tags: [["d", id], ["k", "1"]] });
+      await signAndPublish({ kind: 31234, content: "", tags: [["d", id], ["k", "1"]] }, publishOpts);
     } catch {}
-  }, [pubkey, signAndPublish]);
+  }, [pubkey, signAndPublish, privateRelayUrls]);
 
   const getDraft = useCallback((id) => drafts[id] ?? null, [drafts]);
 

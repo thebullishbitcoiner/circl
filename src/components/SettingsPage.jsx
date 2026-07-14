@@ -2,6 +2,8 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import useMailboxes from "../hooks/useMailboxes.js";
 import useSearchRelays from "../hooks/useSearchRelays.js";
+import useBlockedRelays from "../hooks/useBlockedRelays.js";
+import usePrivateRelays from "../hooks/usePrivateRelays.js";
 import { MailboxesFactory } from "applesauce-core";
 import CustomEmojiSettingsPage from "./CustomEmojiSettingsPage.jsx";
 import useContentSettings from "../hooks/useContentSettings.js";
@@ -206,17 +208,19 @@ function RelayEditor({ pubkey, signAndPublish }) {
   const [addRead, setAddRead] = useState(true);
   const [addWrite, setAddWrite] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
   const effectiveInboxes = localInboxes ?? inboxes;
   const effectiveOutboxes = localOutboxes ?? outboxes;
   const allRelays = [...new Set([...effectiveInboxes, ...effectiveOutboxes])];
 
-  async function publish(nextIn, nextOut) {
+  async function save() {
     if (!signAndPublish) return;
     setSaving(true);
     try {
-      const template = await MailboxesFactory.create({ inboxes: nextIn, outboxes: nextOut });
+      const template = await MailboxesFactory.create({ inboxes: effectiveInboxes, outboxes: effectiveOutboxes });
       await signAndPublish(template);
+      setDirty(false);
     } finally {
       setSaving(false);
     }
@@ -225,13 +229,13 @@ function RelayEditor({ pubkey, signAndPublish }) {
   function toggleRead(url, checked) {
     const next = checked ? [...effectiveInboxes, url] : effectiveInboxes.filter(r => r !== url);
     setLocalInboxes(next);
-    publish(next, effectiveOutboxes);
+    setDirty(true);
   }
 
   function toggleWrite(url, checked) {
     const next = checked ? [...effectiveOutboxes, url] : effectiveOutboxes.filter(r => r !== url);
     setLocalOutboxes(next);
-    publish(effectiveInboxes, next);
+    setDirty(true);
   }
 
   function remove(url) {
@@ -239,7 +243,7 @@ function RelayEditor({ pubkey, signAndPublish }) {
     const nextOut = effectiveOutboxes.filter(r => r !== url);
     setLocalInboxes(nextIn);
     setLocalOutboxes(nextOut);
-    publish(nextIn, nextOut);
+    setDirty(true);
   }
 
   function add() {
@@ -251,7 +255,7 @@ function RelayEditor({ pubkey, signAndPublish }) {
     setLocalInboxes(nextIn);
     setLocalOutboxes(nextOut);
     setUrlInput("");
-    publish(nextIn, nextOut);
+    setDirty(true);
   }
 
   const colW = 44;
@@ -304,43 +308,53 @@ function RelayEditor({ pubkey, signAndPublish }) {
         <button onClick={add} disabled={saving || (!addRead && !addWrite)}
           style={{ padding: "0 14px", borderRadius: 8, border: "none", background: "var(--primary)", color: "white", fontFamily: "'DM Sans',sans-serif", fontSize: "var(--font-base)", fontWeight: 600, cursor: (saving || (!addRead && !addWrite)) ? "default" : "pointer", opacity: (saving || (!addRead && !addWrite)) ? 0.6 : 1, flexShrink: 0, height: inputH }}>Add</button>
       </div>
-      {saving && <div style={{ fontSize: "calc(var(--font-base) - 3px)", color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textAlign: "center", paddingTop: 6 }}>Publishing…</div>}
+      <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end" }}>
+        <button onClick={save} disabled={saving || !dirty}
+          style={{ padding: "0 18px", borderRadius: 8, border: "none", background: "var(--primary)", color: "white", fontFamily: "'DM Sans',sans-serif", fontSize: "var(--font-base)", fontWeight: 600, cursor: (saving || !dirty) ? "default" : "pointer", opacity: (saving || !dirty) ? 0.5 : 1, height: inputH }}>
+          {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
     </div>
   );
 }
 
-// ── Search relay editor ───────────────────────────────────────────────────────
+// ── Relay list editor (NIP-51 kind 10007 search / 10006 blocked / 10013 private) ──
+// Shared by SearchRelayEditor, BlockedRelayEditor and PrivateRelayEditor: entries
+// marked "Private" round-trip as a NIP-44 encrypted content blob, while plain
+// entries stay as public "relay" tags — any pre-existing plaintext entries are
+// preserved as-is and only newly-added entries default to encrypted.
 
-function hasNip44ForSearch() {
+function hasNip44ForRelayList() {
   return typeof window !== "undefined" &&
     typeof window.nostr?.nip44?.encrypt === "function";
 }
 
-function SearchRelayEditor({ pubkey, signAndPublish }) {
-  const searchRelays = useSearchRelays(pubkey); // [{url, source}]
+function RelayListEditor({ pubkey, signAndPublish, kind, relays, placeholder }) {
   const [localRelays, setLocalRelays]   = useState(null); // null = use loaded
   const [urlInput, setUrlInput]         = useState("");
   const [saving, setSaving]             = useState(false);
+  const [dirty, setDirty]               = useState(false);
   const [newVisibility, setNewVisibility] = useState("private"); // "private" | "public"
 
-  const effective = localRelays ?? searchRelays;
+  const effective = localRelays ?? relays;
 
-  async function publish(nextRelays) {
+  async function save() {
     if (!signAndPublish) return;
     setSaving(true);
     try {
-      const publicUrls    = nextRelays.filter(r => r.source === "public").map(r => r.url);
-      const privateUrls   = nextRelays.filter(r => r.source === "encrypted").map(r => r.url);
+      const publicUrls    = effective.filter(r => r.source === "public").map(r => r.url);
+      const privateUrls   = effective.filter(r => r.source === "encrypted").map(r => r.url);
       const tags          = publicUrls.map(url => ["relay", url]);
       let content         = "";
       if (privateUrls.length > 0) {
-        if (!hasNip44ForSearch()) throw new Error("Your signer does not support NIP-44 encryption");
+        if (!hasNip44ForRelayList()) throw new Error("Your signer does not support NIP-44 encryption");
         content = await window.nostr.nip44.encrypt(
           pubkey,
           JSON.stringify(privateUrls.map(url => ["relay", url]))
         );
       }
-      await signAndPublish({ kind: 10007, tags, content });
+      await signAndPublish({ kind, tags, content });
+      setDirty(false);
     } finally {
       setSaving(false);
     }
@@ -351,13 +365,13 @@ function SearchRelayEditor({ pubkey, signAndPublish }) {
       r.url === url ? { ...r, source: r.source === "encrypted" ? "public" : "encrypted" } : r
     );
     setLocalRelays(next);
-    publish(next);
+    setDirty(true);
   }
 
   function remove(url) {
     const next = effective.filter(r => r.url !== url);
     setLocalRelays(next);
-    publish(next);
+    setDirty(true);
   }
 
   function add() {
@@ -367,7 +381,7 @@ function SearchRelayEditor({ pubkey, signAndPublish }) {
     const next = [...effective, { url, source }];
     setLocalRelays(next);
     setUrlInput("");
-    publish(next);
+    setDirty(true);
   }
 
   const inputH = "calc(var(--font-base) + 20px)";
@@ -395,7 +409,7 @@ function SearchRelayEditor({ pubkey, signAndPublish }) {
 
       <div style={{ marginTop: effective.length > 0 ? 14 : 8, display: "flex", alignItems: "center", gap: 8 }}>
         <input value={urlInput} onChange={e => setUrlInput(e.target.value)} onKeyDown={e => e.key === "Enter" && add()}
-          placeholder="search.relay.example.com" disabled={saving}
+          placeholder={placeholder} disabled={saving}
           style={{ flex: 1, padding: "0 10px", borderRadius: 8, border: "1.5px solid var(--border)", background: "var(--bg)", color: "var(--text)", fontFamily: "monospace", fontSize: "calc(var(--font-base) - 2px)", outline: "none", opacity: saving ? 0.5 : 1, height: inputH, boxSizing: "border-box" }} />
         <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer", flexShrink: 0 }}>
           <input type="checkbox" checked={newVisibility === "private"} onChange={e => setNewVisibility(e.target.checked ? "private" : "public")} style={{ cursor: "pointer" }} />
@@ -404,9 +418,29 @@ function SearchRelayEditor({ pubkey, signAndPublish }) {
         <button onClick={add} disabled={saving || !urlInput.trim()}
           style={{ padding: "0 18px", borderRadius: 8, border: "none", background: "var(--primary)", color: "white", fontFamily: "'DM Sans',sans-serif", fontSize: "var(--font-base)", fontWeight: 600, cursor: (saving || !urlInput.trim()) ? "default" : "pointer", opacity: (saving || !urlInput.trim()) ? 0.6 : 1, flexShrink: 0, height: inputH }}>Add</button>
       </div>
-      {saving && <div style={{ fontSize: "calc(var(--font-base) - 3px)", color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", textAlign: "center", paddingTop: 6 }}>Publishing…</div>}
+      <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "flex-end" }}>
+        <button onClick={save} disabled={saving || !dirty}
+          style={{ padding: "0 18px", borderRadius: 8, border: "none", background: "var(--primary)", color: "white", fontFamily: "'DM Sans',sans-serif", fontSize: "var(--font-base)", fontWeight: 600, cursor: (saving || !dirty) ? "default" : "pointer", opacity: (saving || !dirty) ? 0.5 : 1, height: inputH }}>
+          {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
     </div>
   );
+}
+
+function SearchRelayEditor({ pubkey, signAndPublish }) {
+  const relays = useSearchRelays(pubkey); // [{url, source}]
+  return <RelayListEditor pubkey={pubkey} signAndPublish={signAndPublish} kind={10007} relays={relays} placeholder="search.relay.example.com" />;
+}
+
+function BlockedRelayEditor({ pubkey, signAndPublish }) {
+  const relays = useBlockedRelays(pubkey); // [{url, source}]
+  return <RelayListEditor pubkey={pubkey} signAndPublish={signAndPublish} kind={10006} relays={relays} placeholder="relay.example.com" />;
+}
+
+function PrivateRelayEditor({ pubkey, signAndPublish }) {
+  const relays = usePrivateRelays(pubkey); // [{url, source}]
+  return <RelayListEditor pubkey={pubkey} signAndPublish={signAndPublish} kind={10013} relays={relays} placeholder="relay.example.com" />;
 }
 
 // ── Sub-page shell ────────────────────────────────────────────────────────────
@@ -631,8 +665,16 @@ function RelaysSubPage({ onBack, pubkey, signAndPublish }) {
         <RelayEditor pubkey={pubkey} signAndPublish={signAndPublish} />
       </div>
       <RelaySectionHeader label="Search Relays" info="Relays queried when searching notes (NIP-51 kind 10007)" />
-      <div style={{ margin: "0 12px 16px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
+      <div style={{ margin: "0 12px 20px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
         <SearchRelayEditor pubkey={pubkey} signAndPublish={signAndPublish} />
+      </div>
+      <RelaySectionHeader label="Blocked Relays" info="Relays this client will never connect to — useful for retired or slow relays (NIP-51 kind 10006)" />
+      <div style={{ margin: "0 12px 20px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
+        <BlockedRelayEditor pubkey={pubkey} signAndPublish={signAndPublish} />
+      </div>
+      <RelaySectionHeader label="Private Relays" info="Relays used to store your drafts, kept off your public relays (NIP-51 kind 10013)" />
+      <div style={{ margin: "0 12px 16px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
+        <PrivateRelayEditor pubkey={pubkey} signAndPublish={signAndPublish} />
       </div>
     </SubPage>
   );

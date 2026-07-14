@@ -1,4 +1,5 @@
 import { EventStore } from "applesauce-core";
+import { normalizeURL } from "applesauce-core/helpers/url";
 import { RelayPool } from "applesauce-relay";
 import { createEventLoader } from "applesauce-loaders/loaders";
 import { RELAYS } from "./constants.js";
@@ -10,6 +11,47 @@ export const pool = new RelayPool();
 // or literal/encoded whitespace — these come from malformed NIP-65 events.
 export const validRelays = urls =>
   urls.filter(u => /^wss?:\/\/[^\s]+$/.test(u) && !/wss?:\/\//i.test(u.slice(6)));
+
+// ── Blocked relays (NIP-51 kind 10006) ──────────────────────────────────────
+// Every connection path in the app (persistent `.relay()` connections plus
+// one-off `.request`/`.subscription`/`.publish`/`.group` calls) is routed
+// through `pool`, so guarding these few methods here is enough to guarantee
+// a blocked relay is never connected to, no matter which hook/component the
+// request originates from.
+
+// `pool.relay()` normalizes URLs (e.g. adds a trailing slash) before using
+// them as Map keys, so comparisons must normalize both sides the same way
+// or an already-connected relay never matches its blocked-list entry.
+function safeNormalize(url) {
+  try { return normalizeURL(url); } catch { return url; }
+}
+
+let blockedRelayUrls = new Set();
+
+export function setBlockedRelayUrls(urls) {
+  blockedRelayUrls = new Set(urls.map(safeNormalize));
+  for (const url of pool.relays.keys()) {
+    if (blockedRelayUrls.has(url)) pool.remove(url);
+  }
+}
+
+const excludeBlocked = urls =>
+  Array.isArray(urls) ? urls.filter(u => !blockedRelayUrls.has(safeNormalize(u))) : urls;
+
+const _relay = pool.relay.bind(pool);
+pool.relay = url => (blockedRelayUrls.has(safeNormalize(url)) ? undefined : _relay(url));
+
+const _group = pool.group.bind(pool);
+pool.group = (relays, ignoreOffline) => _group(excludeBlocked(relays), ignoreOffline);
+
+const _publish = pool.publish.bind(pool);
+pool.publish = (relays, event, opts) => _publish(excludeBlocked(relays), event, opts);
+
+const _request = pool.request.bind(pool);
+pool.request = (relays, filters, opts) => _request(excludeBlocked(relays), filters, opts);
+
+const _subscription = pool.subscription.bind(pool);
+pool.subscription = (relays, filters, opts) => _subscription(excludeBlocked(relays), filters, opts);
 
 // ── Profile localStorage cache ──────────────────────────────────────────────
 // Seeded synchronously at module init so profiles are in EventStore before
