@@ -185,6 +185,8 @@ function NoteCard({
               myPubkey={myPubkey}
               myProfile={myProfile}
               events={events}
+              replyCount={rCount}
+              repostCount={rpCount}
               onOpenThread={onOpenThread}
               onOpenZaps={onOpenZaps}
               onOpenReactions={onOpenReactions}

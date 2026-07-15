@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Zi, Hi, Ri, Rpi, Bi } from "./icons.jsx";
-import { haptic, fmtSatsVal, replyCount, repostAndQuoteCount } from "../utils.js";
+import { haptic, fmtSatsVal, replyCount as computeReplyCount, repostAndQuoteCount as computeRepostCount } from "../utils.js";
 import { broadcastEvent } from "../nostr.js";
 import ZapBadges from "./ZapBadges.jsx";
 import ZapModal from "./ZapModal.jsx";
@@ -12,6 +12,7 @@ import RepostSheet from "./RepostSheet.jsx";
 
 export default function NoteActions({
   event, profiles, myPubkey, myProfile, events: allEvents,
+  replyCount: replyCountProp, repostCount: repostCountProp,
   onOpenThread, onOpenZaps, onOpenReactions, onOpenReposts,
   onPublish, onBookmark, isBookmarked, publishEvent, onPrepend,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
@@ -26,8 +27,8 @@ export default function NoteActions({
     const extra = additionalEventIds.flatMap(id => (getLocalReactions?.(id) ?? []).filter(r => !r.id || !seen.has(r.id)));
     return [...primaryReactions, ...extra];
   })();
-  const rCount = replyCount(event.id, allEvents)
-    + (additionalEventIds.length ? additionalEventIds.reduce((s, id) => s + replyCount(id, allEvents), 0) : 0);
+  const rCount = (replyCountProp ?? computeReplyCount(event.id, allEvents))
+    + (additionalEventIds.length ? additionalEventIds.reduce((s, id) => s + computeReplyCount(id, allEvents), 0) : 0);
   const primaryZaps = getLocalZaps?.(event.id) ?? [];
   const localZaps = additionalEventIds.length === 0 ? primaryZaps : (() => {
     const seen = new Set(primaryZaps.map(z => z.id).filter(Boolean));
@@ -160,7 +161,7 @@ export default function NoteActions({
             onMouseDown={e => { e.stopPropagation(); const t = setTimeout(() => { haptic.longPress(); openModal(<ComposeSheet quotedEvent={event} profiles={profiles} myPubkey={myPubkey} myProfile={myProfile} events={allEvents} publishEvent={publishEvent} onPrepend={onPrepend} onDismiss={dismiss} customEmojis={customEmojis} />); }, 600); window.addEventListener("mouseup", () => clearTimeout(t), { once: true }); }}
             onTouchStart={e => { e.stopPropagation(); const t = setTimeout(() => { haptic.longPress(); openModal(<ComposeSheet quotedEvent={event} profiles={profiles} myPubkey={myPubkey} myProfile={myProfile} events={allEvents} publishEvent={publishEvent} onPrepend={onPrepend} onDismiss={dismiss} customEmojis={customEmojis} />); }, 600); window.addEventListener("touchend", () => clearTimeout(t), { once: true }); }}
           >
-            <Rpi />{(repostAndQuoteCount(event.id, allEvents) + additionalEventIds.reduce((s, id) => s + repostAndQuoteCount(id, allEvents), 0)) || ""}
+            <Rpi />{((repostCountProp ?? computeRepostCount(event.id, allEvents)) + additionalEventIds.reduce((s, id) => s + computeRepostCount(id, allEvents), 0)) || ""}
           </button>
           <button className={`action-btn${isBookmarked?.(event) ? " saved" : ""}`}
             onClick={e => { e.stopPropagation(); onBookmark?.(event); }}>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { isHexPubkey, normPubkey } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
 import { DEFAULT_RELAYS } from "../constants.js";
@@ -17,6 +17,10 @@ function parseAddressTag(val) {
 export default function useBookmarkedEvents({ bookmarkTags, localEvents = [] }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
+  // Read via ref so the resolution effect below only reruns when the bookmark
+  // list itself changes, not on every unrelated feed/notification update.
+  const localEventsRef = useRef(localEvents);
+  localEventsRef.current = localEvents;
 
   useEffect(() => {
     if (!bookmarkTags?.length) { setEvents([]); setLoading(false); return; }
@@ -24,7 +28,7 @@ export default function useBookmarkedEvents({ bookmarkTags, localEvents = [] }) 
     let cancelled = false;
     setLoading(true);
 
-    const localPool = (localEvents || []).filter(ev => ev?.id);
+    const localPool = (localEventsRef.current || []).filter(ev => ev?.id);
     const resolvedById = new Map(localPool.map(ev => [ev.id, ev]));
     const resolvedByAddr = new Map(
       localPool
@@ -115,7 +119,7 @@ export default function useBookmarkedEvents({ bookmarkTags, localEvents = [] }) 
       cancelled = true;
       sub.unsubscribe();
     };
-  }, [bookmarkTags, localEvents]);
+  }, [bookmarkTags]);
 
   return { events, loading };
 }
