@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { isHexPubkey, normPubkey } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 
 function parseAddressTag(val) {
   if (typeof val !== "string") return null;
@@ -87,7 +87,7 @@ export default function useBookmarkedEvents({ bookmarkTags, localEvents = [] }) 
       filters.push({ kinds: [30023], authors: [pubkey], "#d": [d] });
     }
 
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
 
     const sub = pool.request(relayUrls, filters).subscribe({
       next: raw => {

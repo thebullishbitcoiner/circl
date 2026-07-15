@@ -6,7 +6,7 @@ import PodcastPreviewChip from "./PodcastPreviewChip.jsx";
 import NoteText from "./NoteText.jsx";
 import { displayName, relativeTime, fmtSats, parseBolt11Msats, zapCommentFromKind9735, zapperPubkeyFromKind9735 } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 import { fetchLinkPreview } from "../utils/linkPreview.js";
 
 const stripPodcastSuffix = t =>
@@ -42,7 +42,7 @@ export default function PodcastZapCard({ event, profiles, onOpenProfile, onOpenS
     if (kindStr !== "30311" || !evPubkey || !dTag) return;
     const cached = eventStore.getTimeline([{ kinds: [30311], authors: [evPubkey], "#d": [dTag], limit: 1 }])?.[0];
     if (cached) { setLiveEvent(cached); return; }
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const sub = pool.request(relayUrls, [{ kinds: [30311], authors: [evPubkey], "#d": [dTag], limit: 1 }]).subscribe({
       next: ev => { eventStore.add(ev); setLiveEvent(ev); },
     });

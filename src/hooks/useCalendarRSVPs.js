@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { pool } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 import { getRSVPStatus } from "applesauce-common/helpers/calendar-rsvp";
 
 export default function useCalendarRSVPs({ event, pubkey }) {
@@ -14,7 +14,7 @@ export default function useCalendarRSVPs({ event, pubkey }) {
     const addr = `${event.kind}:${event.pubkey}:${d}`;
     setLoading(true);
 
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const sub = pool.subscription(relayUrls, [{ kinds: [31925], "#a": [addr] }]).subscribe({
       next: raw => {
         if (seen.current.has(raw.id)) return;

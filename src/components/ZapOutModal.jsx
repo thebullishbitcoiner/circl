@@ -6,7 +6,7 @@ import Overlay from "./Overlay.jsx";
 import { haptic, cacheZapReq } from "../utils.js";
 import { bech32 } from "@scure/base";
 import { payWithNWC, hasWallet } from "../utils/nwcPay.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 
 const utf8Decoder = new TextDecoder();
 
@@ -95,7 +95,7 @@ export default function ZapOutModal({ event, sellerLnAddr, onClose }) {
             event: { id: event.id, pubkey: event.pubkey, kind: event.kind, tags: event.tags || [], content: event.content || "", created_at: event.created_at, sig: event.sig || "" },
             amount: msats,
             comment: description,
-            relays: RELAYS,
+            relays: DEFAULT_RELAYS,
           });
           signed = await window.nostr.signEvent(zapRequestTemplate);
 

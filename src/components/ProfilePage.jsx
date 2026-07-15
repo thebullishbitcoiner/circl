@@ -15,7 +15,7 @@ import NoteJsonModal from "./NoteJsonModal.jsx";
 import useInteractions from "../hooks/useInteractions.js";
 import { useNavigation } from "../context/NavigationContext.jsx";
 import { pool, eventStore, validRelays } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 import useMailboxes from "../hooks/useMailboxes.js";
 import SkelCard from "./SkelCard.jsx";
 import ProfileMediaGrid from "./ProfileMediaGrid.jsx";
@@ -290,7 +290,7 @@ export default function ProfilePage({
   // queried from the author's outbox relays, not just the user's connected relays.
   const { outboxes: profileOutboxes } = useMailboxes(pubkey);
   const contentRelayUrls = useMemo(() => {
-    const base = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const base = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     if (!profileOutboxes?.length) return base;
     return [...new Set([...base, ...validRelays(profileOutboxes)])];
   }, [profileOutboxes]);
@@ -395,7 +395,7 @@ export default function ProfilePage({
     mediaFetchingRef.current = true;
     setMediaLoading(true);
 
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const filter = { kinds: [1], authors: [pubkey], limit: 100 };
     if (mediaUntilRef.current) filter.until = mediaUntilRef.current;
 
@@ -479,7 +479,7 @@ export default function ProfilePage({
     setProfileLoading(true);
     setCircleLoading(!isOwn);
 
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const byId = new Map();
 
     const flush = () => {
@@ -661,7 +661,7 @@ export default function ProfilePage({
     const cached = readPinnedCache(pubkey);
     let knownCreatedAt = cached?.created_at ?? 0;
     if (cached?.items?.length) setPinnedNoteIds(cached.items);
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const sub = pool.subscription(relayUrls, [{ kinds: [10001], authors: [pubkey], limit: 1 }]).subscribe({
       next: raw => {
         if (cancelled || raw.created_at <= knownCreatedAt) return;
@@ -706,7 +706,7 @@ export default function ProfilePage({
     if (!pubkey || tab !== "podcasts" || podcastsFetchedRef.current) return;
     podcastsFetchedRef.current = true;
     let cancelled = false;
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
 
     // 1. NIP-F4 show structure: fetch kind 10154 from the profile pubkey itself,
     //    and also via kind 10064 → declared podcast pubkeys → kind 10154 metadata
@@ -786,7 +786,7 @@ export default function ProfilePage({
     if (!pubkey || tab !== "voice" || voiceFetchedRef.current) return;
     voiceFetchedRef.current = true;
     let cancelled = false;
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     setVoiceMessagesLoading(true);
     const accum = [];
     pool.request(relayUrls, [{ kinds: [1222], authors: [pubkey], limit: VOICE_PAGE }]).subscribe({
@@ -813,7 +813,7 @@ export default function ProfilePage({
   const loadMoreVoice = () => {
     if (voiceLoadingMore || !voiceHasMore || !voiceUntilRef.current || !pubkey) return;
     setVoiceLoadingMore(true);
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const accum = [];
     pool.request(relayUrls, [{ kinds: [1222], authors: [pubkey], limit: VOICE_PAGE, until: voiceUntilRef.current }]).subscribe({
       next: raw => {
@@ -839,7 +839,7 @@ export default function ProfilePage({
   useEffect(() => {
     if (!selectedPodcast?.pubkey) return;
     let cancelled = false;
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     setPodcastEpisodes([]);
     setEpisodesLoading(true);
     const accumulated = [];

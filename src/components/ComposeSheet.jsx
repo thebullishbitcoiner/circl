@@ -6,7 +6,7 @@ import Overlay from "./Overlay.jsx";
 import { sheetPortal } from "../utils/sheetPortal.js";
 import Avatar from "./Avatar.jsx";
 import { displayName, avatarInitial, replyTagsForPublish, kind1111TagsForPublish, nip19 } from "../utils.js";
-import { GIPHY_KEY, RELAYS } from "../constants.js";
+import { GIPHY_KEY, DEFAULT_RELAYS } from "../constants.js";
 import { broadcastEvent, pool } from "../nostr.js";
 import EmojiPicker from "./EmojiPicker.jsx";
 import PollCompose from "./PollCompose.jsx";
@@ -220,7 +220,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
         if (pollExpiry) tags.push(["endsAt", String(Math.floor(new Date(pollExpiry).getTime() / 1000))]);
       }
 
-      const published = await publishEvent({ kind: isZap ? 6969 : 1068, content: question, tags });
+      const published = await publishEvent({ kind: isZap ? 6969 : 1068, content: question, tags }, { trackStatus: true });
       if (published) onPrepend?.(published);
       deleteDraft(thisDraftId);
       onDismiss?.();
@@ -228,7 +228,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     }
 
     if (goalMode && publishEvent) {
-      const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+      const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
       const tags = [
         ["amount", String(Math.round(Number(goalAmount) * 1000))],
         ["relays", ...relayUrls],
@@ -236,7 +236,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
       if (goalDescription.trim()) tags.push(["summary", goalDescription.trim()]);
       if (goalClosedAt) tags.push(["closed_at", String(Math.floor(new Date(goalClosedAt).getTime() / 1000))]);
       if (goalImage.trim()) tags.push(["image", goalImage.trim()]);
-      const published = await publishEvent({ kind: 9041, content: goalTitle.trim(), tags });
+      const published = await publishEvent({ kind: 9041, content: goalTitle.trim(), tags }, { trackStatus: true });
       if (!published) { setUploadErr("Failed to publish — please try again."); publishingRef.current = false; setPublishing(false); return; }
       onPrepend?.(published);
       deleteDraft(thisDraftId);
@@ -291,7 +291,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
       }
       for (const et of emojiTags) tags.push(et);
       if (replyTo && replyTo.pubkey !== myPubkey) broadcastEvent(replyTo);
-      const published = await publishEvent({ kind: isNip22Reply ? 1111 : 1, content: finalContent, tags });
+      const published = await publishEvent({ kind: isNip22Reply ? 1111 : 1, content: finalContent, tags }, { trackStatus: true });
       if (published) { onPrepend?.(published); deleteDraft(thisDraftId); }
     } else {
       onPost?.(full);

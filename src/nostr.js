@@ -2,7 +2,8 @@ import { EventStore } from "applesauce-core";
 import { normalizeURL } from "applesauce-core/helpers/url";
 import { RelayPool } from "applesauce-relay";
 import { createEventLoader } from "applesauce-loaders/loaders";
-import { RELAYS } from "./constants.js";
+import { BehaviorSubject } from "rxjs";
+import { DEFAULT_RELAYS } from "./constants.js";
 
 export const eventStore = new EventStore();
 export const pool = new RelayPool();
@@ -95,11 +96,62 @@ eventStore.insert$.subscribe(event => {
 
 export function broadcastEvent(event) {
   if (!event?.id || !event?.sig) return Promise.resolve();
-  const relays = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+  const relays = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
   return Promise.race([
     pool.publish(relays, event),
     new Promise(resolve => setTimeout(resolve, 8000)),
   ]).catch(() => null);
+}
+
+// ── Publish status tracking ─────────────────────────────────────────────────
+// Opt-in per-relay publish progress for the "publishing…" UI. Uses pool.event
+// (not pool.publish) so we get one PublishResponse per relay as it resolves,
+// instead of a single Promise that only settles once every relay is done.
+//
+// relay.event()'s own 10s eventTimeout only starts once the relay is ready
+// (connected/authed) — if a relay is slow to connect or never comes up, that
+// timer never starts and the row would hang forever. relay.publish() covers
+// this with an outer publishTimeout, but we can't use it here since it
+// batches all relays into one Promise instead of emitting per-relay. So we
+// add our own ceiling below to guarantee every row eventually settles.
+const PUBLISH_STATUS_TIMEOUT_MS = 20_000;
+
+export const publishSession$ = new BehaviorSubject(null);
+
+export function publishWithStatus(relays, event) {
+  const id = Math.random();
+  // pool.relay() normalizes URLs before using them as the Relay's own `.url`
+  // (see pool.js), so every PublishResponse.from comes back normalized. Match
+  // that here, or unnormalized entries (e.g. DEFAULT_RELAYS without a
+  // trailing slash) never match their response and hang forever.
+  const normalized = [...new Set(relays.map(safeNormalize))];
+  publishSession$.next({
+    id,
+    event,
+    relays: normalized.map(url => ({ url, status: "pending", message: null })),
+  });
+
+  const timer = setTimeout(() => {
+    const cur = publishSession$.value;
+    if (!cur || cur.id !== id) return;
+    publishSession$.next({
+      ...cur,
+      relays: cur.relays.map(r => r.status === "pending" ? { ...r, status: "failed", message: "Timed out" } : r),
+    });
+  }, PUBLISH_STATUS_TIMEOUT_MS);
+
+  return pool.event(normalized, event).subscribe({
+    next: ({ from, ok, message }) => {
+      const cur = publishSession$.value;
+      if (!cur || cur.id !== id) return;
+      publishSession$.next({
+        ...cur,
+        relays: cur.relays.map(r => r.url === from ? { ...r, status: ok ? "ok" : "failed", message } : r),
+      });
+    },
+    complete: () => clearTimeout(timer),
+    error: () => clearTimeout(timer),
+  });
 }
 
 // ── Event loader ────────────────────────────────────────────────────────────
@@ -114,7 +166,7 @@ export const eventLoader = createEventLoader(
 
 export function nostrSubscribe(filters, opts = {}) {
   const { onEvent, onEose, closeOnEose } = opts;
-  const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+  const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
   const wrap = ev => ({ ...ev, rawEvent: () => ev });
 
   if (closeOnEose) {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { parseBolt11Msats, zapperPubkeyFromKind9735, zapCommentFromKind9735 } from "../utils.js";
 import { pool } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 
 export default function useGoalProgress(goalEvent) {
   const [zaps, setZaps] = useState([]);
@@ -18,7 +18,7 @@ export default function useGoalProgress(goalEvent) {
       .filter(Boolean);
     const relayUrls = goalRelays?.length
       ? goalRelays
-      : pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+      : pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
 
     const seen = new Set();
     const sub = pool.subscription(relayUrls, [{ kinds: [9735], "#e": [goalEvent.id] }]).subscribe({

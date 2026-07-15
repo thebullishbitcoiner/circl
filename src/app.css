@@ -542,6 +542,20 @@
   .follow-btn:hover{background:var(--primary);color:white;}
   .relay-item{font-size:calc(var(--font-base) - 3px);color:var(--text-muted);padding:3px 0;font-family:monospace;word-break:break-all;}
 
+  /* Publish status (card + modal share these) */
+  .publish-status-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;}
+  .publish-status-close{background:none;border:none;cursor:pointer;font-size:18px;line-height:1;color:var(--text-faint);padding:0;flex-shrink:0;}
+  .publish-status-relay-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);}
+  .publish-status-relay-row:last-child{border-bottom:none;}
+  .publish-status-relay-url{font-size:calc(var(--font-base) - 3px);color:var(--text-muted);font-family:monospace;word-break:break-all;}
+  .publish-status-icon{flex-shrink:0;width:14px;height:14px;display:flex;align-items:center;justify-content:center;font-size:12px;line-height:1;}
+  .publish-status-icon-pending{border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite;}
+  .publish-status-icon-ok{color:#2ecc71;font-weight:700;}
+  .publish-status-icon-failed{color:#e74c3c;font-weight:700;cursor:default;}
+  .publish-status-progress{height:3px;border-radius:2px;background:var(--border);overflow:hidden;margin-top:10px;}
+  .publish-status-progress-bar{height:100%;width:100%;background:var(--primary);transform-origin:left;animation-name:publishStatusCountdown;animation-timing-function:linear;animation-fill-mode:forwards;}
+  @keyframes publishStatusCountdown{from{transform:scaleX(1);}to{transform:scaleX(0);}}
+
   /* ── Slide panels (reader + profile) ── */
   .slide-panel{
     position:absolute;inset:0;background:var(--bg);z-index:20;overflow:hidden;
@@ -1035,6 +1049,11 @@
   .zap-modal-title{font-family:'DM Sans',sans-serif;font-size:18px;font-weight:600;color:var(--text);margin-bottom:3px;}
   .zap-modal-sub{font-size:12px;color:var(--text-faint);}
   .zap-modal-close{background:none;border:none;cursor:pointer;font-size:22px;line-height:1;color:var(--text-faint);padding:0;flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:2px;}
+
+  /* Publish status modal (mobile) */
+  .overlay.publish-status-overlay{z-index:450;}
+  .publish-status-modal{width:calc(100% - 40px);max-width:360px;background:var(--bg);border-radius:14px;padding:20px;animation:popIn .2s cubic-bezier(.4,0,.2,1);box-shadow:0 8px 40px var(--shadow-md);}
+  .publish-status-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;color:var(--text);}
   .zap-presets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
   .zap-preset{padding:10px 4px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface);font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;color:var(--text);cursor:pointer;transition:all .15s;text-align:center;}
   .zap-preset:hover,.zap-preset.sel{border-color:var(--primary);background:rgba(109,40,217,.08);color:var(--primary);}

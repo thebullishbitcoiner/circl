@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { RELAYS, NOSTR_CLIENT_TAG } from "../constants.js";
+import { DEFAULT_RELAYS, NOSTR_CLIENT_TAG } from "../constants.js";
 import { isHexPubkey, normPubkey } from "../utils.js";
-import { pool, validRelays } from "../nostr.js";
+import { pool, validRelays, publishWithStatus } from "../nostr.js";
 import useMailboxes from "./useMailboxes.js";
 import useBlockedRelays from "./useBlockedRelays.js";
 import usePrivateRelays from "./usePrivateRelays.js";
@@ -25,7 +25,7 @@ export default function useAuth() {
     if (!saved) return;
     const pk = normPubkey(saved);
     if (!isHexPubkey(pk)) return;
-    for (const url of RELAYS) pool.relay(url);
+    for (const url of DEFAULT_RELAYS) pool.relay(url);
     setPubkey(pk);
     setStatus("ready");
   }, []);
@@ -42,7 +42,7 @@ export default function useAuth() {
       );
       const pk = normPubkey(raw);
       if (!isHexPubkey(pk)) throw new Error("Extension returned an invalid pubkey.");
-      for (const url of RELAYS) pool.relay(url);
+      for (const url of DEFAULT_RELAYS) pool.relay(url);
       setPubkey(pk);
       setStatus("ready");
       sessionStorage.setItem("circl_pk", pk);
@@ -99,13 +99,19 @@ export default function useAuth() {
     const publishRelays = opts.relays?.length > 0
       ? opts.relays
       : outboxes.length > 0
-        ? [...new Set([...RELAYS, ...outboxes])]
-        : RELAYS;
-    // Fire-and-forget relay publish so callers get the signed event immediately
-    Promise.race([
-      pool.publish(publishRelays, signed),
-      new Promise(resolve => setTimeout(resolve, 8000)),
-    ]).catch(() => null);
+        ? [...new Set([...DEFAULT_RELAYS, ...outboxes])]
+        : DEFAULT_RELAYS;
+    if (opts.trackStatus) {
+      // Tracked publish: per-relay status flows into publishSession$ for the
+      // publish-status card/modal. Still fire-and-forget from the caller's POV.
+      publishWithStatus(publishRelays, signed);
+    } else {
+      // Fire-and-forget relay publish so callers get the signed event immediately
+      Promise.race([
+        pool.publish(publishRelays, signed),
+        new Promise(resolve => setTimeout(resolve, 8000)),
+      ]).catch(() => null);
+    }
     return signed;
   }, [pubkey, outboxes]);
 

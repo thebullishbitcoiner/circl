@@ -5,7 +5,7 @@ import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
 import { displayName, nip05OrNpub, relativeTime, parseHighlight, parseArticle } from "../utils.js";
 import { pool } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 
 function SourceChip({ sourceTag, sourceRef, sourceEvent }) {
   if (sourceTag === "r") {
@@ -72,7 +72,7 @@ function HighlightCard({
   useEffect(() => {
     if (!sourceRef || sourceTag === "r") return;
     let cancelled = false;
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
 
     if (sourceTag === "e") {
       resolveEventById?.(sourceRef).then(ev => {

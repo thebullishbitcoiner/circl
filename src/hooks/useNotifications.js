@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { isHexPubkey, normPubkey, parseBolt11Msats, isQuoteRepost, fmtSats, parseArticle } from "../utils.js";
 import { pool, eventStore, eventLoader } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 import useMailboxes from "./useMailboxes.js";
 
 const NOTIF_KINDS = [1, 6, 7, 9735, 30023, 1018];
@@ -100,7 +100,7 @@ export default function useNotifications({ pubkey }) {
 
     // Use own read (inbox) relays if known, fall back to connected pool relays
     const relayUrls = inboxes.length > 0 ? inboxes
-      : pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+      : pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const since = Math.floor(Date.now() / 1000) - SINCE_SEC;
 
     const sub = pool.subscription(relayUrls, [{ kinds: NOTIF_KINDS, "#p": [pk], limit: 500, since }]).subscribe({

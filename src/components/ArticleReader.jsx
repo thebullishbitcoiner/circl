@@ -12,7 +12,7 @@ import InlineCompose from "./InlineCompose.jsx";
 import { Bk } from "./icons.jsx";
 import { displayName, nip05OrNpub, parseArticle } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 
 export default function ArticleReader({
   event,
@@ -73,7 +73,7 @@ export default function ArticleReader({
 
   // Subscribe to replies/comments
   useEffect(() => {
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const dTag = event.tags?.find(t => t[0] === "d")?.[1] ?? "";
     const addr = `${event.kind}:${event.pubkey}:${dTag}`;
     const known = new Map();
@@ -96,7 +96,7 @@ export default function ArticleReader({
   useEffect(() => {
     if (!comments.length) return;
     const pks = [...new Set(comments.map(c => c.pubkey))];
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     pool.request(relayUrls, [{ kinds: [0], authors: pks }]).subscribe({
       next: ev => eventStore.add(ev),
     });

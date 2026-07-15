@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { isHexPubkey, normPubkey, nip19 } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 
 const PRIORITY_COUNT = 32; // self + notification actors + first feed authors
 const REST_DELAY_MS = 600;
@@ -67,7 +67,7 @@ const FETCH_CHUNK_SIZE = 50;
 
 function fetchBatch(pubkeys) {
   if (!pubkeys.length) return;
-  const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+  const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
   // Chunk to stay within relay filter size limits
   for (let i = 0; i < pubkeys.length; i += FETCH_CHUNK_SIZE) {
     const chunk = pubkeys.slice(i, i + FETCH_CHUNK_SIZE);

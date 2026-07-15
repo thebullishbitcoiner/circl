@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { isHexPubkey, normPubkey } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 
 const EMOJI_LIST_KIND = 10030;
 const EMOJI_SET_KIND  = 30030;
@@ -37,7 +37,7 @@ export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
     setEmojis([]);
     setSets([]);
 
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const received  = [];
 
     const sub = pool.request(relayUrls, [{ kinds: [EMOJI_LIST_KIND], authors: [pk] }]).subscribe({

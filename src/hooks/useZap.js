@@ -3,7 +3,7 @@ import { NWCClient } from "@getalby/sdk/nwc";
 import { makeZapRequest } from "nostr-tools/nip57";
 import { bech32 } from "@scure/base";
 import { decodeInvoice } from "@getalby/lightning-tools";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 import { cacheZapReq } from "../utils.js";
 
 const utf8Decoder = new TextDecoder();
@@ -35,7 +35,7 @@ export default function useZap(wallet) {
     let client;
     try {
       const msats = amountSats * 1000;
-      const allRelays = [...new Set([...RELAYS, ...extraRelays])];
+      const allRelays = [...new Set([...DEFAULT_RELAYS, ...extraRelays])];
 
       // Fetch LNURL data directly (bypasses any proxy that might strip allowsNostr)
       const lnurlData = await fetchLnurlData(recipientLnAddr);

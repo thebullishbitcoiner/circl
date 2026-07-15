@@ -12,7 +12,7 @@ import { displayName, nip05OrNpub, parseCalendarEvent, formatCalendarDate } from
 import useCalendarRSVPs from "../hooks/useCalendarRSVPs.js";
 import { CalendarEventRSVPFactory } from "applesauce-common/factories/calendar-rsvp";
 import { pool, eventStore } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 
 const MapPin = ({ s = 14 }) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -79,7 +79,7 @@ export default function EventDetailView({
   useEffect(() => {
     const allPks = [...grouped.accepted, ...grouped.tentative, ...grouped.declined];
     if (!allPks.length) return;
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     pool.request(relayUrls, [{ kinds: [0], authors: allPks }]).subscribe({
       next: ev => eventStore.add(ev),
     });
@@ -87,7 +87,7 @@ export default function EventDetailView({
 
   // Subscribe to replies/comments
   useEffect(() => {
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const dTag = event.tags?.find(t => t[0] === "d")?.[1] ?? "";
     const addr = `${event.kind}:${event.pubkey}:${dTag}`;
     const known = new Map();
@@ -110,7 +110,7 @@ export default function EventDetailView({
   useEffect(() => {
     if (!comments.length) return;
     const pks = [...new Set(comments.map(c => c.pubkey))];
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     pool.request(relayUrls, [{ kinds: [0], authors: pks }]).subscribe({
       next: ev => eventStore.add(ev),
     });

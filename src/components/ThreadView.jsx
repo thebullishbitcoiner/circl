@@ -14,7 +14,7 @@ import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
 import { pool, eventStore } from "../nostr.js";
 import { claimPlayback, releasePlayback, takePendingResume } from "../voicePlayback.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 import PollInline from "./PollInline.jsx";
 import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
 import CalendarInlineCard from "./CalendarInlineCard.jsx";
@@ -469,7 +469,7 @@ export default function ThreadView({
   // Fetch ancestor chain and subscribe to replies whenever the focused event changes
   useEffect(() => {
     setFetchedEvents([]);
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const known = new Map(events.map(e => [e.id, e]));
     const subs = [];
 

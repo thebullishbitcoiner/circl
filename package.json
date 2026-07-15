@@ -1,7 +1,7 @@
 {
   "name": "circl",
   "private": true,
-  "version": "0.71.0",
+  "version": "0.72.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -24,7 +24,8 @@
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
     "react-qr-code": "^2.2.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "rxjs": "^7.8.2"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",

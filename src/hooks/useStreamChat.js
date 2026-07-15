@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { pool, eventStore } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 
 export default function useStreamChat(streamEvent) {
   const [messages, setMessages] = useState([]);
@@ -26,7 +26,7 @@ export default function useStreamChat(streamEvent) {
       .filter(t => t[0] === "relays")
       .flatMap(t => t.slice(1))
       .filter(Boolean);
-    const poolRelays = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const poolRelays = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const relayUrls = [...new Set([...poolRelays, ...streamRelays])];
 
     const sub = pool.subscription(relayUrls, [

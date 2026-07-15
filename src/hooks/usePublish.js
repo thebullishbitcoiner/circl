@@ -8,9 +8,9 @@ export default function usePublish({ signAndPublish, pubkey }) {
     } catch { return null; }
   }, [signAndPublish]);
 
-  const publishEvent = useCallback(async tmpl => {
+  const publishEvent = useCallback(async (tmpl, opts) => {
     try {
-      return await signAndPublish(tmpl);
+      return await signAndPublish(tmpl, opts);
     } catch { return null; }
   }, [signAndPublish]);
 

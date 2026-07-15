@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { isHexPubkey, normPubkey } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 
 const SERVER_LIST_KIND = 10063;
 const LS_KEY = "circl_blossom_v1";
@@ -32,7 +32,7 @@ export default function useBlossomServers({ pubkey, signAndPublish } = {}) {
 
     hasMutated.current = false;
     let cancelled = false;
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const received  = [];
 
     const sub = pool.request(relayUrls, [{ kinds: [SERVER_LIST_KIND], authors: [pk] }]).subscribe({

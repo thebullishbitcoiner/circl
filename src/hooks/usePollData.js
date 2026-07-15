@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { pool } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 import { parseBolt11Msats } from "../utils.js";
 
 // Warm-start cache: polls show last known counts instantly on remount while subscription reloads
@@ -106,7 +106,7 @@ export default function usePollData({ event, myPubkey }) {
   const [voteEvents, setVoteEvents] = useState(() => _pollCache.get(event.id)?.voteEvents ?? []);
   const rawEvents = useRef([]);
 
-  const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+  const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
 
   useEffect(() => {
     if (!options.length) { setLoading(false); return; }

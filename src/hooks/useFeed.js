@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { parseBolt11Msats, isHexPubkey, zapperPubkeyFromKind9735 } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 
 function compareFeedEventsDesc(a, b) {
   const ta = Number(a?.created_at) || 0;
@@ -31,7 +31,7 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap }) {
     setDeletionMap(new Map());
     seen.current = new Set();
 
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const since = Math.floor(Date.now() / 1000) - 60 * 60 * 48;
 
     // Pre-fetch profiles for all follows in parallel with the feed so names are

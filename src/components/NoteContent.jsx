@@ -11,7 +11,7 @@ import LinkPreviewCard from "./LinkPreviewCard.jsx";
 import NoteAudioAttachment from "./NoteAudioAttachment.jsx";
 import PodcastPreviewChip from "./PodcastPreviewChip.jsx";
 import { pool, eventStore } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 import { useNavigation } from "../context/NavigationContext.jsx";
 import useContentSettings from "../hooks/useContentSettings.js";
 
@@ -38,7 +38,7 @@ function ZapEmbed({ event, profiles, onOpenProfile }) {
     if (kindStr !== "30311" || !evPubkey || !dTag) return;
     const cached = eventStore.getTimeline([{ kinds: [30311], authors: [evPubkey], "#d": [dTag], limit: 1 }])?.[0];
     if (cached) { setLiveEvent(cached); return; }
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const sub = pool.request(relayUrls, [{ kinds: [30311], authors: [evPubkey], "#d": [dTag], limit: 1 }]).subscribe({
       next: ev => { eventStore.add(ev); setLiveEvent(ev); },
     });
@@ -104,7 +104,7 @@ function fetchMentionedProfiles(content) {
   const toFetch = pubkeys.filter(pk => !_mentionFetched.has(pk));
   if (!toFetch.length) return;
   for (const pk of toFetch) _mentionFetched.add(pk);
-  const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+  const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
   pool.request(relayUrls, [{ kinds: [0], authors: toFetch }]).subscribe({
     next: ev => eventStore.add(ev),
   });
@@ -478,7 +478,7 @@ export default function NoteContent({
     const refs = [...content.matchAll(/nostr:(naddr1[023456789acdefghjklmnpqrstuvwxyz]+)/ig)].map(m => m[1]);
     if (!refs.length) return;
     let cancelled = false;
-    const connected = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const connected = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     for (const naddr of refs) {
       if (resolvedNaddrRefs[naddr]) continue;
       const data = decodeNaddr(naddr);

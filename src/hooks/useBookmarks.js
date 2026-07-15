@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { isHexPubkey, normPubkey, hasNip44, hasNip04, decryptListContent } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 
 const BOOKMARK_LIST_KIND = 10003;
 const CACHE_KEY = "circl_bookmarks";
@@ -80,7 +80,7 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
     let knownCreatedAt = cached?.created_at ?? 0;
     let processTimer = null;
 
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
 
     const process = async () => {
       if (cancelled || !latestEvent) return;

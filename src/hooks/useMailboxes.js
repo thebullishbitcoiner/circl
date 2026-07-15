@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { isHexPubkey } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 
 // Track pubkeys we've already fetched so we don't re-request on remount
 const _fetched = new Set();
@@ -21,7 +21,7 @@ export default function useMailboxes(pubkey) {
 
     if (!_fetched.has(pubkey)) {
       _fetched.add(pubkey);
-      const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+      const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
       pool.request(relayUrls, [{ kinds: [10002], authors: [pubkey], limit: 1 }]).subscribe({
         next: ev => eventStore.add(ev),
       });

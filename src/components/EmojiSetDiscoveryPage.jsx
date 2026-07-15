@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { pool, eventStore } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 import { displayName } from "../utils.js";
 import useProfiles from "../hooks/useProfiles.js";
 
@@ -18,7 +18,7 @@ export default function EmojiSetDiscoveryPage({ onBack, bookmarkedATags = [], ad
   const { profiles } = useProfiles({ pubkeys: authorPubkeys });
 
   useEffect(() => {
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const received  = [];
     let cancelled   = false;
 

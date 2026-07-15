@@ -11,7 +11,7 @@ import NoteText from "./NoteText.jsx";
 import useStreamChat from "../hooks/useStreamChat.js";
 import useProfiles from "../hooks/useProfiles.js";
 import { pool, eventStore } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
@@ -165,7 +165,7 @@ export default function StreamDetailView({
   // Fetch all host profiles
   useEffect(() => {
     if (!hostPks.length) return;
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     pool.request(relayUrls, [{ kinds: [0], authors: hostPks }]).subscribe({
       next: ev => eventStore.add(ev),
     });

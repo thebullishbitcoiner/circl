@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { pool, eventStore } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 import { replyCount, repostAndQuoteCount } from "../utils.js";
 import NoteCard from "./NoteCard.jsx";
 import MutedNoteGate from "./MutedNoteGate.jsx";
@@ -24,7 +24,7 @@ export default function HashtagFeed({
   useEffect(() => {
     if (!hashtag) return;
     const key = hashtag.toLowerCase();
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
 
     const cached = hashtagCache.get(key);
     if (cached && Date.now() - cached.ts < HASHTAG_CACHE_TTL) {

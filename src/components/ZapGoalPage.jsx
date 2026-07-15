@@ -6,7 +6,7 @@ import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
 import { Bk } from "./icons.jsx";
 import { displayName, nip05OrNpub, relativeTime, fmtSats } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 import useGoalProgress from "../hooks/useGoalProgress.js";
 
 
@@ -36,7 +36,7 @@ export default function ZapGoalPage({
     const pubkeys = [...new Set(zaps.map(z => z.zapper).filter(Boolean))];
     const toFetch = pubkeys.filter(pk => !profiles?.[pk]);
     if (!toFetch.length) return;
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     pool.request(relayUrls, [{ kinds: [0], authors: toFetch }]).subscribe({
       next: ev => eventStore.add(ev),
     });

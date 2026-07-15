@@ -4,7 +4,7 @@ import NoteJsonModal from "./NoteJsonModal.jsx";
 import { Bk, Rpi } from "./icons.jsx";
 import { displayName, avatarUrl, avatarInitial, fmtSats, relativeTime, nip05OrNpub, normPubkey } from "../utils.js";
 import { eventStore, pool } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 import NoteContent from "./NoteContent.jsx";
 import useProfiles from "../hooks/useProfiles.js";
 
@@ -97,7 +97,7 @@ export function ReactionsScreen({ eventId, reactions: seedReactions, profiles: p
   );
 
   useEffect(() => {
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const sub = pool.request(relayUrls, [{ kinds: [7], "#e": [eventId] }]).subscribe({
       next: raw => {
         if (!raw.content) return;

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { getStreamStatus } from "applesauce-common/helpers/stream";
 import { getOutboxes } from "applesauce-core/helpers/mailboxes";
 import { pool, eventStore } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 import { isHexPubkey } from "../utils.js";
 
 export default function useActiveStream(pubkey) {
@@ -20,7 +20,7 @@ export default function useActiveStream(pubkey) {
       }
     }
 
-    const defaultRelays = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const defaultRelays = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const subs = [];
     let best = null;
 

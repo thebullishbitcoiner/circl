@@ -3,8 +3,7 @@ import { decode } from "nostr-tools/nip19";
 /** NIP-89-style `client` tag on all events published by this app */
 export const NOSTR_CLIENT_TAG = ["client", "Circl"];
 
-export const RELAYS = [
-  "wss://relay.damus.io",
+export const DEFAULT_RELAYS = [
   "wss://nos.lol",
   "wss://relay.primal.net",
 ];

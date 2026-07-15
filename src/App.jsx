@@ -14,7 +14,7 @@ import {
 } from "./utils.js";
 import useAuth from "./hooks/useAuth.js";
 import { nostrSubscribe, eventLoader, eventStore, pool, validRelays } from "./nostr.js";
-import { RELAYS } from "./constants.js";
+import { DEFAULT_RELAYS } from "./constants.js";
 import useFollows from "./hooks/useFollows.js";
 import useFeed from "./hooks/useFeed.js";
 import useNotifications from "./hooks/useNotifications.js";
@@ -80,6 +80,8 @@ import { SbHome, SbBell, SbBook, SbZap, SbSearch, SbWallet, NavHome, NavBell, Na
 import { AudioProvider, useAudio } from "./contexts/AudioContext.jsx";
 import AudioPlayer from "./components/AudioPlayer.jsx";
 import AudioPlayerCard from "./components/AudioPlayerCard.jsx";
+import PublishStatusCard from "./components/PublishStatusCard.jsx";
+import PublishStatusModal from "./components/PublishStatusModal.jsx";
 export default function App() {
   const { pubkey, status, error, login, logout, signAndPublish, privateRelayUrls } = useAuth();
   const { follows, loading: fl, follow: followPk, unfollow: unfollowPk, refresh: refreshFollows } = useFollows({ pubkey, signAndPublish });
@@ -161,7 +163,7 @@ export default function App() {
     const stored = eventStore.getTimeline([{ ids: [eventId], limit: 1 }])?.[0];
     if (stored) return stored;
     // Always include connected relays so note1 refs (no hints) still get fetched
-    const connected = pool.relays.size > 0 ? [...pool.relays.keys()] : RELAYS;
+    const connected = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const allRelays = relayHints.length
       ? [...new Set([...validRelays(relayHints), ...connected])]
       : connected;
@@ -1531,6 +1533,7 @@ export default function App() {
             </div>
 
             <div className="right-panel">
+              <PublishStatusCard />
               <AudioPlayerCard />
               <RelaysCard profilePubkey={viewedProfilePubkey} pubkey={pubkey} activeNav={activeNav} />
               {topEntry?.type === "thread" && (
@@ -1643,6 +1646,7 @@ export default function App() {
       )}
 
       <div className={`toast ${toast.show ? "show" : ""}`}>{toast.msg}</div>
+      <PublishStatusModal />
       <GlobalAudioPlayer />
     </>
     </NavigationContext.Provider>

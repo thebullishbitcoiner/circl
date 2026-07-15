@@ -5,7 +5,7 @@ import { Bk } from "./icons.jsx";
 import { displayName, nip05OrNpub, relativeTime, getZapReqFromCache } from "../utils.js";
 import { decodeInvoice } from "@getalby/lightning-tools";
 import { pool } from "../nostr.js";
-import { RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 
 function zapReqFromDesc(tx) {
   try {
@@ -206,7 +206,7 @@ function ZappedNote({ noteId, relayHints, profiles, onOpenProfile, onOpenThread 
     if (!noteId) return;
     let found = false;
     let cancelled = false;
-    const relays = relayHints?.length ? relayHints : RELAYS;
+    const relays = relayHints?.length ? relayHints : DEFAULT_RELAYS;
     const sub = pool.request(relays, [{ ids: [noteId], limit: 1 }]).subscribe({
       next: ev => { if (!cancelled) { found = true; setNote(ev); } },
       error: () => { if (!cancelled && !found) setFailed(true); },
