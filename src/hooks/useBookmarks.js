@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { isHexPubkey, normPubkey } from "../utils.js";
+import { isHexPubkey, normPubkey, hasNip44, hasNip04, decryptListContent } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
 
@@ -36,18 +36,6 @@ function mergeBookmarkTags(decryptedTags, publicEventTags) {
   if (Array.isArray(decryptedTags)) for (const t of decryptedTags) { if (Array.isArray(t)) push(t); }
   for (const t of publicEventTags || []) { if (t[0] === "e" || t[0] === "a") push(t); }
   return out;
-}
-
-function hasNip44() {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.nostr?.nip44?.encrypt === "function" &&
-    typeof window.nostr?.nip44?.decrypt === "function"
-  );
-}
-
-function hasNip04() {
-  return typeof window !== "undefined" && typeof window.nostr?.nip04?.decrypt === "function";
 }
 
 // Cache stores decrypted bookmark tags + public key set per account
@@ -110,16 +98,7 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
       }
       if (cancelled || generation !== gen) return;
       if (content && (hasNip44() || hasNip04())) {
-        let plain = null;
-        // NIP-51: detect encryption by presence of "?iv=" (NIP-04) vs its absence (NIP-44)
-        const looksLikeNip04 = content.includes("?iv=");
-        if (looksLikeNip04) {
-          if (hasNip04()) try { plain = await window.nostr.nip04.decrypt(ev.pubkey, ev.content); } catch {}
-          if (!plain && hasNip44()) try { plain = await window.nostr.nip44.decrypt(ev.pubkey, ev.content); } catch {}
-        } else {
-          if (hasNip44()) try { plain = await window.nostr.nip44.decrypt(ev.pubkey, ev.content); } catch {}
-          if (!plain && hasNip04()) try { plain = await window.nostr.nip04.decrypt(ev.pubkey, ev.content); } catch {}
-        }
+        const plain = await decryptListContent(ev.pubkey, content);
         if (plain) {
           try {
             const parsed = JSON.parse(plain);

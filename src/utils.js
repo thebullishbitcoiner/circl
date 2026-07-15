@@ -605,3 +605,27 @@ export const parseHighlight = ev => {
     comment: get("comment"),
   };
 };
+
+export function hasNip44() {
+  return typeof window !== "undefined" &&
+    typeof window.nostr?.nip44?.encrypt === "function" &&
+    typeof window.nostr?.nip44?.decrypt === "function";
+}
+
+export function hasNip04() {
+  return typeof window !== "undefined" &&
+    typeof window.nostr?.nip04?.decrypt === "function";
+}
+
+// Decrypts NIP-51 list content, auto-detecting NIP-04 (?iv=) vs NIP-44.
+// Returns the plaintext string or null.
+export async function decryptListContent(pubkey, content) {
+  let plain = null;
+  if (content.includes("?iv=")) {
+    if (hasNip04()) try { plain = await window.nostr.nip04.decrypt(pubkey, content); } catch {}
+    if (!plain && hasNip44()) try { plain = await window.nostr.nip44.decrypt(pubkey, content); } catch {}
+  } else {
+    if (hasNip44()) try { plain = await window.nostr.nip44.decrypt(pubkey, content); } catch {}
+  }
+  return plain;
+}

@@ -1,18 +1,7 @@
 import { useState, useEffect } from "react";
-import { isHexPubkey } from "../utils.js";
+import { isHexPubkey, hasNip44, hasNip04, decryptListContent } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
 import { RELAYS } from "../constants.js";
-
-function hasNip44() {
-  return typeof window !== "undefined" &&
-    typeof window.nostr?.nip44?.encrypt === "function" &&
-    typeof window.nostr?.nip44?.decrypt === "function";
-}
-
-function hasNip04() {
-  return typeof window !== "undefined" &&
-    typeof window.nostr?.nip04?.decrypt === "function";
-}
 
 // Reads a NIP-51 "standard list" of relays for the given kind (10007 search,
 // 10006 blocked, 10013 private, ...). Public entries live as ["relay", url]
@@ -60,15 +49,7 @@ export default function useRelayList(pubkey, kind) {
           }
         }
         if (!cancelled && generation === gen) {
-          let plain = null;
-          const looksLikeNip04 = content.includes("?iv=");
-          if (looksLikeNip04) {
-            if (hasNip04()) try { plain = await window.nostr.nip04.decrypt(ev.pubkey, content); } catch {}
-            if (!plain && hasNip44()) try { plain = await window.nostr.nip44.decrypt(ev.pubkey, content); } catch {}
-          } else {
-            if (hasNip44()) try { plain = await window.nostr.nip44.decrypt(ev.pubkey, content); } catch {}
-            if (!plain && hasNip04()) try { plain = await window.nostr.nip04.decrypt(ev.pubkey, content); } catch {}
-          }
+          const plain = await decryptListContent(ev.pubkey, content);
           if (plain) {
             try {
               const parsed = JSON.parse(plain);
