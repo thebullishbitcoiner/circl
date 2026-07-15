@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { publishSession$ } from "../nostr.js";
 
-export const PUBLISH_STATUS_AUTO_DISMISS_MS = 10_000;
+export const PUBLISH_STATUS_AUTO_DISMISS_MS = 5_000;
 
 export default function usePublishStatus() {
   const [session, setSession] = useState(publishSession$.value);
