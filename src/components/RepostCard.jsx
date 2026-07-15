@@ -8,6 +8,12 @@ import NoteJsonModal from "./NoteJsonModal.jsx";
 import PollInline from "./PollInline.jsx";
 import { displayName, nip05OrNpub, relativeTime } from "../utils.js";
 import CalendarInlineCard from "./CalendarInlineCard.jsx";
+import LongformInlineCard from "./LongformInlineCard.jsx";
+import StreamInlineCard from "./StreamInlineCard.jsx";
+import PodcastZapInlineCard from "./PodcastZapInlineCard.jsx";
+import HighlightInlineCard from "./HighlightInlineCard.jsx";
+import { pool, eventStore } from "../nostr.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 
 export default function RepostCard({
   event, profiles, events, myPubkey, myProfile,
@@ -19,17 +25,37 @@ export default function RepostCard({
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail, onOpenPollVotes,
   customEmojis,
 }) {
-  const { onOpenCalendarEvent, onOpenPoll, onOpenGoal } = useNavigation();
-  const originalId  = event.tags.find(t => t[0] === "e")?.[1];
-  const fromContent = (() => { try { return JSON.parse(event.content); } catch { return null; } })();
-  const fromPool    = originalId ? events.find(e => e.id === originalId) : null;
-  const original    = fromPool || fromContent;
+  const { onOpenCalendarEvent, onOpenPoll, onOpenGoal, onOpenArticle, onOpenStream } = useNavigation();
+  const originalId   = event.tags.find(t => t[0] === "e")?.[1];
+  const originalATag = event.tags.find(t => t[0] === "a")?.[1];
+  const fromContent  = (() => { try { return JSON.parse(event.content); } catch { return null; } })();
+  const fromPool     = originalId ? events.find(e => e.id === originalId) : null;
+  const [resolvedByCoord, setResolvedByCoord] = useState(null);
+  const original      = fromPool || fromContent || resolvedByCoord;
   const [menuOpen, setMenuOpen] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
 
   useEffect(() => {
     if (!original && originalId) resolveEventById?.(originalId);
   }, [originalId, original]);
+
+  // NIP-18 reposts of addressable events (articles, streams, ...) may only carry
+  // an `a` coordinate tag with no embedded/resolvable `e`-tagged content.
+  useEffect(() => {
+    if (original || originalId || !originalATag) return;
+    const [kindStr, coordPubkey, dTag = ""] = originalATag.split(":");
+    const kind = Number(kindStr);
+    if (!kind || !coordPubkey) return;
+    const filter = { kinds: [kind], authors: [coordPubkey], "#d": [dTag], limit: 1 };
+    const cached = eventStore.getTimeline([filter])?.[0];
+    if (cached) { setResolvedByCoord(cached); return; }
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
+    const sub = pool.request(relayUrls, [filter]).subscribe({
+      next: ev => { eventStore.add(ev); setResolvedByCoord(ev); },
+    });
+    const timeout = setTimeout(() => sub.unsubscribe(), 5000);
+    return () => { sub.unsubscribe(); clearTimeout(timeout); };
+  }, [original, originalId, originalATag]);
 
   return (
     <>
@@ -39,6 +65,8 @@ export default function RepostCard({
         if (original.kind === 1068 || original.kind === 6969) { onOpenPoll?.(original); return; }
         if (original.kind === 9041) { onOpenGoal?.(original); return; }
         if (original.kind === 31922 || original.kind === 31923) { onOpenCalendarEvent?.(original); return; }
+        if (original.kind === 30023) { onOpenArticle?.(original); return; }
+        if (original.kind === 30311) { onOpenStream?.(original); return; }
         onOpenThread?.(original);
       }}>
       <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--text-faint)", marginBottom: 8, paddingLeft: 2 }}>
@@ -86,6 +114,14 @@ export default function RepostCard({
         </div>
             {(original.kind === 31922 || original.kind === 31923)
               ? <CalendarInlineCard event={original} onOpen={onOpenCalendarEvent ?? onOpenThread} />
+              : original.kind === 30023
+              ? <LongformInlineCard event={original} onOpen={onOpenArticle ?? onOpenThread} />
+              : original.kind === 30311
+              ? <StreamInlineCard event={original} onOpen={onOpenStream ?? onOpenThread} />
+              : original.kind === 9735
+              ? <PodcastZapInlineCard event={original} profiles={profiles} onOpenProfile={onOpenProfile} onOpenStream={onOpenStream} />
+              : original.kind === 9802
+              ? <HighlightInlineCard event={original} profiles={profiles} onOpenThread={onOpenThread} onOpenArticle={onOpenArticle} resolveEventById={resolveEventById} />
               : <NoteContent
                   content={original.content}
                   tags={original.tags}
@@ -114,20 +150,22 @@ export default function RepostCard({
                 onOpenVotes={onOpenPollVotes}
               />
             )}
-            <NoteActions
-              event={original} profiles={profiles}
-              myPubkey={myPubkey} myProfile={myProfile} events={events}
-              onOpenThread={onOpenThread} onOpenZaps={onOpenZaps}
-              onOpenReactions={onOpenReactions} onOpenReposts={onOpenReposts}
-              onPublish={onPublish} publishEvent={publishEvent} onPrepend={onPrepend}
-              onBookmark={onBookmark} isBookmarked={isBookmarked}
-              getLocalZaps={getLocalZaps} addLocalZap={addLocalZap}
-              getLocalReactions={getLocalReactions} setLocalReaction={setLocalReaction}
-              onRequestModal={onRequestModal} onDismissModal={onDismissModal}
-              sendZap={sendZap} defaultZapAmount={defaultZapAmount}
-              defaultZapMsg={defaultZapMsg} onZapFail={onZapFail}
-              customEmojis={customEmojis}
-            />
+            {original.kind !== 9735 && (
+              <NoteActions
+                event={original} profiles={profiles}
+                myPubkey={myPubkey} myProfile={myProfile} events={events}
+                onOpenThread={onOpenThread} onOpenZaps={onOpenZaps}
+                onOpenReactions={onOpenReactions} onOpenReposts={onOpenReposts}
+                onPublish={onPublish} publishEvent={publishEvent} onPrepend={onPrepend}
+                onBookmark={onBookmark} isBookmarked={isBookmarked}
+                getLocalZaps={getLocalZaps} addLocalZap={addLocalZap}
+                getLocalReactions={getLocalReactions} setLocalReaction={setLocalReaction}
+                onRequestModal={onRequestModal} onDismissModal={onDismissModal}
+                sendZap={sendZap} defaultZapAmount={defaultZapAmount}
+                defaultZapMsg={defaultZapMsg} onZapFail={onZapFail}
+                customEmojis={customEmojis}
+              />
+            )}
         </>
       ) : (
         <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, color: "var(--text-faint)", padding: "4px 0" }}>
