@@ -79,6 +79,7 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
     let latestEvent = null;
     let knownCreatedAt = cached?.created_at ?? 0;
     let processTimer = null;
+    let bgRetryCount = 0;
 
     const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
 
@@ -97,14 +98,35 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
         }
       }
       if (cancelled || generation !== gen) return;
+      let decryptFailed = false;
       if (content && (hasNip44() || hasNip04())) {
-        const plain = await decryptListContent(ev.pubkey, content);
+        let plain = null;
+        // A signer can transiently fail/timeout under concurrent load (e.g. other
+        // components decrypting at the same time) — retry before giving up.
+        for (let attempt = 0; attempt < 4 && !plain; attempt++) {
+          if (attempt > 0) await new Promise(r => setTimeout(r, 700 * attempt));
+          if (cancelled || generation !== gen) return;
+          plain = await decryptListContent(ev.pubkey, content);
+        }
         if (plain) {
           try {
             const parsed = JSON.parse(plain);
             if (Array.isArray(parsed)) decrypted = parsed;
           } catch {}
+        } else {
+          decryptFailed = true;
         }
+      }
+      if (decryptFailed) {
+        // Don't let a failed decrypt clobber a known-good list with an empty one —
+        // keep whatever's already showing (cache or prior state). Self-heal with a
+        // couple of delayed background retries instead of requiring a manual refresh.
+        settledRef.current = true;
+        if (!cancelled && bgRetryCount < 2) {
+          bgRetryCount++;
+          setTimeout(() => { if (!cancelled) process(); }, 5000);
+        }
+        return;
       }
       if (!cancelled && generation === gen) {
         const merged = mergeBookmarkTags(decrypted, ev.tags);
