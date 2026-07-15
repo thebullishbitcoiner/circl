@@ -120,19 +120,27 @@ export default function NoteText({ content, profiles, onOpenProfile, onOpenHasht
 
     } else if (/^https?:\/\//i.test(part)) {
       const href = trimUrlToken(part);
+      const trailing = part.slice(href.length);
       elements.push(
-        <a key={i} className="note-link" href={href} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-          {href.replace(/^https?:\/\//, "")}
-        </a>
+        <Fragment key={i}>
+          <a className="note-link" href={href} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+            {href.replace(/^https?:\/\//, "")}
+          </a>
+          {trailing}
+        </Fragment>
       );
       prevWasDecodedNostr = false;
 
     } else if (BARE_URL_RE.test(part)) {
       const display = trimUrlToken(part);
+      const trailing = part.slice(display.length);
       elements.push(
-        <a key={i} className="note-link" href={`https://${display}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-          {display}
-        </a>
+        <Fragment key={i}>
+          <a className="note-link" href={`https://${display}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+            {display}
+          </a>
+          {trailing}
+        </Fragment>
       );
       prevWasDecodedNostr = false;
 
