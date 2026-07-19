@@ -5,7 +5,7 @@ import { useNavigation } from "../context/NavigationContext.jsx";
 import NoteDetailsModal from "./NoteDetailsModal.jsx";
 
 export default function NoteContextMenu({ event, onClose, onViewJson, publishEvent, onDeleted }) {
-  const { isMuted, onMuteUser, onUnmuteUser, myPubkey, onTogglePin, isPinned } = useNavigation();
+  const { isMuted, onMuteUser, onUnmuteUser, myPubkey, onTogglePin, isPinned, mutedThreads, onMuteThread, onUnmuteThread } = useNavigation();
   const menuRef = useRef(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
@@ -44,6 +44,18 @@ export default function NoteContextMenu({ event, onClose, onViewJson, publishEve
     onClose();
   };
 
+  // NIP-51 mute lists store the thread *root* id — resolve it from the NIP-10
+  // root marker so muting from any reply silences the whole thread.
+  const threadRootId = event.tags?.find(t => t[0] === "e" && t[3] === "root")?.[1] ?? event.id;
+  const threadMuted = mutedThreads?.includes(threadRootId);
+  const canMuteThread = [1, 1111, 1244].includes(event.kind) && !!(onMuteThread || onUnmuteThread);
+
+  const handleMuteThread = () => {
+    if (threadMuted) onUnmuteThread?.(threadRootId);
+    else onMuteThread?.(threadRootId);
+    onClose();
+  };
+
   const handleRequestDelete = async () => {
     if (!publishEvent) return;
     onClose();
@@ -70,6 +82,11 @@ export default function NoteContextMenu({ event, onClose, onViewJson, publishEve
       {!isOwnNote && (
         <button type="button" className="note-card-menu-item note-card-menu-item--danger" onClick={handleMute}>
           {authorMuted ? "Unmute User" : "Mute User"}
+        </button>
+      )}
+      {canMuteThread && (
+        <button type="button" className="note-card-menu-item note-card-menu-item--danger" onClick={handleMuteThread}>
+          {threadMuted ? "Unmute Thread" : "Mute Thread"}
         </button>
       )}
       {isOwnNote && event.kind === 1 && onTogglePin && (

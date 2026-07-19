@@ -45,6 +45,18 @@ export default function FeedItem({
   if (muteReason) {
     return (
       <div className="note-card" style={{ animationDelay: `${delay}s` }}>
+        {event.kind === 6 ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--text-faint)", marginBottom: 4, paddingLeft: 2 }}>
+            <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
+              <polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" />
+              <polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" />
+            </svg>
+            <span style={{ cursor: "pointer", fontWeight: 500 }} onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }}>
+              {displayName(event.pubkey, profiles)}
+            </span>
+            &nbsp;reposted
+          </div>
+        ) : (
         <div className="note-header">
           <div style={{ flexShrink: 0, cursor: "pointer" }} onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }}>
             <Avatar pk={event.pubkey} profiles={profiles} size={36} />
@@ -61,9 +73,10 @@ export default function FeedItem({
             <span /><span /><span />
           </button>
         </div>
+        )}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0 6px" }}>
           <span style={{ fontSize: 13, color: "var(--text-muted)", fontFamily: "'DM Sans', sans-serif" }}>
-            {muteReason === "user" ? "Muted user" : <>Muted · <span style={{ color: "var(--text-faint)" }}>{muteReason}</span></>}
+            {muteReason === "user" ? "Muted user" : muteReason === "thread" ? "Muted thread" : <>Muted · <span style={{ color: "var(--text-faint)" }}>{muteReason}</span></>}
           </span>
           <button
             type="button"

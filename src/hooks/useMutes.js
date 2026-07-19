@@ -277,10 +277,18 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
           if (lower.includes(word)) return word;
         }
       }
+      // Checked last so hashtag/word reasons win — callers that skip the
+      // thread reason (e.g. ThreadView) still gate on the more specific ones
+      if (threadsRef.current.length > 0) {
+        if (threadsRef.current.includes(event.id)) return "thread";
+        for (const t of event.tags || []) {
+          if (t[0] === "e" && t[1] && t[3] !== "mention" && threadsRef.current.includes(t[1])) return "thread";
+        }
+      }
       return null;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [hashtags, words]
+    [hashtags, words, threads]
   );
 
   const toggleMute = useCallback(
@@ -303,6 +311,17 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
     catch (e) { hashtagsRef.current = prev; setHashtags(prev); throw e; }
   }, [persistAll]);
 
+  const muteThread = useCallback(async eventId => {
+    const norm = (eventId || "").toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(norm)) throw new Error("Invalid thread id");
+    const prev = threadsRef.current;
+    if (prev.includes(norm)) return;
+    const next = [...prev, norm];
+    threadsRef.current = next; setThreads(next);
+    try { await persistAll(mutesRef.current, hashtagsRef.current, wordsRef.current, next); }
+    catch (e) { threadsRef.current = prev; setThreads(prev); throw e; }
+  }, [persistAll]);
+
   const muteWord = useCallback(async word => {
     const norm = word.toLowerCase().trim();
     if (!norm) return;
@@ -316,7 +335,7 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
 
   return {
     mutes, hashtags, words, threads,
-    muteEvent, mute, unmute, muteHashtag, muteWord, unmuteHashtag, unmuteWord, unmuteThread,
+    muteEvent, mute, unmute, muteHashtag, muteWord, muteThread, unmuteHashtag, unmuteWord, unmuteThread,
     isMuted, isContentMuted, toggleMute,
   };
 }

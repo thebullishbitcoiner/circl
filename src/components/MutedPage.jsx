@@ -1,8 +1,9 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import Avatar from "./Avatar.jsx";
 import useSearchRelays from "../hooks/useSearchRelays.js";
+import useProfiles from "../hooks/useProfiles.js";
 import { pool, eventStore } from "../nostr.js";
-import { displayName, shortNpub, normPubkey, isHexPubkey, truncNpub } from "../utils.js";
+import { displayName, shortNpub, normPubkey, isHexPubkey, truncNpub, relativeTime } from "../utils.js";
 
 const TABS = [
   { id: "users",    label: "Users" },
@@ -79,7 +80,7 @@ export default function MutedPage({
   mutes = [], hashtags = [], words = [], threads = [],
   profiles,
   onUnmute, onMuteUser, onMuteHashtag, onUnmuteHashtag, onMuteWord, onUnmuteWord, onUnmuteThread,
-  onOpenProfile,
+  onOpenProfile, onOpenThread, resolveEventById,
 }) {
   const [tab, setTab] = useState("users");
   const [hashtagInput, setHashtagInput] = useState("");
@@ -175,6 +176,28 @@ export default function MutedPage({
     userAbortRef.current?.abort();
     userSubRef.current?.unsubscribe();
   }, []);
+
+  // Resolve muted thread root ids into events for the preview rows
+  const [threadEvents, setThreadEvents] = useState({});
+  useEffect(() => {
+    if (!resolveEventById) return;
+    let cancelled = false;
+    for (const id of threads) {
+      if (id in threadEvents) continue;
+      resolveEventById(id).then(ev => {
+        if (!cancelled) setThreadEvents(prev => (id in prev ? prev : { ...prev, [id]: ev ?? null }));
+      });
+    }
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threads, resolveEventById]);
+
+  const threadAuthorPks = useMemo(
+    () => [...new Set(Object.values(threadEvents).filter(Boolean).map(e => e.pubkey))],
+    [threadEvents]
+  );
+  const { profiles: threadProfiles } = useProfiles({ pubkeys: threadAuthorPks });
+  const mergedProfiles = useMemo(() => ({ ...profiles, ...threadProfiles }), [profiles, threadProfiles]);
 
   const submitHashtag = () => {
     const val = hashtagInput.trim().replace(/^#/, "");
@@ -360,16 +383,39 @@ export default function MutedPage({
           </div>
         ) : (
           <div>
-            {threads.map(id => (
-              <div key={id} className="list-row" style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px" }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ fontFamily: "monospace", fontSize: 12, color: "var(--text-muted)", wordBreak: "break-all" }}>{id}</span>
+            {threads.map(id => {
+              const ev = threadEvents[id];
+              return (
+                <div key={id} className="list-row" style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px" }}>
+                  {ev ? (
+                    <>
+                      <div style={{ flexShrink: 0, alignSelf: "flex-start", cursor: "pointer" }} onClick={() => onOpenThread?.(ev)}>
+                        <Avatar pk={ev.pubkey} profiles={mergedProfiles} size={40} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => onOpenThread?.(ev)}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                          <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "var(--font-base)", fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayName(ev.pubkey, mergedProfiles)}</span>
+                          <span style={{ flexShrink: 0, fontFamily: "'DM Sans',sans-serif", fontSize: 11, color: "var(--text-faint)" }}>{relativeTime(ev.created_at)}</span>
+                        </div>
+                        <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "calc(var(--font-base) - 1px)", color: "var(--text-muted)", marginTop: 2, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", wordBreak: "break-word" }}>
+                          {(ev.content || "").trim() || "(no text)"}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontFamily: "monospace", fontSize: 12, color: "var(--text-muted)", wordBreak: "break-all" }}>{id}</span>
+                      {ev !== null && (
+                        <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 11, color: "var(--text-faint)", marginTop: 2 }}>Loading note…</div>
+                      )}
+                    </div>
+                  )}
+                  <button type="button" className="profile-follow-btn" style={{ flexShrink: 0 }} onClick={() => onUnmuteThread?.(id)}>
+                    Unmute
+                  </button>
                 </div>
-                <button type="button" className="profile-follow-btn" style={{ flexShrink: 0 }} onClick={() => onUnmuteThread?.(id)}>
-                  Unmute
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )
       )}

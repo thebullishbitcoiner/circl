@@ -137,7 +137,7 @@ export default function App() {
   const [bookmarkRefreshKey, setBookmarkRefreshKey] = useState(0);
   const { toggle: toggleBm, isBookmarked, bookmarkItems } = useBookmarks({ pubkey, signAndPublish, refreshKey: bookmarkRefreshKey });
   const { togglePin, isPinned, pinnedIds } = usePinnedNotes({ pubkey, signAndPublish });
-  const { mutes, hashtags: mutedHashtags, words: mutedWords, threads: mutedThreads, muteEvent, mute: muteUser, unmute: unmuteUser, muteHashtag, muteWord, unmuteHashtag, unmuteWord, unmuteThread, isMuted, isContentMuted } = useMutes({ pubkey, signAndPublish });
+  const { mutes, hashtags: mutedHashtags, words: mutedWords, threads: mutedThreads, muteEvent, mute: muteUser, unmute: unmuteUser, muteHashtag, muteWord, muteThread, unmuteHashtag, unmuteWord, unmuteThread, isMuted, isContentMuted } = useMutes({ pubkey, signAndPublish });
   const { circles, createCircle, renameCircle, deleteCircle, addMember: addCircleMember, removeMember: removeCircleMember } = useCircles({ pubkey, signAndPublish });
   const { emojis: customEmojis, sets: customEmojiSets, allCustomEmojis, addEmoji, removeEmoji, addSet: addEmojiSet, removeSet: removeEmojiSet, loading: customEmojiLoading } = useCustomEmojiList({ pubkey, signAndPublish });
   const { servers: blossomServers, saveServers: saveBlossomServers } = useBlossomServers({ pubkey, signAndPublish });
@@ -471,6 +471,15 @@ export default function App() {
     }
   };
 
+  const handleMuteThread = async id => {
+    try {
+      await muteThread(id);
+      showToast("Thread muted");
+    } catch (e) {
+      showToast(e?.message || "Could not update mute list");
+    }
+  };
+
   const handleUnmuteThread = async id => {
     try {
       await unmuteThread(id);
@@ -494,7 +503,12 @@ export default function App() {
     setFloatingCompose(true);
   };
 
-  const hasUnread = (notificationEvents[0]?.created_at ?? 0) > lastNotifSeenAt;
+  const visibleNotifications = useMemo(
+    () => notificationEvents.filter(e => !isMuted(e.pubkey) && !isContentMuted(e)),
+    [notificationEvents, isMuted, isContentMuted]
+  );
+
+  const hasUnread = (visibleNotifications[0]?.created_at ?? 0) > lastNotifSeenAt;
 
   const navigate = nav => {
     if (nav === activeNav && !settingsOpen && navStack.length === 0) {
@@ -566,6 +580,9 @@ export default function App() {
       isContentMuted,
       onMuteUser: handleMuteUser,
       onUnmuteUser: handleUnmuteUser,
+      mutedThreads,
+      onMuteThread: handleMuteThread,
+      onUnmuteThread: handleUnmuteThread,
       myPubkey: pubkey,
       mutes,
       onTogglePin: handleTogglePin,
@@ -733,13 +750,13 @@ export default function App() {
                     : (
                       <>
                         <NotificationsFeed
-                          items={notificationEvents.filter(e => !isMuted(e.pubkey) && !isContentMuted(e)).slice(0, visibleCount)}
+                          items={visibleNotifications.slice(0, visibleCount)}
                           profiles={profiles}
                           onOpenProfile={handleOpenProfile}
                           onOpenNotification={handleOpenNotification}
                           allEvents={mergedFeedPool}
                         />
-                        {visibleCount < notificationEvents.filter(e => !isMuted(e.pubkey) && !isContentMuted(e)).length && (
+                        {visibleCount < visibleNotifications.length && (
                           <div style={{ padding: "20px", textAlign: "center" }}>
                             <div style={{ width: 20, height: 20, border: "2px solid var(--border)", borderTopColor: "var(--primary)", borderRadius: "50%", animation: "spin .7s linear infinite", margin: "0 auto" }} />
                           </div>
@@ -872,6 +889,8 @@ export default function App() {
                           onUnmuteWord={handleUnmuteWord}
                           onUnmuteThread={handleUnmuteThread}
                           onOpenProfile={handleOpenProfile}
+                          onOpenThread={handleOpenThread}
+                          resolveEventById={resolveEventById}
                         />
                       </div>
                     );
@@ -1017,6 +1036,8 @@ export default function App() {
                         onUnmuteWord={handleUnmuteWord}
                         onUnmuteThread={handleUnmuteThread}
                         onOpenProfile={handleOpenProfile}
+                        onOpenThread={handleOpenThread}
+                        resolveEventById={resolveEventById}
                       />
                     );
                   }
