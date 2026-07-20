@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { isHexPubkey, normPubkey } from "../utils.js";
-import { pool, eventStore } from "../nostr.js";
-import { DEFAULT_RELAYS } from "../constants.js";
+import { pool, eventStore, relayUrls$ } from "../nostr.js";
 
 const CIRCLE_KIND = 30000;
 const CACHE_KEY = "circl_circles";
@@ -67,8 +66,6 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
     else setCircles([]);
 
     let processTimer = null;
-
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
 
     const process = async () => {
       if (cancelled || Object.keys(byId).length === 0) return;
@@ -140,7 +137,7 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
       return true;
     };
 
-    const sub = pool.subscription(relayUrls, [{ kinds: [CIRCLE_KIND], authors: [pk] }]).subscribe({
+    const sub = pool.group(relayUrls$, false).subscription([{ kinds: [CIRCLE_KIND], authors: [pk] }]).subscribe({
       next: raw => {
         eventStore.add(raw);
         if (!cancelled && ingestRaw(raw)) {

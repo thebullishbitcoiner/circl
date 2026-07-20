@@ -171,14 +171,17 @@ export const replyCount = (eventId, pool) =>
     directReplyParentId(e) === eventId
   ).length;
 
-export const repostAndQuoteCount = (eventId, pool) => {
-  const kind6  = pool.filter(e =>
-    e.kind === 6 && e.tags.some(t => t[0] === "e" && t[1] === eventId)
-  ).length;
-  const quotes = pool.filter(e =>
-    e.kind === 1 && e.id !== eventId && e.tags.some(t => t[0] === "q" && t[1] === eventId)
-  ).length;
-  return kind6 + quotes;
+// localReposts is an optional list of {id} backfilled out-of-band (e.g. from
+// reposts/quotes by authors outside the feed pool) — merged in by event id so
+// anything already found in `pool` isn't double-counted.
+export const repostAndQuoteCount = (eventId, pool, localReposts = []) => {
+  const ids = new Set();
+  for (const e of pool) {
+    if (e.kind === 6 && e.tags.some(t => t[0] === "e" && t[1] === eventId)) ids.add(e.id);
+    else if (e.kind === 1 && e.id !== eventId && e.tags.some(t => t[0] === "q" && t[1] === eventId)) ids.add(e.id);
+  }
+  for (const r of localReposts) if (r?.id) ids.add(r.id);
+  return ids.size;
 };
 
 /** Thread root note id for `replyTo` (walks parents in `pool` when markers are missing). */

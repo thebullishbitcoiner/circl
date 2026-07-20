@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { isHexPubkey, normPubkey } from "../utils.js";
-import { pool, eventStore } from "../nostr.js";
-import { DEFAULT_RELAYS } from "../constants.js";
+import { pool, eventStore, relayUrls$ } from "../nostr.js";
 
 export default function useFollows({ pubkey, signAndPublish }) {
   const [follows, setFollows] = useState([]);
@@ -15,10 +14,9 @@ export default function useFollows({ pubkey, signAndPublish }) {
     if (!isHexPubkey(pubkey)) return;
     setLoading(true);
 
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     let latest = { created_at: 0 };
 
-    const sub = pool.request(relayUrls, [{ kinds: [3], authors: [pubkey], limit: 1 }]).subscribe({
+    const sub = pool.group(relayUrls$, false).request([{ kinds: [3], authors: [pubkey], limit: 1 }]).subscribe({
       next: raw => {
         eventStore.add(raw);
         if ((raw.created_at || 0) <= (latest.created_at || 0)) return;

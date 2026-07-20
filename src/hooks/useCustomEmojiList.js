@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { isHexPubkey, normPubkey } from "../utils.js";
-import { pool, eventStore } from "../nostr.js";
-import { DEFAULT_RELAYS } from "../constants.js";
+import { pool, eventStore, relayUrls$ } from "../nostr.js";
 
 const EMOJI_LIST_KIND = 10030;
 const EMOJI_SET_KIND  = 30030;
@@ -37,103 +36,135 @@ export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
     setEmojis([]);
     setSets([]);
 
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
-    const received  = [];
+    const received = [];
+    let listSettled = false;
+    let cleanupSetSub = null;
+    // Declared before subscribing (and accessed only via optional chaining)
+    // so finishList() can't hit a not-yet-initialized reference in the
+    // unlikely case a relay group completes synchronously.
+    let listSub = null;
+    let listCutoff = null;
 
-    const sub = pool.request(relayUrls, [{ kinds: [EMOJI_LIST_KIND], authors: [pk] }]).subscribe({
+    // pool.group(relayUrls$, false) bypasses ignoreOffline (so relays still
+    // mid-handshake right after login aren't silently skipped) and
+    // re-queries automatically as more relays connect.
+    listSub = pool.group(relayUrls$, false).request([{ kinds: [EMOJI_LIST_KIND], authors: [pk] }]).subscribe({
       next: raw => { eventStore.add(raw); received.push(raw); },
-      complete: async () => {
-        if (cancelled) return;
-
-        // pick latest event
-        let latest = null;
-        for (const ev of received) {
-          if (!latest || ev.created_at > latest.created_at) latest = ev;
-        }
-
-        if (!latest) { settledRef.current = true; setLoading(false); return; }
-
-        // New format: tags are NIP-44 encrypted into content. Legacy events (published
-        // before encryption was added) carry plaintext tags with empty content.
-        let tags = latest.tags || [];
-        const content = (latest.content || "").trim();
-        if (content) {
-          if (!hasNip44()) {
-            // Signer may not be injected yet (common on mobile) — wait up to 3s
-            for (let i = 0; i < 6; i++) {
-              await new Promise(r => setTimeout(r, 500));
-              if (cancelled || hasNip44()) break;
-            }
-          }
-          if (cancelled) return;
-          if (hasNip44()) {
-            try {
-              const plain = await window.nostr.nip44.decrypt(latest.pubkey, latest.content);
-              const parsed = JSON.parse(plain);
-              if (Array.isArray(parsed)) tags = parsed;
-            } catch { /* leave tags empty on decrypt failure */ }
-          }
-        }
-
-        // individual emojis
-        const parsedEmojis = tags
-          .filter(t => t[0] === "emoji" && t[1] && t[2])
-          .map(t => ({ name: t[1], url: t[2] }));
-
-        // bookmarked set a-tags: "30030:<pubkey>:<d>"
-        const aTags = tags
-          .filter(t => t[0] === "a" && typeof t[1] === "string" && t[1].startsWith(`${EMOJI_SET_KIND}:`))
-          .map(t => t[1]);
-
-        if (!cancelled) setEmojis(parsedEmojis);
-
-        if (aTags.length === 0) {
-          if (!cancelled) { setSets([]); settledRef.current = true; setLoading(false); }
-          return;
-        }
-
-        // fetch the actual set events
-        const setFilters = aTags.map(aTag => {
-          const parts = aTag.split(":");
-          return { kinds: [EMOJI_SET_KIND], authors: [parts[1]], "#d": [parts[2]] };
-        });
-
-        const setEvents = [];
-        const setSub = pool.request(relayUrls, setFilters).subscribe({
-          next: raw => { eventStore.add(raw); setEvents.push(raw); },
-          complete: () => {
-            if (cancelled) return;
-            const resolved = aTags.map(aTag => {
-              const parts = aTag.split(":");
-              const setpk = parts[1], dTag = parts[2];
-              const candidates = setEvents.filter(ev =>
-                ev.pubkey === setpk && ev.tags?.find(t => t[0] === "d" && t[1] === dTag)
-              );
-              const ev = candidates.reduce((best, cur) =>
-                (!best || cur.created_at > best.created_at) ? cur : best, null
-              );
-              if (!ev) return { aTag, title: dTag, emojis: [] };
-              const title = ev.tags?.find(t => t[0] === "title")?.[1] ?? dTag;
-              const setEmojis = [...new Map(
-                (ev.tags || []).filter(t => t[0] === "emoji" && t[1] && t[2]).map(t => [t[1], { name: t[1], url: t[2] }])
-              ).values()];
-              return { aTag, title, emojis: setEmojis };
-            });
-            if (!cancelled) { setSets(resolved); settledRef.current = true; setLoading(false); }
-          },
-          error: () => { if (!cancelled) { settledRef.current = true; setLoading(false); } },
-        });
-
-        // store cleanup ref so outer cleanup can reach it
-        cleanupSetSub = () => setSub.unsubscribe();
-      },
-      error: () => { if (!cancelled) { settledRef.current = true; setLoading(false); } },
+      complete: () => finishList(),
+      error: () => finishList(),
     });
 
-    let cleanupSetSub = null;
+    // Runs once, on whichever comes first: the request completing (real
+    // EOSE-based answer, possibly empty) or the cutoff timer below. This
+    // hook previously had no cutoff at all, so a request that silently
+    // reached zero relays (e.g. right after login) left `loading` stuck
+    // true forever with no recovery.
+    listCutoff = setTimeout(() => finishList(), 8000);
+
+    async function finishList() {
+      if (cancelled || listSettled) return;
+      listSettled = true;
+      if (listCutoff) clearTimeout(listCutoff);
+      listSub?.unsubscribe();
+
+      // pick latest event
+      let latest = null;
+      for (const ev of received) {
+        if (!latest || ev.created_at > latest.created_at) latest = ev;
+      }
+
+      if (!latest) { settledRef.current = true; setLoading(false); return; }
+
+      // New format: tags are NIP-44 encrypted into content. Legacy events (published
+      // before encryption was added) carry plaintext tags with empty content.
+      let tags = latest.tags || [];
+      const content = (latest.content || "").trim();
+      if (content) {
+        if (!hasNip44()) {
+          // Signer may not be injected yet (common on mobile) — wait up to 3s
+          for (let i = 0; i < 6; i++) {
+            await new Promise(r => setTimeout(r, 500));
+            if (cancelled || hasNip44()) break;
+          }
+        }
+        if (cancelled) return;
+        if (hasNip44()) {
+          try {
+            const plain = await window.nostr.nip44.decrypt(latest.pubkey, latest.content);
+            const parsed = JSON.parse(plain);
+            if (Array.isArray(parsed)) tags = parsed;
+          } catch { /* leave tags empty on decrypt failure */ }
+        }
+      }
+
+      // individual emojis
+      const parsedEmojis = tags
+        .filter(t => t[0] === "emoji" && t[1] && t[2])
+        .map(t => ({ name: t[1], url: t[2] }));
+
+      // bookmarked set a-tags: "30030:<pubkey>:<d>"
+      const aTags = tags
+        .filter(t => t[0] === "a" && typeof t[1] === "string" && t[1].startsWith(`${EMOJI_SET_KIND}:`))
+        .map(t => t[1]);
+
+      if (!cancelled) setEmojis(parsedEmojis);
+
+      if (aTags.length === 0) {
+        if (!cancelled) { setSets([]); settledRef.current = true; setLoading(false); }
+        return;
+      }
+
+      // fetch the actual set events
+      const setFilters = aTags.map(aTag => {
+        const parts = aTag.split(":");
+        return { kinds: [EMOJI_SET_KIND], authors: [parts[1]], "#d": [parts[2]] };
+      });
+
+      const setEvents = [];
+      let setsSettled = false;
+      let setSub = null;
+      let setsCutoff = null;
+
+      setSub = pool.group(relayUrls$, false).request(setFilters).subscribe({
+        next: raw => { eventStore.add(raw); setEvents.push(raw); },
+        complete: () => finishSets(),
+        error: () => finishSets(),
+      });
+      setsCutoff = setTimeout(() => finishSets(), 8000);
+
+      function finishSets() {
+        if (cancelled || setsSettled) return;
+        setsSettled = true;
+        if (setsCutoff) clearTimeout(setsCutoff);
+        setSub?.unsubscribe();
+
+        const resolved = aTags.map(aTag => {
+          const parts = aTag.split(":");
+          const setpk = parts[1], dTag = parts[2];
+          const candidates = setEvents.filter(ev =>
+            ev.pubkey === setpk && ev.tags?.find(t => t[0] === "d" && t[1] === dTag)
+          );
+          const ev = candidates.reduce((best, cur) =>
+            (!best || cur.created_at > best.created_at) ? cur : best, null
+          );
+          if (!ev) return { aTag, title: dTag, emojis: [] };
+          const title = ev.tags?.find(t => t[0] === "title")?.[1] ?? dTag;
+          const setEmojis = [...new Map(
+            (ev.tags || []).filter(t => t[0] === "emoji" && t[1] && t[2]).map(t => [t[1], { name: t[1], url: t[2] }])
+          ).values()];
+          return { aTag, title, emojis: setEmojis };
+        });
+        setSets(resolved); settledRef.current = true; setLoading(false);
+      }
+
+      // store cleanup ref so outer cleanup can reach it
+      cleanupSetSub = () => { if (setsCutoff) clearTimeout(setsCutoff); setSub?.unsubscribe(); };
+    }
+
     return () => {
       cancelled = true;
-      sub.unsubscribe();
+      if (listCutoff) clearTimeout(listCutoff);
+      listSub?.unsubscribe();
       cleanupSetSub?.();
     };
   }, [pubkey]);

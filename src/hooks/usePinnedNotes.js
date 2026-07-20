@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { isHexPubkey, normPubkey } from "../utils.js";
-import { pool, eventStore } from "../nostr.js";
-import { DEFAULT_RELAYS } from "../constants.js";
+import { pool, eventStore, relayUrls$ } from "../nostr.js";
 
 const PIN_LIST_KIND = 10001;
 const CACHE_KEY = "circl_pins";
@@ -45,8 +44,6 @@ export default function usePinnedNotes({ pubkey, signAndPublish } = {}) {
     let knownCreatedAt = cached?.created_at ?? 0;
     let processTimer = null;
 
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
-
     const process = () => {
       if (cancelled || !latestEvent) return;
       const gen = ++generation;
@@ -61,7 +58,7 @@ export default function usePinnedNotes({ pubkey, signAndPublish } = {}) {
       }
     };
 
-    const sub = pool.subscription(relayUrls, [{ kinds: [PIN_LIST_KIND], authors: [pk] }]).subscribe({
+    const sub = pool.group(relayUrls$, false).subscription([{ kinds: [PIN_LIST_KIND], authors: [pk] }]).subscribe({
       next: raw => {
         eventStore.add(raw);
         if (!cancelled && raw.created_at > Math.max(knownCreatedAt, latestEvent?.created_at ?? 0)) {

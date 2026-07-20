@@ -2,7 +2,7 @@ import { EventStore } from "applesauce-core";
 import { normalizeURL } from "applesauce-core/helpers/url";
 import { RelayPool } from "applesauce-relay";
 import { createEventLoader } from "applesauce-loaders/loaders";
-import { BehaviorSubject } from "rxjs";
+import { BehaviorSubject, isObservable, map } from "rxjs";
 import { DEFAULT_RELAYS } from "./constants.js";
 
 export const eventStore = new EventStore();
@@ -36,8 +36,11 @@ export function setBlockedRelayUrls(urls) {
   }
 }
 
-const excludeBlocked = urls =>
-  Array.isArray(urls) ? urls.filter(u => !blockedRelayUrls.has(safeNormalize(u))) : urls;
+const excludeBlocked = urls => {
+  if (Array.isArray(urls)) return urls.filter(u => !blockedRelayUrls.has(safeNormalize(u)));
+  if (isObservable(urls)) return urls.pipe(map(list => list.filter(u => !blockedRelayUrls.has(safeNormalize(u)))));
+  return urls;
+};
 
 const _relay = pool.relay.bind(pool);
 pool.relay = url => (blockedRelayUrls.has(safeNormalize(url)) ? undefined : _relay(url));
@@ -153,6 +156,17 @@ export function publishWithStatus(relays, event) {
     error: () => clearTimeout(timer),
   });
 }
+
+// ── Reactive relay list ─────────────────────────────────────────────────────
+// Live view of the pool's connected relays (falling back to DEFAULT_RELAYS
+// when empty) that grows as outbox/private relays are discovered after
+// login. Pass this — instead of a one-time array snapshot — to
+// pool.group(relayUrls$, false) so a query fired right after login keeps
+// reaching newly-added relays instead of being pinned to whatever existed
+// at mount time.
+export const relayUrls$ = pool.relays$.pipe(
+  map(m => (m.size > 0 ? [...m.keys()] : DEFAULT_RELAYS))
+);
 
 // ── Event loader ────────────────────────────────────────────────────────────
 // Uses pool.group(relays, false) to bypass the ignoreOffline=true default so

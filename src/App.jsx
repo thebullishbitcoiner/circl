@@ -89,6 +89,7 @@ export default function App() {
   const [likes, setLikes] = useState({});
   const [zapsByEvent, setZapsByEvent] = useState({});
   const [reactionsByEvent, setReactionsByEvent] = useState({});
+  const [repostsByEvent, setRepostsByEvent] = useState({});
 
   const getLocalZaps = useCallback(
     eventId => zapsByEvent[eventId] ?? [],
@@ -128,10 +129,23 @@ export default function App() {
     });
   }, []);
 
+  const getLocalReposts = useCallback(
+    eventId => repostsByEvent[eventId] ?? [],
+    [repostsByEvent]
+  );
+  const addLocalRepost = useCallback((eventId, repost) => {
+    setRepostsByEvent(prev => {
+      const current = prev[eventId] ?? [];
+      if (repost.id && current.some(r => r.id === repost.id)) return prev;
+      return { ...prev, [eventId]: [...current, repost] };
+    });
+  }, []);
+
   const { events, loading: el, prependEvent, isDeleted } = useFeed({
     follows,
     setLocalReaction,
     addLocalZap,
+    addLocalRepost,
   });
   const { items: notificationEvents, loading: notifLoading } = useNotifications({ pubkey });
   const [bookmarkRefreshKey, setBookmarkRefreshKey] = useState(0);
@@ -723,6 +737,7 @@ export default function App() {
                                 addLocalZap={addLocalZap}
                                 getLocalReactions={getLocalReactions}
                                 setLocalReaction={setLocalReaction}
+                                getLocalReposts={getLocalReposts}
                                 sendZap={sendZap}
                                 defaultZapAmount={zapSettings.amount}
                                 defaultZapMsg={zapSettings.msg}

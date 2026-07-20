@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { isHexPubkey, hasNip44, hasNip04, decryptListContent } from "../utils.js";
-import { pool, eventStore } from "../nostr.js";
-import { DEFAULT_RELAYS } from "../constants.js";
+import { pool, eventStore, relayUrls$ } from "../nostr.js";
 
 // Reads a NIP-51 "standard list" of relays for the given kind (10007 search,
 // 10006 blocked, 10013 private, ...). Public entries live as ["relay", url]
@@ -21,8 +20,6 @@ export default function useRelayList(pubkey, kind) {
     let generation = 0;
     let latestEvent = null;
     let processTimer = null;
-
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
 
     const process = async () => {
       if (cancelled || !latestEvent) return;
@@ -69,7 +66,7 @@ export default function useRelayList(pubkey, kind) {
       if (!cancelled && generation === gen) setRelays(all);
     };
 
-    const sub = pool.subscription(relayUrls, [{ kinds: [kind], authors: [pubkey] }]).subscribe({
+    const sub = pool.group(relayUrls$, false).subscription([{ kinds: [kind], authors: [pubkey] }]).subscribe({
       next: raw => {
         eventStore.add(raw);
         if (!cancelled && raw.created_at > (latestEvent?.created_at ?? 0)) {

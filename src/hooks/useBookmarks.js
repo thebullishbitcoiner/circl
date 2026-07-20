@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { isHexPubkey, normPubkey, hasNip44, hasNip04, decryptListContent } from "../utils.js";
-import { pool, eventStore } from "../nostr.js";
-import { DEFAULT_RELAYS } from "../constants.js";
+import { pool, eventStore, relayUrls$ } from "../nostr.js";
 
 const BOOKMARK_LIST_KIND = 10003;
 const CACHE_KEY = "circl_bookmarks";
@@ -81,8 +80,6 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
     let processTimer = null;
     let bgRetryCount = 0;
 
-    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
-
     const process = async () => {
       if (cancelled || !latestEvent) return;
       const gen = ++generation;
@@ -142,7 +139,7 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
       }
     };
 
-    const sub = pool.subscription(relayUrls, [{ kinds: [BOOKMARK_LIST_KIND], authors: [pk] }]).subscribe({
+    const sub = pool.group(relayUrls$, false).subscription([{ kinds: [BOOKMARK_LIST_KIND], authors: [pk] }]).subscribe({
       next: raw => {
         eventStore.add(raw);
         if (!cancelled && raw.created_at > Math.max(knownCreatedAt, latestEvent?.created_at ?? 0)) {
