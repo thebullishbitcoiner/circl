@@ -5,14 +5,17 @@ import { useDraftsContext } from "../contexts/DraftsContext.jsx";
 import Overlay from "./Overlay.jsx";
 import { sheetPortal } from "../utils/sheetPortal.js";
 import Avatar from "./Avatar.jsx";
-import { displayName, avatarInitial, replyTagsForPublish, kind1111TagsForPublish, nip19 } from "../utils.js";
-import { GIPHY_KEY, DEFAULT_RELAYS } from "../constants.js";
+import { displayName, avatarInitial, replyTagsForPublish, kind1111TagsForPublish, extractContentTags, nip19 } from "../utils.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 import { broadcastEvent, pool } from "../nostr.js";
 import EmojiPicker from "./EmojiPicker.jsx";
 import PollCompose from "./PollCompose.jsx";
 import GoalCompose from "./GoalCompose.jsx";
-import { uploadToBlossom } from "../utils/blossom.js";
+import ThreadCompose, { makeThreadPost } from "./ThreadCompose.jsx";
+import { uploadFile } from "../utils/upload.js";
 import { VoiceRecorderBody } from "./VoiceRecorderSheet.jsx";
+import useRichTextEditor from "../hooks/useRichTextEditor.js";
+import useGifPicker from "../hooks/useGifPicker.js";
 
 const TAGGING_FONT = "12.5px 'DM Sans', sans-serif";
 let _measureCanvas = null;
@@ -60,14 +63,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   const [uploading,      setUploading]      = useState(false);
   const [uploadErr,      setUploadErr]      = useState("");
   const [publishing,     setPublishing]     = useState(false);
-  const [showGif,        setShowGif]        = useState(false);
-  const [gifQuery,       setGifQuery]       = useState("");
-  const [gifs,           setGifs]           = useState([]);
-  const [gifLoading,     setGifLoading]     = useState(false);
-  const [gifError,       setGifError]       = useState("");
   const [showEmoji,      setShowEmoji]      = useState(false);
-  const [mentionResults, setMentionResults] = useState([]);
-  const [mentionIndex,   setMentionIndex]   = useState(0);
   const [pollMode,       setPollMode]       = useState(false);
   const [pollType,       setPollType]       = useState("standard");
   const [pollOptions,    setPollOptions]    = useState(["", ""]);
@@ -84,16 +80,27 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   const [selectedCircle,  setSelectedCircle]  = useState(initialCircle);
   const [showCirclePicker, setShowCirclePicker] = useState(false);
   const [emojiTags,       setEmojiTags]       = useState([]);
-  const [isDragOver,      setIsDragOver]      = useState(false);
   const [excludedMentions, setExcludedMentions] = useState(new Set());
   const [showTagList,      setShowTagList]      = useState(false);
   const [activeTab, setActiveTab]   = useState(() => (replyTo?.kind === 1222 || replyTo?.kind === 1244) ? "voice" : "text");
   const [voicePhase, setVoicePhase] = useState("idle");
   const [voiceMode,  setVoiceMode]  = useState(false);
+  const [threadMode,          setThreadMode]          = useState(false);
+  const [threadPosts,         setThreadPosts]         = useState(() => [makeThreadPost()]);
+  const [threadPublishedCount, setThreadPublishedCount] = useState(0);
   const fileRef        = useRef(null);
-  const editorRef      = useRef(null);
   const publishingRef  = useRef(false);
   const voiceSendRef   = useRef(null);
+  const threadLastPublishedRef = useRef(null);
+
+  const richText = useRichTextEditor({
+    profiles, myPubkey,
+    onTextChange: text => setHasText(text.trim().length > 0),
+    onFilesDropped: files => uploadFiles(files),
+  });
+  const editorRef = richText.editorRef;
+  const gifPicker = useGifPicker({ onPick: url => setMedia(m => [...m, { url, type: "gif" }]) });
+  const { showGif, setShowGif, gifQuery, setGifQuery, gifs, gifLoading, gifError, pickGif } = gifPicker;
 
   const thisDraftId = computeDraftId(replyTo, quotedEvent);
   const draft = getDraft(thisDraftId);
@@ -103,6 +110,13 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
   useEffect(() => {
     if (!draft || restoredRef.current) return;
     restoredRef.current = true;
+    if (draft.isThread) {
+      if (draft.posts?.length) {
+        setThreadMode(true);
+        setThreadPosts(draft.posts.map(p => ({ id: makeThreadPost().id, content: p.content || "", media: p.media || [], emojiTags: p.emojiTags || [] })));
+      }
+      return;
+    }
     if (draft.content && editorRef.current) {
       editorRef.current.textContent = draft.content;
       setHasText(true);
@@ -151,52 +165,36 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
 
   const allNonLockedIncluded = allTaggedPubkeys.filter(pk => pk !== lockedAuthorPk).every(pk => !excludedMentions.has(pk));
 
-  const collectDraftState = useCallback(() => ({
-    content: getContent(),
-    media,
-    emojiTags,
-    excludedMentions,
-    selectedCircleId: selectedCircle?.id ?? null,
-  }), [media, emojiTags, excludedMentions, selectedCircle]);
+  const collectDraftState = useCallback(() => (
+    threadMode
+      ? { isThread: true, posts: threadPosts }
+      : {
+          content: getContent(),
+          media,
+          emojiTags,
+          excludedMentions,
+          selectedCircleId: selectedCircle?.id ?? null,
+        }
+  ), [threadMode, threadPosts, media, emojiTags, excludedMentions, selectedCircle]);
 
   const handleDismiss = useCallback(() => {
     // Force keyboard to dismiss before closing (prevents iOS dead-zone after emoji search)
     document.activeElement?.blur();
-    const content = getContent();
-    const hasDraftContent = content.trim().length > 0 || media.length > 0;
+    const hasDraftContent = threadMode
+      ? threadPosts.some(p => p.content.trim() || p.media.length > 0)
+      : getContent().trim().length > 0 || media.length > 0;
     if (hasDraftContent) saveDraft(thisDraftId, collectDraftState());
     onDismiss?.();
-  }, [saveDraft, onDismiss, thisDraftId, collectDraftState, media]);
+  }, [saveDraft, onDismiss, thisDraftId, collectDraftState, media, threadMode, threadPosts]);
 
   const isVoiceActive = voiceMode || (isVoiceReply && activeTab === "voice");
-  const title   = quotedEvent ? "Quote repost" : replyTo ? "Reply" : goalMode ? "New Goal" : pollMode ? "New Poll" : voiceMode ? "Voice note" : "New note";
+  const title   = quotedEvent ? "Quote repost" : replyTo ? "Reply" : goalMode ? "New Goal" : pollMode ? "New Poll" : threadMode ? "New Thread" : voiceMode ? "Voice note" : "New note";
   const pollValid = pollMode && pollOptions.filter(o => o.trim()).length >= 2;
   const goalValid = goalMode && goalTitle.trim().length > 0 && Number(goalAmount) > 0;
-  const canPost = goalMode ? goalValid : pollMode ? pollValid : (hasText || media.length > 0);
+  const threadValid = threadMode && threadPosts.some(p => p.content.trim() || p.media.length > 0);
+  const canPost = goalMode ? goalValid : pollMode ? pollValid : threadMode ? threadValid : (hasText || media.length > 0);
 
-  // Walk the contenteditable DOM and produce the final content string,
-  // converting mention chip spans back to their nostr: URIs.
-  const getContent = () => {
-    const div = editorRef.current;
-    if (!div) return "";
-    let result = "";
-    const walk = node => {
-      if (node.nodeType === Node.TEXT_NODE) {
-        result += node.textContent;
-      } else if (node.nodeType === Node.ELEMENT_NODE) {
-        if (node.dataset?.uri) {
-          result += node.dataset.uri;
-        } else if (node.tagName === "BR") {
-          result += "\n";
-        } else {
-          if (node.tagName === "DIV" && result.length > 0) result += "\n";
-          node.childNodes.forEach(walk);
-        }
-      }
-    };
-    div.childNodes.forEach(walk);
-    return result;
-  };
+  const getContent = richText.getContent;
 
   const handlePost = async () => {
     if (!canPost || publishingRef.current) return;
@@ -244,6 +242,44 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
       return;
     }
 
+    if (threadMode && publishEvent) {
+      const remaining = threadPosts
+        .slice(threadPublishedCount)
+        .map(p => ({ ...p, content: p.content.trim() }))
+        .filter(p => p.content || p.media.length > 0);
+
+      if (threadPublishedCount === 0 && !remaining.length) {
+        publishingRef.current = false; setPublishing(false);
+        return;
+      }
+
+      let prevPublished = threadPublishedCount > 0 ? threadLastPublishedRef.current : null;
+      let sentCount = threadPublishedCount;
+      for (const post of remaining) {
+        const urls = post.media.map(m => m.url).join("\n");
+        const content = [post.content, urls].filter(Boolean).join("\n");
+        const tags = prevPublished ? replyTagsForPublish(prevPublished, []) : [];
+        const existingPubkeys = new Set(tags.filter(pt => pt[0] === "p").map(pt => pt[1]));
+        for (const t of extractContentTags(content, { existingPubkeys })) tags.push(t);
+        for (const et of post.emojiTags) tags.push(et);
+
+        const published = await publishEvent({ kind: 1, content, tags }, { trackStatus: true });
+        if (!published) {
+          setUploadErr(`Failed to publish post ${sentCount + 1} of ${threadPosts.length} — thread stopped. Already-posted segments are live; press Publish again to retry the rest.`);
+          setThreadPublishedCount(sentCount);
+          threadLastPublishedRef.current = prevPublished;
+          publishingRef.current = false; setPublishing(false);
+          return;
+        }
+        onPrepend?.(published);
+        prevPublished = published;
+        sentCount += 1;
+      }
+      deleteDraft(thisDraftId);
+      onDismiss?.();
+      return;
+    }
+
     const content = getContent().trim();
     const urls = media.map(m => m.url).join("\n");
     const full = [content, urls].filter(Boolean).join("\n");
@@ -274,21 +310,8 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
           tags.push(["p", pk]);
         }
       }
-      const hashtags = [...new Set(
-        [...finalContent.matchAll(/#([a-zA-Z][a-zA-Z0-9_]+)/g)].map(m => m[1].toLowerCase())
-      )];
-      for (const ht of hashtags) tags.push(["t", ht]);
-      const taggedPubkeys = new Set(tags.filter(t => t[0] === "p").map(t => t[1]));
-      for (const m of finalContent.matchAll(/nostr:(npub1[a-z0-9]+|nprofile1[a-z0-9]+)/g)) {
-        try {
-          const decoded = nip19.decode(m[1]);
-          const pk = decoded.type === "npub" ? decoded.data : decoded.type === "nprofile" ? decoded.data.pubkey : null;
-          if (pk && !taggedPubkeys.has(pk) && !excludedMentions.has(pk)) {
-            tags.push(["p", pk, "", "mention"]);
-            taggedPubkeys.add(pk);
-          }
-        } catch { /* invalid bech32, skip */ }
-      }
+      const existingPubkeys = new Set(tags.filter(t => t[0] === "p").map(t => t[1]));
+      for (const t of extractContentTags(finalContent, { existingPubkeys, excludedMentions })) tags.push(t);
       for (const et of emojiTags) tags.push(et);
       if (replyTo && replyTo.pubkey !== myPubkey) broadcastEvent(replyTo);
       const published = await publishEvent({ kind: isNip22Reply ? 1111 : 1, content: finalContent, tags }, { trackStatus: true });
@@ -299,52 +322,13 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     onDismiss?.();
   };
 
-  const uploadFile = async file => {
-    // Try Blossom servers first
-    if (blossomServers.length > 0) {
-      const blossomUrl = await uploadToBlossom(file, blossomServers, myPubkey);
-      if (blossomUrl) return blossomUrl;
-    }
-
-    // Fall back to nostr.build
-    const uploadUrl = "https://nostr.build/api/v2/upload/files";
-    let authHeader = "";
-    if (myPubkey && window.nostr?.signEvent) {
-      const buf         = await file.arrayBuffer();
-      const digest      = await crypto.subtle.digest("SHA-256", buf);
-      const payloadHash = Array.from(new Uint8Array(digest))
-        .map(b => b.toString(16).padStart(2, "0")).join("");
-      const authEvent = await window.nostr.signEvent({
-        kind: 27235,
-        pubkey: myPubkey,
-        created_at: Math.floor(Date.now() / 1000),
-        tags: [["u", uploadUrl], ["method", "POST"], ["payload", payloadHash]],
-        content: "",
-      });
-      authHeader = `Nostr ${btoa(JSON.stringify(authEvent))}`;
-    }
-    const form = new FormData();
-    form.append("file", file);
-    const headers = authHeader ? { Authorization: authHeader } : {};
-    const res  = await fetch(uploadUrl, { method: "POST", headers, body: form });
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      throw new Error(`HTTP ${res.status}: ${errText}`);
-    }
-    const json = await res.json();
-    const url  = json?.nip94_event?.tags?.find(t => t[0] === "url")?.[1]
-              ?? json?.data?.[0]?.url;
-    if (!url) throw new Error("No URL returned");
-    return url;
-  };
-
   const uploadFiles = async files => {
     if (!files.length) return;
     setUploading(true); setUploadErr("");
     const errors = [];
     for (const file of files) {
       try {
-        const url = await uploadFile(file);
+        const url = await uploadFile(file, { blossomServers, myPubkey });
         setMedia(m => [...m, { url, type: file.type.startsWith("video/") ? "video" : "image" }]);
       } catch (err) {
         errors.push(err.message);
@@ -360,194 +344,17 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     e.target.value = "";
   };
 
-  const mediaFilesFromClipboard = clipboardData => {
-    if (!clipboardData) return [];
-    const files = Array.from(clipboardData.files || []).filter(f => f.type.startsWith("image/") || f.type.startsWith("video/"));
-    if (files.length) return files;
-    return Array.from(clipboardData.items || [])
-      .filter(item => item.kind === "file" && (item.type.startsWith("image/") || item.type.startsWith("video/")))
-      .map(item => item.getAsFile())
-      .filter(Boolean);
-  };
-
-  const handleDragOver = e => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = e => {
-    e.preventDefault();
-    setIsDragOver(false);
-  };
-
-  const handleDrop = e => {
-    e.preventDefault();
-    setIsDragOver(false);
-    const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith("image/") || f.type.startsWith("video/"));
-    if (files.length) uploadFiles(files);
-  };
-
-  const fetchGifs = async url => {
-    setGifLoading(true);
-    setGifError("");
-    try {
-      const res  = await fetch(url);
-      const json = await res.json();
-      if (json.message) { setGifError(json.message); setGifs([]); }
-      else setGifs(json.data || []);
-    } catch (e) {
-      setGifError("Could not load GIFs");
-      setGifs([]);
-    }
-    setGifLoading(false);
-  };
-
-  useEffect(() => {
-    if (!gifQuery.trim()) { setGifs([]); setGifError(""); return; }
-    const t = setTimeout(() =>
-      fetchGifs(`https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(gifQuery)}&limit=18&rating=g`),
-      400
-    );
-    return () => clearTimeout(t);
-  }, [gifQuery]);
-
-  useEffect(() => {
-    if (!showGif || gifQuery) return;
-    fetchGifs(`https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=18&rating=g`);
-  }, [showGif]);
-
-  const pickGif = gif => {
-    const url = gif.images?.original?.url || gif.images?.downsized?.url;
-    if (!url) return;
-    setMedia(m => [...m, { url, type: "gif" }]);
-    setShowGif(false); setGifQuery("");
-  };
-
-  const handleInput = () => {
-    setHasText(getContent().trim().length > 0);
-
-    const sel = window.getSelection();
-    if (!sel?.rangeCount) { setMentionResults([]); return; }
-    const range = sel.getRangeAt(0);
-    if (range.startContainer.nodeType !== Node.TEXT_NODE) { setMentionResults([]); return; }
-
-    const textBefore = range.startContainer.textContent.slice(0, range.startOffset);
-    const match = textBefore.match(/@([\w.-]*)$/);
-    if (match && Object.keys(profiles || {}).length > 0) {
-      const query = match[1].toLowerCase();
-      setMentionIndex(0);
-      const results = Object.entries(profiles)
-        .filter(([pk, p]) => {
-          if (pk === myPubkey) return false;
-          const name = (p.display_name || p.name || "").toLowerCase();
-          const nip05 = (p.nip05 || "").toLowerCase().split("@")[0];
-          return !query || name.startsWith(query) || nip05.startsWith(query);
-        })
-        .slice(0, 6)
-        .map(([pk]) => pk);
-      setMentionResults(results);
-    } else {
-      setMentionResults([]);
-    }
-  };
-
-  const selectMention = pk => {
-    const div = editorRef.current;
-    const name = displayName(pk, profiles);
-    const uri  = `nostr:${nip19.npubEncode(pk)}`;
-
-    const sel = window.getSelection();
-    if (!sel?.rangeCount) return;
-    const range = sel.getRangeAt(0);
-    const textNode = range.startContainer;
-    if (textNode.nodeType !== Node.TEXT_NODE) return;
-
-    const textBefore = textNode.textContent.slice(0, range.startOffset);
-    const atIndex = textBefore.lastIndexOf("@");
-    if (atIndex === -1) return;
-
-    const replaceRange = document.createRange();
-    replaceRange.setStart(textNode, atIndex);
-    replaceRange.setEnd(textNode, range.startOffset);
-    replaceRange.deleteContents();
-
-    const chip = document.createElement("span");
-    chip.className = "mention-chip";
-    chip.dataset.uri = uri;
-    chip.contentEditable = "false";
-    chip.textContent = `@${name}`;
-    replaceRange.insertNode(chip);
-
-    const space = document.createTextNode(" ");
-    chip.after(space);
-
-    const newRange = document.createRange();
-    newRange.setStart(space, space.length);
-    newRange.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(newRange);
-
-    setMentionResults([]);
-    setHasText(true);
-    div.focus();
-  };
+  const selectMention = richText.selectMention;
 
   const handleKeyDown = e => {
-    if (mentionResults.length > 0) {
-      if (e.key === "ArrowDown")                  { e.preventDefault(); setMentionIndex(i => Math.min(i + 1, mentionResults.length - 1)); return; }
-      if (e.key === "ArrowUp")                    { e.preventDefault(); setMentionIndex(i => Math.max(i - 1, 0)); return; }
-      if (e.key === "Enter" || e.key === "Tab")   { e.preventDefault(); selectMention(mentionResults[mentionIndex]); return; }
-      if (e.key === "Escape")                     { setMentionResults([]); return; }
-    }
+    if (richText.handleMentionKeyDown(e)) return;
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && canPost && !publishing) { e.preventDefault(); handlePost(); }
   };
 
-  const handlePaste = e => {
-    const imageFiles = mediaFilesFromClipboard(e.clipboardData);
-    if (imageFiles.length) {
-      e.preventDefault();
-      uploadFiles(imageFiles);
-      return;
-    }
-    e.preventDefault();
-    const text = e.clipboardData.getData("text/plain");
-    const sel = window.getSelection();
-    if (!sel?.rangeCount) return;
-    const range = sel.getRangeAt(0);
-    range.deleteContents();
-    const node = document.createTextNode(text);
-    range.insertNode(node);
-    const newRange = document.createRange();
-    newRange.setStartAfter(node);
-    newRange.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(newRange);
-    setHasText(getContent().trim().length > 0);
-  };
-
   const insertEmoji = picked => {
-    const isCustom = picked && typeof picked === "object";
-    const text     = isCustom ? picked.content : picked;
-    const emojiTag = isCustom ? picked.emojiTag : null;
-    const div = editorRef.current;
-    if (!div) return;
-    div.focus();
-    const sel = window.getSelection();
-    if (sel?.rangeCount) {
-      const range = sel.getRangeAt(0);
-      range.deleteContents();
-      const node = document.createTextNode(text);
-      range.insertNode(node);
-      const newRange = document.createRange();
-      newRange.setStartAfter(node);
-      newRange.collapse(true);
-      sel.removeAllRanges();
-      sel.addRange(newRange);
-    }
-    if (emojiTag) {
+    richText.insertEmoji(picked, emojiTag => {
       setEmojiTags(prev => prev.some(t => t[1] === emojiTag[1]) ? prev : [...prev, emojiTag]);
-    }
-    setHasText(true);
+    });
   };
 
   return createPortal(
@@ -626,7 +433,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
 
         {/* Scrollable area: text editor + image previews + quoted event scroll together */}
         {!voiceMode && (!isVoiceReply || activeTab === "text") && <div className="compose-sheet-scroll">
-          {!goalMode && <div className="compose-sheet-body">
+          {!goalMode && !threadMode && <div className="compose-sheet-body">
             <div className="compose-sheet-av">
               {myProfile?.picture
                 ? <img src={myProfile.picture} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
@@ -634,20 +441,33 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
             </div>
             <div
               ref={editorRef}
-              className={`compose-sheet-input compose-richtext${isDragOver ? " drag-over" : ""}`}
+              className={`compose-sheet-input compose-richtext${richText.isDragOver ? " drag-over" : ""}`}
               contentEditable
               suppressContentEditableWarning
-              onInput={handleInput}
+              onInput={richText.handleInput}
               onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
+              onPaste={richText.handlePaste}
+              onDragOver={richText.handleDragOver}
+              onDragLeave={richText.handleDragLeave}
+              onDrop={richText.handleDrop}
               data-placeholder={replyTo ? "Write your reply…" : "What's on your mind?"}
             />
           </div>}
 
-          {selectedCircle && (
+          {threadMode && (
+            <ThreadCompose
+              posts={threadPosts}
+              onChangePosts={setThreadPosts}
+              publishedCount={threadPublishedCount}
+              myPubkey={myPubkey}
+              myProfile={myProfile}
+              profiles={profiles}
+              customEmojis={customEmojis}
+              blossomServers={blossomServers}
+            />
+          )}
+
+          {!threadMode && selectedCircle && (
             <div style={{ padding: "0 16px 8px", display: "flex", alignItems: "center", gap: 6 }}>
               <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="8" r="4" />
@@ -843,15 +663,15 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
           </div>
         )}
 
-        {mentionResults.length > 0 && (
+        {!threadMode && richText.mentionResults.length > 0 && (
           <div className="mention-list">
-            {mentionResults.map((pk, i) => (
+            {richText.mentionResults.map((pk, i) => (
               <button
                 key={pk}
                 type="button"
-                className={`mention-item${i === mentionIndex ? " active" : ""}`}
+                className={`mention-item${i === richText.mentionIndex ? " active" : ""}`}
                 onMouseDown={e => { e.preventDefault(); selectMention(pk); }}
-                onMouseEnter={() => setMentionIndex(i)}
+                onMouseEnter={() => richText.setMentionIndex(i)}
               >
                 <Avatar pk={pk} profiles={profiles} size={28} />
                 <div className="mention-item-info">
@@ -865,12 +685,12 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
 
         <div className="compose-sheet-footer">
           <input ref={fileRef} type="file" accept="image/*,video/*" multiple style={{ display: "none" }} onChange={handleFileChange} />
-          <button className="compose-media-btn" title="Add image or video" onClick={() => fileRef.current?.click()}>
+          {!threadMode && <button className="compose-media-btn" title="Add image or video" onClick={() => fileRef.current?.click()}>
             <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
               <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
             </svg>
-          </button>
-          <button
+          </button>}
+          {!threadMode && <button
             type="button"
             className="compose-media-btn compose-emoji-toggle"
             title="Emoji"
@@ -888,17 +708,17 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
               <line x1="9" y1="9" x2="9.01" y2="9" />
               <line x1="15" y1="9" x2="15.01" y2="9" />
             </svg>
-          </button>
-          <button type="button" className="compose-media-btn" title="Add GIF" onClick={() => { setShowEmoji(false); setShowGif(v => !v); }}
+          </button>}
+          {!threadMode && <button type="button" className="compose-media-btn" title="Add GIF" onClick={() => { setShowEmoji(false); setShowGif(v => !v); }}
             style={showGif ? { color: "var(--primary)", background: "var(--surface)" } : {}}>
             <span style={{ fontSize: 11, fontWeight: 700, fontFamily: "'DM Sans',sans-serif", letterSpacing: "-.5px" }}>GIF</span>
-          </button>
+          </button>}
           {!replyTo && !quotedEvent && (
             <button
               type="button"
               className="compose-media-btn"
               title="Voice note"
-              onClick={() => { setShowEmoji(false); setShowGif(false); setPollMode(false); setGoalMode(false); setVoiceMode(v => !v); }}
+              onClick={() => { setShowEmoji(false); setShowGif(false); setPollMode(false); setGoalMode(false); setThreadMode(false); setVoiceMode(v => !v); }}
               style={voiceMode ? { color: "var(--primary)", background: "var(--surface)" } : {}}
               aria-pressed={voiceMode}
             >
@@ -915,7 +735,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
               type="button"
               className="compose-media-btn"
               title="Create poll"
-              onClick={() => { setShowEmoji(false); setShowGif(false); setGoalMode(false); setPollMode(v => !v); }}
+              onClick={() => { setShowEmoji(false); setShowGif(false); setGoalMode(false); setThreadMode(false); setPollMode(v => !v); }}
               style={pollMode ? { color: "var(--primary)", background: "var(--surface)" } : {}}
               aria-pressed={pollMode}
             >
@@ -931,7 +751,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
               type="button"
               className="compose-media-btn"
               title="Create goal"
-              onClick={() => { setShowEmoji(false); setShowGif(false); setPollMode(false); setGoalMode(v => !v); }}
+              onClick={() => { setShowEmoji(false); setShowGif(false); setPollMode(false); setThreadMode(false); setGoalMode(v => !v); }}
               style={goalMode ? { color: "var(--primary)", background: "var(--surface)" } : {}}
               aria-pressed={goalMode}
             >
@@ -939,6 +759,26 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
                 <circle cx="12" cy="12" r="10" />
                 <circle cx="12" cy="12" r="6" />
                 <circle cx="12" cy="12" r="2" />
+              </svg>
+            </button>
+          )}
+          {!replyTo && !quotedEvent && (
+            <button
+              type="button"
+              className="compose-media-btn"
+              title="Start a thread"
+              onClick={() => { setShowEmoji(false); setShowGif(false); setPollMode(false); setGoalMode(false); setThreadMode(v => !v); }}
+              style={threadMode ? { color: "var(--primary)", background: "var(--surface)" } : {}}
+              aria-pressed={threadMode}
+            >
+              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="6" cy="6" r="2.5" />
+                <circle cx="6" cy="18" r="2.5" />
+                <path d="M6 8.5v7" />
+                <path d="M9.5 6H16a3 3 0 0 1 3 3v0" />
+                <path d="M9.5 18H16a3 3 0 0 0 3-3v0" />
+                <polyline points="16.5 6.5 19 9 16.5 11.5" />
+                <polyline points="16.5 17.5 19 15 16.5 12.5" />
               </svg>
             </button>
           )}

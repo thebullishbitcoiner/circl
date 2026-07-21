@@ -43,13 +43,18 @@ export default function useDrafts({ pubkey, signAndPublish, privateRelayUrls = [
 
   const saveDraft = useCallback(async (id, state) => {
     if (!pubkey || !hasNip44 || !signAndPublish) return;
-    const payload = {
-      content: state.content || "",
-      media: state.media || [],
-      emojiTags: state.emojiTags || [],
-      excludedMentions: state.excludedMentions ? [...state.excludedMentions] : [],
-      selectedCircleId: state.selectedCircleId ?? null,
-    };
+    const payload = state.isThread
+      ? {
+          isThread: true,
+          posts: (state.posts || []).map(p => ({ content: p.content || "", media: p.media || [], emojiTags: p.emojiTags || [] })),
+        }
+      : {
+          content: state.content || "",
+          media: state.media || [],
+          emojiTags: state.emojiTags || [],
+          excludedMentions: state.excludedMentions ? [...state.excludedMentions] : [],
+          selectedCircleId: state.selectedCircleId ?? null,
+        };
     let encrypted;
     try {
       encrypted = await window.nostr.nip44.encrypt(pubkey, JSON.stringify(payload));

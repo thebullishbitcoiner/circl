@@ -305,6 +305,32 @@ export const replyTagsForPublish = (replyTo, pool = []) => {
   return [...eTags, ...pTags];
 };
 
+/**
+ * Hashtag `t` tags and `nostr:npub/nprofile` mention `p` tags found in note content.
+ * `existingPubkeys` seeds already-tagged pubkeys so mentions aren't duplicated;
+ * `excludedMentions` skips pubkeys the user explicitly untagged.
+ */
+export const extractContentTags = (content, { existingPubkeys = new Set(), excludedMentions = new Set() } = {}) => {
+  const tags = [];
+  const hashtags = [...new Set(
+    [...content.matchAll(/#([a-zA-Z][a-zA-Z0-9_]+)/g)].map(m => m[1].toLowerCase())
+  )];
+  for (const ht of hashtags) tags.push(["t", ht]);
+
+  const taggedPubkeys = new Set(existingPubkeys);
+  for (const m of content.matchAll(/nostr:(npub1[a-z0-9]+|nprofile1[a-z0-9]+)/g)) {
+    try {
+      const decoded = nip19.decode(m[1]);
+      const pk = decoded.type === "npub" ? decoded.data : decoded.type === "nprofile" ? decoded.data.pubkey : null;
+      if (pk && !taggedPubkeys.has(pk) && !excludedMentions.has(pk)) {
+        tags.push(["p", pk, "", "mention"]);
+        taggedPubkeys.add(pk);
+      }
+    } catch { /* invalid bech32, skip */ }
+  }
+  return tags;
+};
+
 export const buildParentChain = (event, pool, seen = new Set()) => {
   if (seen.has(event.id)) return [];
   seen.add(event.id);
