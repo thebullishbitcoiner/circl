@@ -149,7 +149,11 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
           processTimer = setTimeout(process, 300);
         }
       },
-      error: () => { if (!cancelled && !cached) setItems([]); },
+      // Only show empty on a subscription error if we never got a real
+      // answer at all — a relay disconnecting *after* successfully
+      // delivering the list (normal for a long-lived subscription) must not
+      // clobber data that's already loaded and showing.
+      error: () => { if (!cancelled && !cached && !settledRef.current) setItems([]); },
     });
 
     const cutoffTimer = setTimeout(() => { sub.unsubscribe(); settledRef.current = true; process(); }, 8000);

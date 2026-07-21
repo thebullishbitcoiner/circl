@@ -38,6 +38,7 @@ export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
 
     const received = [];
     let listSettled = false;
+    let bgRetryCount = 0;
     let cleanupSetSub = null;
     // Declared before subscribing (and accessed only via optional chaining)
     // so finishList() can't hit a not-yet-initialized reference in the
@@ -79,6 +80,7 @@ export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
       // before encryption was added) carry plaintext tags with empty content.
       let tags = latest.tags || [];
       const content = (latest.content || "").trim();
+      let decryptFailed = false;
       if (content) {
         if (!hasNip44()) {
           // Signer may not be injected yet (common on mobile) — wait up to 3s
@@ -93,7 +95,22 @@ export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
             const plain = await window.nostr.nip44.decrypt(latest.pubkey, latest.content);
             const parsed = JSON.parse(plain);
             if (Array.isArray(parsed)) tags = parsed;
-          } catch { /* leave tags empty on decrypt failure */ }
+            else decryptFailed = true;
+          } catch { decryptFailed = true; }
+        } else {
+          decryptFailed = true;
+        }
+      }
+
+      if (decryptFailed) {
+        // Signer may still be warming up (common on mobile) — self-heal with
+        // a couple of delayed background retries instead of showing an
+        // empty list, same pattern as useBookmarks.js/useMutes.js.
+        if (bgRetryCount < 2) {
+          bgRetryCount++;
+          listSettled = false;
+          setTimeout(() => { if (!cancelled) finishList(); }, 5000);
+          return;
         }
       }
 

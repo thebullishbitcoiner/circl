@@ -91,6 +91,7 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
     let latestEvent = null;
     let knownCreatedAt = cached?.created_at ?? 0;
     let processTimer = null;
+    let bgRetryCount = 0;
 
     const process = async () => {
       if (cancelled || !latestEvent) return;
@@ -134,23 +135,38 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
       }
 
       if (!cancelled && generation === gen) {
-        unreadableRef.current = decryptFailed;
-        if (!decryptFailed) {
-          const pub = parseMuteTags(ev.tags || []);
-          const priv = parseMuteTags(privateTags);
-          const result = {
-            pubkeys: mergeUniq(priv.pubkeys, pub.pubkeys),
-            hashtags: mergeUniq(priv.hashtags, pub.hashtags),
-            words: mergeUniq(priv.words, pub.words),
-            threads: mergeUniq(priv.threads, pub.threads),
-          };
-          setMutes(result.pubkeys); mutesRef.current = result.pubkeys;
-          setHashtags(result.hashtags); hashtagsRef.current = result.hashtags;
-          setWords(result.words); wordsRef.current = result.words;
-          setThreads(result.threads); threadsRef.current = result.threads;
-          writeCache(pk, result, ev.created_at);
-          knownCreatedAt = ev.created_at;
+        if (decryptFailed) {
+          // Signer may still be warming up (common on mobile, where nip44
+          // injection is often slower than the wait above) — don't
+          // permanently flag the list as unreadable (which blocks
+          // mute/unmute) on the first failure. Self-heal with a couple of
+          // delayed background retries first, same as useBookmarks.js.
+          settledRef.current = true;
+          if (bgRetryCount < 2) {
+            bgRetryCount++;
+            setTimeout(() => { if (!cancelled) process(); }, 5000);
+            return;
+          }
+          unreadableRef.current = true;
+          setMuteEvent(ev);
+          return;
         }
+
+        unreadableRef.current = false;
+        const pub = parseMuteTags(ev.tags || []);
+        const priv = parseMuteTags(privateTags);
+        const result = {
+          pubkeys: mergeUniq(priv.pubkeys, pub.pubkeys),
+          hashtags: mergeUniq(priv.hashtags, pub.hashtags),
+          words: mergeUniq(priv.words, pub.words),
+          threads: mergeUniq(priv.threads, pub.threads),
+        };
+        setMutes(result.pubkeys); mutesRef.current = result.pubkeys;
+        setHashtags(result.hashtags); hashtagsRef.current = result.hashtags;
+        setWords(result.words); wordsRef.current = result.words;
+        setThreads(result.threads); threadsRef.current = result.threads;
+        writeCache(pk, result, ev.created_at);
+        knownCreatedAt = ev.created_at;
         setMuteEvent(ev);
         settledRef.current = true;
       }
@@ -167,7 +183,11 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
         }
       },
       error: () => {
-        if (!cancelled && !cached) { setMutes([]); setHashtags([]); setWords([]); setThreads([]); }
+        // Only show empty on a subscription error if we never got a real
+        // answer at all — a relay disconnecting *after* successfully
+        // delivering the list (normal for a long-lived subscription) must
+        // not clobber data that's already loaded and showing.
+        if (!cancelled && !cached && !settledRef.current) { setMutes([]); setHashtags([]); setWords([]); setThreads([]); }
       },
     });
 

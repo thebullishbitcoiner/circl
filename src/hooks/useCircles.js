@@ -35,7 +35,9 @@ function writeCache(pk, byId) {
 
 function cacheToCircles(byId) {
   return Object.entries(byId)
-    .filter(([, v]) => !v.deleted)
+    // Entries still holding `_raw` failed to decrypt and haven't resolved to
+    // real title/members yet — skip them rather than rendering a blank circle.
+    .filter(([, v]) => !v.deleted && !v._raw)
     .map(([id, v]) => ({ id, title: v.title, members: v.members, decryptionFailed: false }));
 }
 
@@ -66,6 +68,7 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
     else setCircles([]);
 
     let processTimer = null;
+    let bgRetryCount = 0;
 
     const process = async () => {
       if (cancelled || Object.keys(byId).length === 0) return;
@@ -124,6 +127,15 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
         setCircles(next);
         circlesRef.current = next;
         settledRef.current = true;
+
+        // Signer may still be warming up (common on mobile) — entries still
+        // holding `_raw` failed to decrypt this pass. Self-heal with a
+        // couple of delayed background retries, same as useBookmarks.js.
+        const stillFailed = Object.values(byId).some(v => v._raw);
+        if (stillFailed && bgRetryCount < 2) {
+          bgRetryCount++;
+          setTimeout(() => { if (!cancelled) process(); }, 5000);
+        }
       }
     };
 
@@ -146,7 +158,11 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
           processTimer = setTimeout(process, 300);
         }
       },
-      error: () => { if (!cancelled && !cached) setCircles([]); },
+      // Only show empty on a subscription error if we never got a real
+      // answer at all — a relay disconnecting *after* successfully
+      // delivering the list (normal for a long-lived subscription) must not
+      // clobber data that's already loaded and showing.
+      error: () => { if (!cancelled && !cached && !settledRef.current) setCircles([]); },
     });
 
     const cutoffTimer = setTimeout(() => { sub.unsubscribe(); settledRef.current = true; process(); }, 8000);

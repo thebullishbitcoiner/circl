@@ -20,6 +20,7 @@ export default function useRelayList(pubkey, kind) {
     let generation = 0;
     let latestEvent = null;
     let processTimer = null;
+    let resolved = false;
 
     const process = async () => {
       if (cancelled || !latestEvent) return;
@@ -63,7 +64,7 @@ export default function useRelayList(pubkey, kind) {
         }
       }
 
-      if (!cancelled && generation === gen) setRelays(all);
+      if (!cancelled && generation === gen) { setRelays(all); resolved = true; }
     };
 
     const sub = pool.group(relayUrls$, false).subscription([{ kinds: [kind], authors: [pubkey] }]).subscribe({
@@ -76,7 +77,11 @@ export default function useRelayList(pubkey, kind) {
           processTimer = setTimeout(process, 300);
         }
       },
-      error: () => { if (!cancelled) setRelays([]); },
+      // Only show empty on a subscription error if we never resolved a real
+      // answer at all — a relay disconnecting *after* successfully
+      // delivering the list (normal for a long-lived subscription) must not
+      // clobber data that's already loaded and showing.
+      error: () => { if (!cancelled && !resolved) setRelays([]); },
     });
 
     const cutoffTimer = setTimeout(() => { sub.unsubscribe(); process(); }, 8000);
