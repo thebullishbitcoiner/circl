@@ -49,7 +49,7 @@ export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
     // mid-handshake right after login aren't silently skipped) and
     // re-queries automatically as more relays connect.
     listSub = pool.group(relayUrls$, false).request([{ kinds: [EMOJI_LIST_KIND], authors: [pk] }]).subscribe({
-      next: raw => { eventStore.add(raw); received.push(raw); },
+      next: raw => { if (raw.kind !== EMOJI_LIST_KIND) return; eventStore.add(raw); received.push(raw); },
       complete: () => finishList(),
       error: () => finishList(),
     });
@@ -126,7 +126,7 @@ export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
       let setsCutoff = null;
 
       setSub = pool.group(relayUrls$, false).request(setFilters).subscribe({
-        next: raw => { eventStore.add(raw); setEvents.push(raw); },
+        next: raw => { if (raw.kind !== EMOJI_SET_KIND) return; eventStore.add(raw); setEvents.push(raw); },
         complete: () => finishSets(),
         error: () => finishSets(),
       });

@@ -2,7 +2,7 @@ import { EventStore } from "applesauce-core";
 import { normalizeURL } from "applesauce-core/helpers/url";
 import { RelayPool } from "applesauce-relay";
 import { createEventLoader } from "applesauce-loaders/loaders";
-import { BehaviorSubject, isObservable, map } from "rxjs";
+import { BehaviorSubject, isObservable, map, merge, skip, take, debounceTime } from "rxjs";
 import { DEFAULT_RELAYS } from "./constants.js";
 
 export const eventStore = new EventStore();
@@ -164,8 +164,22 @@ export function publishWithStatus(relays, event) {
 // pool.group(relayUrls$, false) so a query fired right after login keeps
 // reaching newly-added relays instead of being pinned to whatever existed
 // at mount time.
-export const relayUrls$ = pool.relays$.pipe(
+//
+// pool.relays$ fires on *every* relay connecting anywhere in the app (login
+// bootstrap, visiting a profile, opening a thread, ...), and pool.group()
+// re-subscribes (tears down + reopens) every REQ built on this stream each
+// time it emits. During boot several relays typically connect within the
+// same second (default relays, then outbox relays as NIP-65 resolves), which
+// was causing every mounted list hook to thrash through several
+// resubscribes in quick succession. Emit the current snapshot immediately
+// (so first load isn't delayed) but debounce subsequent bursts so a flurry
+// of new relay connections collapses into a single resubscribe.
+const relaysMapped$ = pool.relays$.pipe(
   map(m => (m.size > 0 ? [...m.keys()] : DEFAULT_RELAYS))
+);
+export const relayUrls$ = merge(
+  relaysMapped$.pipe(take(1)),
+  relaysMapped$.pipe(skip(1), debounceTime(750)),
 );
 
 // ── Event loader ────────────────────────────────────────────────────────────

@@ -21,7 +21,7 @@ export default function useMailboxes(pubkey) {
     // longer strands `outboxes` at [] for the rest of the session (which used
     // to also starve every other list hook of the wider relay set it needs).
     const reqSub = pool.group(relayUrls$, false).request([{ kinds: [10002], authors: [pubkey], limit: 1 }]).subscribe({
-      next: ev => eventStore.add(ev),
+      next: ev => { if (ev.kind === 10002) eventStore.add(ev); },
       error: () => {},
     });
     const cutoffTimer = setTimeout(() => { if (!cancelled) reqSub.unsubscribe(); }, 8000);

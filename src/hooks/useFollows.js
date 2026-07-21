@@ -18,6 +18,7 @@ export default function useFollows({ pubkey, signAndPublish }) {
 
     const sub = pool.group(relayUrls$, false).request([{ kinds: [3], authors: [pubkey], limit: 1 }]).subscribe({
       next: raw => {
+        if (raw.kind !== 3) return;
         eventStore.add(raw);
         if ((raw.created_at || 0) <= (latest.created_at || 0)) return;
         latest = raw;

@@ -11,6 +11,8 @@ import { pool, eventStore, relayUrls$ } from "../nostr.js";
 const STATS_BACKFILL_INTERVAL_MS = 5_000;
 const STATS_BACKFILL_CHUNK = 100;
 
+const MAIN_FEED_KINDS = [1, 6, 9802, 30023, 1068, 6969, 31922, 31923, 30311, 9041];
+
 function compareFeedEventsDesc(a, b) {
   const ta = Number(a?.created_at) || 0;
   const tb = Number(b?.created_at) || 0;
@@ -58,8 +60,9 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap, addLoc
       );
     }
 
-    const mainSub = pool.group(relayUrls$, false).subscription([{ kinds: [1, 6, 9802, 30023, 1068, 6969, 31922, 31923, 30311, 9041], authors, since, limit: 300 }]).subscribe({
+    const mainSub = pool.group(relayUrls$, false).subscription([{ kinds: MAIN_FEED_KINDS, authors, since, limit: 300 }]).subscribe({
       next: raw => {
+        if (!MAIN_FEED_KINDS.includes(raw.kind)) return;
         eventStore.add(raw);
         if (seen.current.has(raw.id)) return;
         seen.current.add(raw.id);
@@ -70,6 +73,7 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap, addLoc
 
     const deleteSub = pool.group(relayUrls$, false).subscription([{ kinds: [5], authors, since }]).subscribe({
       next: raw => {
+        if (raw.kind !== 5) return;
         const newIds = raw.tags.filter(t => t[0] === "e" && t[1]).map(t => t[1]);
         const newAddrs = raw.tags.filter(t => t[0] === "a" && t[1]).map(t => t[1]);
         if (!newIds.length && !newAddrs.length) return;

@@ -60,6 +60,7 @@ export default function usePinnedNotes({ pubkey, signAndPublish } = {}) {
 
     const sub = pool.group(relayUrls$, false).subscription([{ kinds: [PIN_LIST_KIND], authors: [pk] }]).subscribe({
       next: raw => {
+        if (raw.kind !== PIN_LIST_KIND) return;
         eventStore.add(raw);
         if (!cancelled && raw.created_at > Math.max(knownCreatedAt, latestEvent?.created_at ?? 0)) {
           latestEvent = raw;

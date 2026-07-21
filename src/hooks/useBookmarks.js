@@ -141,6 +141,7 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
 
     const sub = pool.group(relayUrls$, false).subscription([{ kinds: [BOOKMARK_LIST_KIND], authors: [pk] }]).subscribe({
       next: raw => {
+        if (raw.kind !== BOOKMARK_LIST_KIND) return;
         eventStore.add(raw);
         if (!cancelled && raw.created_at > Math.max(knownCreatedAt, latestEvent?.created_at ?? 0)) {
           latestEvent = raw;

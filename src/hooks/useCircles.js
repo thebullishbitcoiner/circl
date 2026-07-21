@@ -139,6 +139,7 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
 
     const sub = pool.group(relayUrls$, false).subscription([{ kinds: [CIRCLE_KIND], authors: [pk] }]).subscribe({
       next: raw => {
+        if (raw.kind !== CIRCLE_KIND) return;
         eventStore.add(raw);
         if (!cancelled && ingestRaw(raw)) {
           clearTimeout(processTimer);

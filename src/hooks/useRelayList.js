@@ -68,6 +68,7 @@ export default function useRelayList(pubkey, kind) {
 
     const sub = pool.group(relayUrls$, false).subscription([{ kinds: [kind], authors: [pubkey] }]).subscribe({
       next: raw => {
+        if (raw.kind !== kind) return;
         eventStore.add(raw);
         if (!cancelled && raw.created_at > (latestEvent?.created_at ?? 0)) {
           latestEvent = raw;
