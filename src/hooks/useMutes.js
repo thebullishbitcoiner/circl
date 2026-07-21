@@ -191,7 +191,14 @@ export default function useMutes({ pubkey, signAndPublish } = {}) {
       },
     });
 
-    const cutoffTimer = setTimeout(() => { sub.unsubscribe(); settledRef.current = true; process(); }, 8000);
+    const cutoffTimer = setTimeout(() => {
+      sub.unsubscribe();
+      settledRef.current = true;
+      // Only reprocess if the current latestEvent hasn't already been
+      // successfully applied — otherwise this redundantly re-decrypts and
+      // re-emits new (but content-identical) state arrays for no reason.
+      if (!latestEvent || latestEvent.created_at !== knownCreatedAt) process();
+    }, 8000);
 
     return () => {
       cancelled = true;

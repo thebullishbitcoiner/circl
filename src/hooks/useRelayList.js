@@ -84,7 +84,13 @@ export default function useRelayList(pubkey, kind) {
       error: () => { if (!cancelled && !resolved) setRelays([]); },
     });
 
-    const cutoffTimer = setTimeout(() => { sub.unsubscribe(); process(); }, 8000);
+    const cutoffTimer = setTimeout(() => {
+      sub.unsubscribe();
+      // Only reprocess if we haven't already resolved a real answer —
+      // otherwise this redundantly re-emits a new (but content-identical)
+      // `relays` array for no reason.
+      if (!resolved) process();
+    }, 8000);
 
     return () => {
       cancelled = true;

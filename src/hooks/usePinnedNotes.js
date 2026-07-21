@@ -75,7 +75,14 @@ export default function usePinnedNotes({ pubkey, signAndPublish } = {}) {
       error: () => { if (!cancelled && !cached && !settledRef.current) setItems([]); },
     });
 
-    const cutoffTimer = setTimeout(() => { sub.unsubscribe(); settledRef.current = true; process(); }, 8000);
+    const cutoffTimer = setTimeout(() => {
+      sub.unsubscribe();
+      settledRef.current = true;
+      // Only reprocess if the current latestEvent hasn't already been
+      // successfully applied — otherwise this redundantly re-emits a new
+      // (but content-identical) `items` array for no reason.
+      if (!latestEvent || latestEvent.created_at !== knownCreatedAt) process();
+    }, 8000);
 
     return () => {
       cancelled = true;

@@ -156,7 +156,16 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
       error: () => { if (!cancelled && !cached && !settledRef.current) setItems([]); },
     });
 
-    const cutoffTimer = setTimeout(() => { sub.unsubscribe(); settledRef.current = true; process(); }, 8000);
+    const cutoffTimer = setTimeout(() => {
+      sub.unsubscribe();
+      settledRef.current = true;
+      // Only reprocess if the current latestEvent hasn't already been
+      // successfully applied — otherwise this redundantly re-decrypts and
+      // re-emits a new (but content-identical) `items` array, which ripples
+      // into anything downstream keyed on that reference (e.g. the bookmarks
+      // screen's event-resolution effect tearing down and restarting).
+      if (!latestEvent || latestEvent.created_at !== knownCreatedAt) process();
+    }, 8000);
 
     return () => {
       cancelled = true;

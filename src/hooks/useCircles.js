@@ -165,7 +165,14 @@ export default function useCircles({ pubkey, signAndPublish } = {}) {
       error: () => { if (!cancelled && !cached && !settledRef.current) setCircles([]); },
     });
 
-    const cutoffTimer = setTimeout(() => { sub.unsubscribe(); settledRef.current = true; process(); }, 8000);
+    const cutoffTimer = setTimeout(() => {
+      sub.unsubscribe();
+      settledRef.current = true;
+      // Only reprocess if something is still unresolved (holding `_raw`) —
+      // otherwise this redundantly re-emits a new (but content-identical)
+      // `circles` array for no reason.
+      if (Object.values(byId).some(v => v._raw)) process();
+    }, 8000);
 
     return () => {
       cancelled = true;
