@@ -368,6 +368,7 @@ function MediaMosaic({ items, onItemClick }) {
 }
 
 const COLLAPSE_THRESHOLD = 500;
+const BIG_FONT_THRESHOLD = 50;
 
 /**
  * Renders note body with inline images (mosaic when multiple), videos, and @mentions.
@@ -439,7 +440,7 @@ export default function NoteContent({
   const [resolvedRefs, setResolvedRefs] = useState({});
   const [resolvedNaddrRefs, setResolvedNaddrRefs] = useState({});
   const [expanded, setExpanded] = useState(false);
-  const { autoplayVideos, loopVideos } = useContentSettings();
+  const { autoplayVideos, loopVideos, bigFontShortNotes } = useContentSettings();
 
   // Fetch profiles for any nprofile/npub mentions so display names resolve
   useEffect(() => { fetchMentionedProfiles(content); }, [content]);
@@ -452,6 +453,7 @@ export default function NoteContent({
     }, 0);
   const shouldCollapse = collapsible && textLength > COLLAPSE_THRESHOLD;
   const isCollapsed = shouldCollapse && !expanded;
+  const isBigFont = bigFontShortNotes && textLength > 0 && textLength < BIG_FONT_THRESHOLD;
 
   useEffect(() => {
     if (!allowEmbeds || !resolveEventById || typeof content !== "string" || !/nostr:(nevent1|note1)/i.test(content)) return;
@@ -540,7 +542,7 @@ export default function NoteContent({
           onOpenProfile={onOpenProfile}
           onOpenHashtag={onOpenHashtag}
           customEmojis={customEmojis}
-          className={className}
+          className={isBigFont ? `${className} note-text-big` : className}
           style={style}
         />
       );

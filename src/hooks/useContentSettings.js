@@ -26,5 +26,7 @@ export default function useContentSettings() {
     setAutoplayVideos: val => update({ autoplayVideos: val }),
     loopVideos: settings.loopVideos ?? true,
     setLoopVideos: val => update({ loopVideos: val }),
+    bigFontShortNotes: settings.bigFontShortNotes ?? false,
+    setBigFontShortNotes: val => update({ bigFontShortNotes: val }),
   };
 }

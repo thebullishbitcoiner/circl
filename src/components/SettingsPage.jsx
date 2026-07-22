@@ -618,6 +618,8 @@ function ContentSubPage({ onBack }) {
 }
 
 function AppearanceSubPage({ onBack, dark, toggleDark, textSize, onTextSizeChange }) {
+  const { bigFontShortNotes, setBigFontShortNotes } = useContentSettings();
+
   return (
     <SubPage title="Appearance" onBack={onBack}>
       <div className="settings-row" onClick={toggleDark}>
@@ -627,6 +629,17 @@ function AppearanceSubPage({ onBack, dark, toggleDark, textSize, onTextSizeChang
         </div>
         <label className="toggle" onClick={e => e.stopPropagation()}>
           <input type="checkbox" checked={dark} onChange={toggleDark} />
+          <div className="toggle-track" />
+          <div className="toggle-thumb" />
+        </label>
+      </div>
+      <div className="settings-row" onClick={() => setBigFontShortNotes(!bigFontShortNotes)}>
+        <div>
+          <div className="settings-row-label">Use BIG font for short notes</div>
+          <div className="settings-row-sub">Render notes under 50 characters in an excessively large font</div>
+        </div>
+        <label className="toggle" onClick={e => e.stopPropagation()}>
+          <input type="checkbox" checked={bigFontShortNotes} onChange={() => setBigFontShortNotes(!bigFontShortNotes)} />
           <div className="toggle-track" />
           <div className="toggle-thumb" />
         </label>

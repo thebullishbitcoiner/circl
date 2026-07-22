@@ -276,6 +276,7 @@
   .meta-dot{font-size:10px;color:var(--text-faint);opacity:.8;}
   .note-time{font-size:10.5px;color:var(--text-faint);}
   .note-text{font-family:'DM Sans',sans-serif;font-size:var(--font-base);line-height:1.5;color:var(--text);margin-bottom:8px;word-break:break-word;overflow-wrap:anywhere;white-space:pre-wrap;}
+  .note-text-big{font-size:2em;line-height:1.2;font-weight:600;}
   .note-content-stack{display:flex;flex-direction:column;gap:0;margin-bottom:8px;min-width:0;}
   .note-content-stack .note-text{margin-bottom:4;}
   .note-content-collapsed{max-height:160px;overflow:hidden;position:relative;}
