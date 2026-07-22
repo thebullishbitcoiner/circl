@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import NoteText from "./NoteText.jsx";
 import Avatar from "./Avatar.jsx";
 import MediaLightbox from "./MediaLightbox.jsx";
@@ -370,6 +370,50 @@ function MediaMosaic({ items, onItemClick }) {
 const COLLAPSE_THRESHOLD = 500;
 const BIG_FONT_THRESHOLD = 50;
 
+function VideoPlayer({ src, autoPlay, muted, loop }) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (!entry.isIntersecting) el.pause(); },
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+
+    function onOtherPlay(e) {
+      if (e.detail !== el) el.pause();
+    }
+    window.addEventListener("circl:videoplaying", onOtherPlay);
+
+    function onPlay() {
+      window.dispatchEvent(new CustomEvent("circl:videoplaying", { detail: el }));
+    }
+    el.addEventListener("play", onPlay);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("circl:videoplaying", onOtherPlay);
+      el.removeEventListener("play", onPlay);
+    };
+  }, []);
+
+  return (
+    <video
+      ref={ref}
+      src={src}
+      controls
+      playsInline
+      preload="metadata"
+      autoPlay={autoPlay}
+      muted={muted}
+      loop={loop}
+    />
+  );
+}
+
 /**
  * Renders note body with inline images (mosaic when multiple), videos, and @mentions.
  */
@@ -596,7 +640,7 @@ export default function NoteContent({
               className="note-media note-media-video"
               onClick={e => e.stopPropagation()}
             >
-              <video src={seg.url} controls playsInline preload="metadata" autoPlay={autoplayVideos} muted={autoplayVideos} loop={loopVideos} />
+              <VideoPlayer src={seg.url} autoPlay={autoplayVideos} muted={autoplayVideos} loop={loopVideos} />
             </div>
           );
         }
