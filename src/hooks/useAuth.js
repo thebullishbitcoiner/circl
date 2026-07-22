@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { DEFAULT_RELAYS, NOSTR_CLIENT_TAG } from "../constants.js";
 import { isHexPubkey, normPubkey } from "../utils.js";
 import { pool, validRelays, publishWithStatus } from "../nostr.js";
@@ -78,6 +78,41 @@ export default function useAuth() {
     if (!pubkey || !privateRelayUrls.length) return;
     for (const url of validRelays(privateRelayUrls)) pool.relay(url);
   }, [pubkey, privateRelayUrls.join(",")]);
+
+  // Track the set of relays the user explicitly configured so the challenge$
+  // callback always reads the latest value without stale closure issues.
+  const knownRelayUrlsRef = useRef(new Set(DEFAULT_RELAYS));
+  useEffect(() => {
+    knownRelayUrlsRef.current = new Set([...DEFAULT_RELAYS, ...outboxes, ...privateRelayUrls]);
+  }, [outboxes, privateRelayUrls]);
+
+  // Auto-respond to NIP-42 AUTH challenges, but only for relays the user
+  // explicitly configured — not arbitrary hint relays added to the pool.
+  useEffect(() => {
+    if (!pubkey) return;
+    const authSubs = new Map();
+    const poolSub = pool.relays$.subscribe(relayMap => {
+      for (const [url, relay] of relayMap) {
+        if (authSubs.has(url)) continue;
+        const sub = relay.challenge$.subscribe(challenge => {
+          if (!challenge || !window.nostr) return;
+          const isKnown = knownRelayUrlsRef.current.has(url);
+          if (!isKnown) {
+            try {
+              const s = JSON.parse(localStorage.getItem("circl_content_settings") || "{}");
+              if (!s.relayAuth) return;
+            } catch { return; }
+          }
+          relay.authenticate({ signEvent: e => window.nostr.signEvent(e) }).catch(() => {});
+        });
+        authSubs.set(url, sub);
+      }
+    });
+    return () => {
+      poolSub.unsubscribe();
+      for (const s of authSubs.values()) s.unsubscribe();
+    };
+  }, [pubkey]);
 
   const signAndPublish = useCallback(async (tmpl, opts = {}) => {
     if (!pubkey || !window.nostr) throw new Error("Not connected");

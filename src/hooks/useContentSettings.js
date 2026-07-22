@@ -28,5 +28,7 @@ export default function useContentSettings() {
     setLoopVideos: val => update({ loopVideos: val }),
     bigFontShortNotes: settings.bigFontShortNotes ?? false,
     setBigFontShortNotes: val => update({ bigFontShortNotes: val }),
+    relayAuth: settings.relayAuth ?? false,
+    setRelayAuth: val => update({ relayAuth: val }),
   };
 }

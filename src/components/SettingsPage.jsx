@@ -671,8 +671,23 @@ function AppearanceSubPage({ onBack, dark, toggleDark, textSize, onTextSizeChang
 }
 
 function RelaysSubPage({ onBack, pubkey, signAndPublish }) {
+  const { relayAuth, setRelayAuth } = useContentSettings();
   return (
     <SubPage title="Relays" onBack={onBack}>
+      <RelaySectionHeader label="Authentication" info="Your configured relays (mailbox, private) are always authenticated automatically." />
+      <div style={{ margin: "0 12px 20px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
+        <div className="settings-row" onClick={() => setRelayAuth(!relayAuth)}>
+          <div>
+            <div className="settings-row-label">Authenticate with unknown relays</div>
+            <div className="settings-row-sub">Sign NIP-42 AUTH challenges from relays not in your configured list</div>
+          </div>
+          <label className="toggle" onClick={e => e.stopPropagation()}>
+            <input type="checkbox" checked={relayAuth} onChange={() => setRelayAuth(!relayAuth)} />
+            <div className="toggle-track" />
+            <div className="toggle-thumb" />
+          </label>
+        </div>
+      </div>
       <RelaySectionHeader label="Mailbox Relays" info="Relays used to publish and receive notes (NIP-65)" />
       <div style={{ margin: "0 12px 20px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
         <RelayEditor pubkey={pubkey} signAndPublish={signAndPublish} />

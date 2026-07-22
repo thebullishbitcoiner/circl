@@ -541,7 +541,18 @@
   .sugg-bio{font-size:9.5px;color:var(--text-faint);margin-top:1px;}
   .follow-btn{padding:3px 10px;border-radius:50px;border:1.5px solid var(--primary);background:none;color:var(--primary);font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:500;cursor:pointer;transition:all .15s;flex-shrink:0;}
   .follow-btn:hover{background:var(--primary);color:white;}
-  .relay-item{font-size:calc(var(--font-base) - 3px);color:var(--text-muted);padding:3px 0;font-family:monospace;word-break:break-all;}
+  .relay-item{font-size:calc(var(--font-base) - 3px);color:var(--text-muted);padding:3px 0;font-family:monospace;word-break:break-all;display:flex;align-items:center;gap:6px;}
+  .relay-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+  .relay-dot--connected{background:#22c55e;}
+  .relay-dot--offline{background:var(--border);}
+  .relay-tooltip{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 11px;font-size:11px;font-family:monospace;box-shadow:0 4px 16px rgba(0,0,0,.18);min-width:200px;max-width:300px;line-height:1.6;}
+  .relay-tooltip-url{font-weight:600;color:var(--text);margin-bottom:5px;word-break:break-all;font-family:'DM Sans',sans-serif;font-size:11.5px;}
+  .relay-tooltip-row{color:var(--text-muted);word-break:break-word;}
+  .relay-tooltip-status--on{color:#22c55e;}
+  .relay-tooltip-status--off{color:var(--text-faint);}
+  .relay-tooltip-faint{color:var(--text-faint);}
+  .relay-tooltip-warn{color:#f59e0b;}
+  .relay-tooltip-notice{color:var(--text-faint);font-style:italic;word-break:break-word;white-space:normal;}
 
   /* Publish status (card + modal share these) */
   .publish-status-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;}
