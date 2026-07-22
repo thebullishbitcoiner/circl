@@ -544,6 +544,7 @@
   .relay-item{font-size:calc(var(--font-base) - 3px);color:var(--text-muted);padding:3px 0;font-family:monospace;word-break:break-all;display:flex;align-items:center;gap:6px;}
   .relay-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
   .relay-dot--connected{background:#22c55e;}
+  .relay-dot--auth{background:#f59e0b;}
   .relay-dot--offline{background:var(--border);}
   .relay-tooltip{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 11px;font-size:11px;font-family:monospace;box-shadow:0 4px 16px rgba(0,0,0,.18);min-width:200px;max-width:300px;line-height:1.6;}
   .relay-tooltip-url{font-weight:600;color:var(--text);margin-bottom:5px;word-break:break-all;font-family:'DM Sans',sans-serif;font-size:11.5px;}

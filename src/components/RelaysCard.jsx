@@ -134,7 +134,11 @@ export default function RelaysCard({ profilePubkey, pubkey, activeNav }) {
           onMouseEnter={e => handleMouseEnter(e, r)}
           onMouseLeave={handleMouseLeave}
         >
-          <span className={`relay-dot ${statusMap[r]?.connected ? "relay-dot--connected" : "relay-dot--offline"}`} />
+          <span className={`relay-dot ${
+            statusMap[r]?.connected
+              ? (statusMap[r]?.authRequiredForRead && !statusMap[r]?.authenticated ? "relay-dot--auth" : "relay-dot--connected")
+              : "relay-dot--offline"
+          }`} />
           {fmtUrl(r)}
         </div>
       ))}
