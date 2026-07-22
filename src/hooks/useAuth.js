@@ -86,26 +86,38 @@ export default function useAuth() {
     knownRelayUrlsRef.current = new Set([...DEFAULT_RELAYS, ...outboxes, ...privateRelayUrls]);
   }, [outboxes, privateRelayUrls]);
 
-  // Auto-respond to NIP-42 AUTH challenges, but only for relays the user
-  // explicitly configured — not arbitrary hint relays added to the pool.
+  // Auto-respond to NIP-42 AUTH challenges reactively — only when a REQ or
+  // EVENT is actually blocked, not on every connect/reconnect. The authenticating
+  // Set is checked synchronously before calling signEvent so that a flood of
+  // simultaneous auth-required responses (one per open subscription) collapses
+  // into a single prompt.
   useEffect(() => {
     if (!pubkey) return;
     const authSubs = new Map();
+    const authenticating = new Set();
+
+    function tryAuthenticate(relay, url) {
+      if (!window.nostr || !relay.challenge) return;
+      if (relay.authenticated || authenticating.has(url)) return;
+      const isKnown = knownRelayUrlsRef.current.has(url);
+      if (!isKnown) {
+        try {
+          const s = JSON.parse(localStorage.getItem("circl_content_settings") || "{}");
+          if (!s.relayAuth) return;
+        } catch { return; }
+      }
+      authenticating.add(url);
+      relay.authenticate({ signEvent: e => window.nostr.signEvent(e) })
+        .finally(() => authenticating.delete(url))
+        .catch(() => {});
+    }
+
     const poolSub = pool.relays$.subscribe(relayMap => {
       for (const [url, relay] of relayMap) {
         if (authSubs.has(url)) continue;
-        const sub = relay.challenge$.subscribe(challenge => {
-          if (!challenge || !window.nostr) return;
-          const isKnown = knownRelayUrlsRef.current.has(url);
-          if (!isKnown) {
-            try {
-              const s = JSON.parse(localStorage.getItem("circl_content_settings") || "{}");
-              if (!s.relayAuth) return;
-            } catch { return; }
-          }
-          relay.authenticate({ signEvent: e => window.nostr.signEvent(e) }).catch(() => {});
-        });
-        authSubs.set(url, sub);
+        const readSub  = relay.authRequiredForRead$.subscribe(r  => { if (r) tryAuthenticate(relay, url); });
+        const writeSub = relay.authRequiredForPublish$.subscribe(r => { if (r) tryAuthenticate(relay, url); });
+        authSubs.set(url, { unsubscribe: () => { readSub.unsubscribe(); writeSub.unsubscribe(); } });
       }
     });
     return () => {
