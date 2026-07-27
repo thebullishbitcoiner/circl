@@ -296,8 +296,10 @@ export default function ProfilePage({
   }, [profileOutboxes]);
   const contentRelayKey = useMemo(() => contentRelayUrls.join(","), [contentRelayUrls]);
 
-  const zapperPks = useMemo(() => {
-    const pks = [];
+  const ownProfilePks = useMemo(() => {
+    // Always fetch the viewed profile's own metadata — it may not be in the
+    // App-level `profilesProp` cache (e.g. a stranger found via search).
+    const pks = [pubkey];
     for (const e of profileEvents) {
       if (e.kind !== 9735) continue;
       const zapper = zapperPubkeyFromKind9735(e);
@@ -306,9 +308,9 @@ export default function ProfilePage({
       if (Ptag) pks.push(Ptag);
     }
     return pks;
-  }, [profileEvents]);
-  const { profiles: zapperProfiles } = useProfiles({ pubkeys: zapperPks });
-  const profiles = useMemo(() => ({ ...zapperProfiles, ...profilesProp }), [profilesProp, zapperProfiles]);
+  }, [pubkey, profileEvents]);
+  const { profiles: ownFetchedProfiles } = useProfiles({ pubkeys: ownProfilePks });
+  const profiles = useMemo(() => ({ ...ownFetchedProfiles, ...profilesProp }), [profilesProp, ownFetchedProfiles]);
 
   const p    = profiles?.[pubkey] || {};
   const name = displayName(pubkey, profiles);

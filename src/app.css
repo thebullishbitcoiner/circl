@@ -730,6 +730,8 @@
   .circle-card-npub{font-family:monospace;font-size:calc(var(--font-base) - 4.5px);color:var(--text-faint);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .circle-unfollow-btn{flex-shrink:0;padding:4px 9px;border-radius:50px;border:1px solid var(--border);background:none;color:var(--text-faint);font-family:'DM Sans',sans-serif;font-size:calc(var(--font-base) - 3px);cursor:pointer;transition:all .15s;align-self:center;}
   .circle-unfollow-btn:hover{border-color:#ef4444;color:#ef4444;}
+  .circle-follow-btn{flex-shrink:0;padding:4px 9px;border-radius:50px;border:1.5px solid var(--primary);background:var(--primary);color:#fff;font-family:'DM Sans',sans-serif;font-size:calc(var(--font-base) - 3px);font-weight:600;cursor:pointer;transition:all .15s;align-self:center;}
+  .circle-follow-btn:hover{opacity:.85;}
 
   .empty-state{padding:48px 20px;text-align:center;}
   .empty-state-title{font-family:'DM Sans',sans-serif;font-size:18px;color:var(--text-muted);margin-bottom:5px;}

@@ -1,14 +1,31 @@
-import { useEffect, useRef, useState, memo } from "react";
+import { useEffect, useRef, useState, memo, useMemo } from "react";
 import { Bk, Ck } from "./icons.jsx";
 import { displayName, shortNpub } from "../utils.js";
+import useProfiles from "../hooks/useProfiles.js";
 
 // Persists scroll position across unmount/remount (e.g. navigating to a profile and back)
 const savedScrollPositions = new Map();
 
-export default memo(function CirclePage({ pubkey, follows = [], profiles, onOpenProfile, onBack, myFollows, onFollow, onUnfollow }) {
+export default memo(function CirclePage({ pubkey, follows = [], profiles: profilesProp, onOpenProfile, onBack, myPubkey, myFollows, onFollow, onUnfollow }) {
+  // The people shown here (another user's follows) are usually outside the
+  // app's global profile cache, so fetch them directly rather than relying
+  // on `profilesProp` alone.
+  const fetchPks = useMemo(() => [pubkey, ...follows], [pubkey, follows]);
+  const { profiles: fetchedProfiles } = useProfiles({ pubkeys: fetchPks });
+  const profiles = useMemo(() => ({ ...fetchedProfiles, ...profilesProp }), [profilesProp, fetchedProfiles]);
+
   const ownerName = displayName(pubkey, profiles);
   const scrollRef = useRef(null);
   const [query, setQuery] = useState("");
+
+  // Mutuals (people you already follow) first, so they're easy to spot
+  const myFollowSet = useMemo(() => new Set(myFollows || []), [myFollows]);
+  const orderedFollows = useMemo(() => {
+    const mutual = [];
+    const rest = [];
+    for (const pk of follows) (myFollowSet.has(pk) ? mutual : rest).push(pk);
+    return [...mutual, ...rest];
+  }, [follows, myFollowSet]);
 
   // Restore scroll position after mount (rAF ensures layout is settled)
   useEffect(() => {
@@ -53,7 +70,7 @@ export default memo(function CirclePage({ pubkey, follows = [], profiles, onOpen
       ) : (() => {
         const q = query.trim().toLowerCase();
         const visible = q
-          ? follows.filter(pk => {
+          ? orderedFollows.filter(pk => {
               const fp = profiles?.[pk] || {};
               return (
                 displayName(pk, profiles).toLowerCase().includes(q) ||
@@ -61,7 +78,7 @@ export default memo(function CirclePage({ pubkey, follows = [], profiles, onOpen
                 shortNpub(pk).toLowerCase().includes(q)
               );
             })
-          : follows;
+          : orderedFollows;
         return visible.length === 0 ? (
           <div className="empty-state">
             <div className="empty-state-title">No results</div>
@@ -71,7 +88,7 @@ export default memo(function CirclePage({ pubkey, follows = [], profiles, onOpen
           {visible.map((pk, i) => {
             const fp = profiles?.[pk] || {};
             const fn = displayName(pk, profiles);
-            const iFollow = myFollows?.includes(pk);
+            const iFollow = myFollowSet.has(pk);
             return (
               <div
                 className="circle-card"
@@ -91,15 +108,25 @@ export default memo(function CirclePage({ pubkey, follows = [], profiles, onOpen
                     )}
                     <div className="circle-card-npub">{shortNpub(pk)}</div>
                   </div>
-                  {iFollow && onUnfollow && (
-                    <button
-                      type="button"
-                      className="circle-unfollow-btn"
-                      onClick={e => { e.stopPropagation(); onUnfollow(pk); }}
-                    >
-                      Unfollow
-                    </button>
-                  )}
+                  {pk !== myPubkey && (iFollow
+                    ? onUnfollow && (
+                      <button
+                        type="button"
+                        className="circle-unfollow-btn"
+                        onClick={e => { e.stopPropagation(); onUnfollow(pk); }}
+                      >
+                        Unfollow
+                      </button>
+                    )
+                    : onFollow && (
+                      <button
+                        type="button"
+                        className="circle-follow-btn"
+                        onClick={e => { e.stopPropagation(); onFollow(pk); }}
+                      >
+                        Follow
+                      </button>
+                    ))}
                 </div>
               </div>
             );

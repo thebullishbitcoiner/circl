@@ -674,7 +674,7 @@ function RelaysSubPage({ onBack, pubkey, signAndPublish }) {
   const { relayAuth, setRelayAuth } = useContentSettings();
   return (
     <SubPage title="Relays" onBack={onBack}>
-      <RelaySectionHeader label="Authentication" info="Your configured relays (mailbox, private) are always authenticated automatically." />
+      <RelaySectionHeader label="Authentication" info="Your configured relays (mailbox + private) always authenticate automatically — they already know your pubkey, so there's no privacy cost. Enabling this for unknown relays links your pubkey and IP to relays added from event hints. The trade-off: keeping it off protects your privacy but may cause some events to fail to load if the relay requires auth to serve content." />
       <div style={{ margin: "0 12px 20px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
         <div className="settings-row" onClick={() => setRelayAuth(!relayAuth)}>
           <div>

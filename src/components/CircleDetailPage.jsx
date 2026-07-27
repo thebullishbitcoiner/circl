@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import Avatar from "./Avatar.jsx";
 import { displayName, shortNpub } from "../utils.js";
+import useProfiles from "../hooks/useProfiles.js";
 
 export default function CircleDetailPage({
   circle,
-  profiles,
+  profiles: profilesProp,
   follows = [],
   onAddMember,
   onRemoveMember,
@@ -12,6 +13,12 @@ export default function CircleDetailPage({
   onOpenProfile,
   onCompose,
 }) {
+  // Circle members may sit outside the app's global profile cache (e.g. a
+  // member the viewer no longer follows) — fetch them directly.
+  const fetchPks = useMemo(() => circle?.members ?? [], [circle]);
+  const { profiles: fetchedProfiles } = useProfiles({ pubkeys: fetchPks });
+  const profiles = useMemo(() => ({ ...fetchedProfiles, ...profilesProp }), [profilesProp, fetchedProfiles]);
+
   const [renaming, setRenaming] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [savingName, setSavingName] = useState(false);
