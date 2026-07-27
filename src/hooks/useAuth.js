@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { DEFAULT_RELAYS, NOSTR_CLIENT_TAG } from "../constants.js";
 import { isHexPubkey, normPubkey } from "../utils.js";
 import { pool, validRelays, publishWithStatus, eventStore } from "../nostr.js";
+import { isReplaceable, getReplaceableIdentifier } from "applesauce-core/helpers/event";
 import useMailboxes from "./useMailboxes.js";
 import useBlockedRelays from "./useBlockedRelays.js";
 import usePrivateRelays from "./usePrivateRelays.js";
@@ -136,6 +137,16 @@ export default function useAuth() {
       created_at: Math.floor(Date.now() / 1000),
       pubkey,
     };
+    // EventStore rejects a replaceable event whose created_at doesn't strictly exceed
+    // the version it already has (1s resolution collides easily on quick successive
+    // saves), so bump past whatever's cached locally before signing.
+    if (isReplaceable(unsigned.kind)) {
+      const identifier = getReplaceableIdentifier(unsigned);
+      const existing = eventStore.getReplaceable(unsigned.kind, pubkey, identifier);
+      if (existing && existing.created_at >= unsigned.created_at) {
+        unsigned.created_at = existing.created_at + 1;
+      }
+    }
     const signed = await withTimeout(
       window.nostr.signEvent(unsigned),
       10000,
