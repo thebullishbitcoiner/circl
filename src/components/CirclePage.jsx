@@ -40,7 +40,14 @@ export default memo(function CirclePage({ pubkey, follows = [], profiles: profil
     <div className="slide-panel-scroll" ref={scrollRef} onScroll={() => savedScrollPositions.set(pubkey, scrollRef.current?.scrollTop ?? 0)}>
       <div className="panel-bar">
         <button type="button" className="back-btn" onClick={onBack}><Bk s={16} /></button>
-        <span className="panel-bar-logo">{ownerName}'s Circle</span>
+        <span className="panel-bar-logo" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {ownerName}'s Circle
+          {follows.length > 0 && (
+            <span style={{ background: "var(--primary)", color: "white", borderRadius: 50, fontSize: 11, fontWeight: 500, padding: "1px 8px", fontFamily: "'DM Sans',sans-serif" }}>
+              {follows.length}
+            </span>
+          )}
+        </span>
       </div>
 
       {follows.length > 0 && (
