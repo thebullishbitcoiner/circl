@@ -325,7 +325,7 @@ function ImageMosaic({ urls, onImageClick }) {
 }
 
 // Renders a mixed image+video mosaic. items = [{ type: "image"|"video", url }]
-function MediaMosaic({ items, onItemClick }) {
+export function MediaMosaic({ items, onItemClick }) {
   const c = items.length;
   const extra = c > 4 ? c - 4 : 0;
   const shown = extra ? items.slice(0, 4) : items;

@@ -1605,6 +1605,7 @@ export default function ProfilePage({
               event={selectedListing}
               profiles={profiles}
               myPubkey={myPubkey}
+              blossomServers={blossomServers}
               onOpenProfile={onOpenProfile}
               publishEvent={publishEvent}
               onDelete={id => { setListingEvents(prev => prev.filter(ev => ev.id !== id)); setSelectedListing(null); }}
@@ -1661,6 +1662,7 @@ export default function ProfilePage({
                         event={e}
                         profiles={profiles}
                         myPubkey={myPubkey}
+                        blossomServers={blossomServers}
                         onOpenProfile={onOpenProfile}
                         publishEvent={publishEvent}
                         onSelect={setSelectedListing}
@@ -1673,6 +1675,8 @@ export default function ProfilePage({
               {createListingOpen && (
                 <CreateListingSheet
                   publishEvent={publishEvent}
+                  myPubkey={myPubkey}
+                  blossomServers={blossomServers}
                   onCreated={ev => setListingEvents(prev => prev.some(e => e.id === ev.id) ? prev : [ev, ...prev])}
                   onDismiss={() => setCreateListingOpen(false)}
                 />

@@ -2,7 +2,7 @@ import { useState, memo } from "react";
 import { createPortal } from "react-dom";
 import ListingDetailModal from "./ListingDetailModal.jsx";
 
-function ListingCard({ event, profiles, myPubkey, onOpenProfile, publishEvent, onDelete, onUpdated, onSelect, delay = 0 }) {
+function ListingCard({ event, profiles, myPubkey, blossomServers, onOpenProfile, publishEvent, onDelete, onUpdated, onSelect, delay = 0 }) {
   const [detailOpen, setDetailOpen] = useState(false);
 
   const title    = event.tags?.find(t => t[0] === "title")?.[1]   || "";
@@ -17,7 +17,7 @@ function ListingCard({ event, profiles, myPubkey, onOpenProfile, publishEvent, o
   let priceDisplay = null;
   if (priceTag) {
     const [, amount, currency, frequency] = priceTag;
-    priceDisplay = `${amount} ${(currency || "").toUpperCase()}${frequency ? ` / ${frequency}` : ""}`;
+    priceDisplay = `${amount} ${currency || ""}${frequency ? ` / ${frequency}` : ""}`;
   }
 
   return (
@@ -47,6 +47,7 @@ function ListingCard({ event, profiles, myPubkey, onOpenProfile, publishEvent, o
           event={event}
           profiles={profiles}
           myPubkey={myPubkey}
+          blossomServers={blossomServers}
           onOpenProfile={onOpenProfile}
           publishEvent={publishEvent}
           onDelete={onDelete}

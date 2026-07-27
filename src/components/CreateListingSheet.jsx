@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import Overlay from "./Overlay.jsx";
+import TagChipInput from "./TagChipInput.jsx";
+import ListingImageUpload from "./ListingImageUpload.jsx";
 import { sheetPortal } from "../utils/sheetPortal.js";
 
-export default function CreateListingSheet({ publishEvent, onCreated, onDismiss }) {
+export default function CreateListingSheet({ publishEvent, myPubkey, blossomServers, onCreated, onDismiss }) {
   const [title,         setTitle]         = useState("");
   const [summary,       setSummary]       = useState("");
   const [priceAmt,      setPriceAmt]      = useState("");
   const [priceCurrency, setPriceCurrency] = useState("sats");
   const [location,      setLocation]      = useState("");
-  const [image,         setImage]         = useState("");
+  const [images,        setImages]        = useState([]);
   const [description,   setDescription]   = useState("");
-  const [hashtags,      setHashtags]      = useState("");
+  const [hashtags,      setHashtags]      = useState([]);
   const [busy,          setBusy]          = useState(false);
   const [error,         setError]         = useState(null);
 
@@ -21,16 +23,14 @@ export default function CreateListingSheet({ publishEvent, onCreated, onDismiss 
       ["d", now],
       ["published_at", now],
     ];
-    if (title)         tags.push(["title", title.trim()]);
-    if (summary)       tags.push(["summary", summary.trim()]);
-    if (location)      tags.push(["location", location.trim()]);
-    if (image.trim())  tags.push(["image", image.trim()]);
+    if (title)    tags.push(["title", title.trim()]);
+    if (summary)  tags.push(["summary", summary.trim()]);
+    if (location) tags.push(["location", location.trim()]);
+    for (const url of images) tags.push(["image", url]);
     if (priceAmt.trim()) {
       tags.push(["price", priceAmt.trim(), priceCurrency.trim()]);
     }
-    for (const tag of hashtags.split(",").map(s => s.trim()).filter(Boolean)) {
-      tags.push(["t", tag]);
-    }
+    for (const tag of hashtags) tags.push(["t", tag]);
     return tags;
   };
 
@@ -110,20 +110,12 @@ export default function CreateListingSheet({ publishEvent, onCreated, onDismiss 
             onChange={e => setLocation(e.target.value)}
             maxLength={200}
           />
-          <input
-            className="highlight-sheet-comment"
-            style={{ padding: "8px 10px" }}
-            placeholder="Image URL"
-            value={image}
-            onChange={e => setImage(e.target.value)}
-          />
-          <input
-            className="highlight-sheet-comment"
-            style={{ padding: "8px 10px" }}
-            placeholder="Hashtags (comma-separated)"
-            value={hashtags}
-            onChange={e => setHashtags(e.target.value)}
-          />
+          <div style={{ margin: "0 16px 12px" }}>
+            <ListingImageUpload images={images} onChange={setImages} myPubkey={myPubkey} blossomServers={blossomServers} />
+          </div>
+          <div style={{ margin: "0 16px 12px" }}>
+            <TagChipInput tags={hashtags} onChange={setHashtags} placeholder="Add hashtags…" />
+          </div>
 
           {error && <div className="highlight-sheet-error">{error}</div>}
         </div>

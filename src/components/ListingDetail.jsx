@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import NoteContent from "./NoteContent.jsx";
+import NoteContent, { MediaMosaic } from "./NoteContent.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
 import ZapOutModal from "./ZapOutModal.jsx";
 import MediaLightbox from "./MediaLightbox.jsx";
+import TagChipInput from "./TagChipInput.jsx";
+import ListingImageUpload from "./ListingImageUpload.jsx";
 import { relativeTime, nip19 } from "../utils.js";
 import { broadcastEvent } from "../nostr.js";
-
-const FREQUENCIES = ["", "hour", "day", "week", "month", "year"];
 
 const inputStyle = {
   width: "100%", boxSizing: "border-box", padding: "7px 10px", borderRadius: 8,
@@ -36,11 +36,12 @@ function ListingContextMenu({ event, onClose, onViewJson, onDelete }) {
   );
 }
 
-export default function ListingDetail({ event, profiles, myPubkey, onOpenProfile, publishEvent, onDelete, onUpdated, onBack }) {
+export default function ListingDetail({ event, profiles, myPubkey, blossomServers, onOpenProfile, publishEvent, onDelete, onUpdated, onBack }) {
   const [menuOpen,      setMenuOpen]      = useState(false);
   const [jsonOpen,      setJsonOpen]      = useState(false);
   const [zapOutOpen,    setZapOutOpen]    = useState(false);
   const [lightboxOpen,  setLightboxOpen]  = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
   const [busy,          setBusy]          = useState(false);
   const [error,         setError]         = useState(null);
 
@@ -49,19 +50,18 @@ export default function ListingDetail({ event, profiles, myPubkey, onOpenProfile
 
   const initTitle    = event.tags?.find(t => t[0] === "title")?.[1]    || "";
   const initSummary  = event.tags?.find(t => t[0] === "summary")?.[1]  || "";
-  const initImage    = event.tags?.find(t => t[0] === "image")?.[1]    || "";
+  const initImages   = event.tags?.filter(t => t[0] === "image").map(t => t[1])  || [];
   const initLocation = event.tags?.find(t => t[0] === "location")?.[1] || "";
   const initStatus   = event.tags?.find(t => t[0] === "status")?.[1]   || "active";
   const initPriceTag = event.tags?.find(t => t[0] === "price");
-  const initHashtags = event.tags?.filter(t => t[0] === "t").map(t => t[1]).join(", ") || "";
+  const initHashtags = event.tags?.filter(t => t[0] === "t").map(t => t[1]) || [];
 
   const [editTitle,    setEditTitle]    = useState(initTitle);
   const [editSummary,  setEditSummary]  = useState(initSummary);
   const [editPriceAmt, setEditPriceAmt] = useState(initPriceTag?.[1] || "");
   const [editCurrency, setEditCurrency] = useState(initPriceTag?.[2] || "USD");
-  const [editFreq,     setEditFreq]     = useState(initPriceTag?.[3] || "");
   const [editLocation, setEditLocation] = useState(initLocation);
-  const [editImage,    setEditImage]    = useState(initImage);
+  const [editImages,   setEditImages]   = useState(initImages);
   const [editDesc,     setEditDesc]     = useState(event.content || "");
   const [editHashtags, setEditHashtags] = useState(initHashtags);
   const [editStatus,   setEditStatus]   = useState(initStatus);
@@ -80,16 +80,12 @@ export default function ListingDetail({ event, profiles, myPubkey, onOpenProfile
     if (editTitle.trim())    tags.push(["title",    editTitle.trim()]);
     if (editSummary.trim())  tags.push(["summary",  editSummary.trim()]);
     if (editLocation.trim()) tags.push(["location", editLocation.trim()]);
-    if (editImage.trim())    tags.push(["image",    editImage.trim()]);
+    for (const url of editImages) tags.push(["image", url]);
     if (editStatus)          tags.push(["status",   editStatus]);
     if (editPriceAmt.trim()) {
-      const price = ["price", editPriceAmt.trim(), editCurrency.trim()];
-      if (editFreq) price.push(editFreq);
-      tags.push(price);
+      tags.push(["price", editPriceAmt.trim(), editCurrency.trim()]);
     }
-    for (const tag of editHashtags.split(",").map(s => s.trim()).filter(Boolean)) {
-      tags.push(["t", tag]);
-    }
+    for (const tag of editHashtags) tags.push(["t", tag]);
 
     const ev = await publishEvent({ kind: editKind, content: editDesc, tags });
     setBusy(false);
@@ -107,19 +103,19 @@ export default function ListingDetail({ event, profiles, myPubkey, onOpenProfile
       }
     : null;
 
-  const title    = initTitle;
-  const image    = initImage || null;
-  const location = initLocation;
-  const status   = initStatus;
-  const priceTag = initPriceTag;
-  const hashtags = event.tags?.filter(t => t[0] === "t").map(t => t[1]);
-  const isDraft  = event.kind === 30403;
-  const isSold   = status === "sold";
+  const title      = initTitle;
+  const location   = initLocation;
+  const status     = initStatus;
+  const priceTag   = initPriceTag;
+  const hashtags   = initHashtags;
+  const isDraft    = event.kind === 30403;
+  const isSold     = status === "sold";
+  const mosaicItems = initImages.map(url => ({ url, type: "image" }));
 
   let priceDisplay = null;
   if (priceTag) {
     const [, amount, currency, frequency] = priceTag;
-    priceDisplay = `${amount} ${(currency || "").toUpperCase()}${frequency ? ` / ${frequency}` : ""}`;
+    priceDisplay = `${amount} ${currency || ""}${frequency ? ` / ${frequency}` : ""}`;
   }
 
   return (
@@ -147,25 +143,16 @@ export default function ListingDetail({ event, profiles, myPubkey, onOpenProfile
       {isOwn ? (
         /* ── Edit mode ── */
         <div style={{ padding: "12px 16px 0", display: "flex", flexDirection: "column", gap: 8 }}>
-          {editImage && (
-            <div style={{ width: "100%", aspectRatio: "4/3", overflow: "hidden", borderRadius: 8, background: "var(--surface2)" }}>
-              <img src={editImage} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            </div>
-          )}
+          <ListingImageUpload images={editImages} onChange={setEditImages} myPubkey={myPubkey} blossomServers={blossomServers} />
           <input style={inputStyle} placeholder="Title *" value={editTitle} onChange={e => setEditTitle(e.target.value)} maxLength={200} />
           <input style={inputStyle} placeholder="Summary (short tagline)" value={editSummary} onChange={e => setEditSummary(e.target.value)} maxLength={300} />
           <textarea style={{ ...inputStyle, resize: "vertical" }} placeholder="Description (markdown supported)" value={editDesc} onChange={e => setEditDesc(e.target.value)} rows={3} />
           <div style={{ display: "flex", gap: 6 }}>
             <input style={{ ...inputStyle, flex: "1 1 70px", minWidth: 0 }} placeholder="Price" type="number" min="0" value={editPriceAmt} onChange={e => setEditPriceAmt(e.target.value)} />
             <input style={{ ...inputStyle, flex: "1 1 55px", minWidth: 0 }} placeholder="Currency" value={editCurrency} onChange={e => setEditCurrency(e.target.value)} maxLength={10} />
-            <select style={{ ...inputStyle, flex: "1 1 80px", minWidth: 0, cursor: "pointer" }} value={editFreq} onChange={e => setEditFreq(e.target.value)}>
-              <option value="">One-time</option>
-              {FREQUENCIES.filter(Boolean).map(f => <option key={f} value={f}>{f.charAt(0).toUpperCase() + f.slice(1)}ly</option>)}
-            </select>
           </div>
           <input style={inputStyle} placeholder="Location" value={editLocation} onChange={e => setEditLocation(e.target.value)} maxLength={200} />
-          <input style={inputStyle} placeholder="Image URL" value={editImage} onChange={e => setEditImage(e.target.value)} />
-          <input style={inputStyle} placeholder="Hashtags (comma-separated)" value={editHashtags} onChange={e => setEditHashtags(e.target.value)} />
+          <TagChipInput tags={editHashtags} onChange={setEditHashtags} placeholder="Add hashtags…" style={inputStyle} />
           <div style={{ display: "flex", gap: 6 }}>
             <select style={{ ...inputStyle, flex: 1 }} value={editStatus} onChange={e => setEditStatus(e.target.value)}>
               <option value="active">Active</option>
@@ -186,9 +173,9 @@ export default function ListingDetail({ event, profiles, myPubkey, onOpenProfile
       ) : (
         /* ── View mode ── */
         <>
-          {image && (
-            <div style={{ width: "100%", aspectRatio: "4/3", overflow: "hidden", background: "var(--surface)", cursor: "zoom-in" }} onClick={() => setLightboxOpen(true)}>
-              <img src={image} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          {mosaicItems.length > 0 && (
+            <div style={{ padding: "12px 16px 0" }}>
+              <MediaMosaic items={mosaicItems} onItemClick={i => { setLightboxIndex(i); setLightboxOpen(true); }} />
             </div>
           )}
           <div style={{ padding: "12px 16px" }}>
@@ -226,12 +213,12 @@ export default function ListingDetail({ event, profiles, myPubkey, onOpenProfile
         </>
       )}
 
-      {lightboxOpen && image && (
+      {lightboxOpen && mosaicItems.length > 0 && (
         <MediaLightbox
-          items={[{ url: image, type: "image" }]}
-          index={0}
+          items={mosaicItems}
+          index={lightboxIndex}
           onClose={() => setLightboxOpen(false)}
-          onIndexChange={() => {}}
+          onIndexChange={setLightboxIndex}
         />
       )}
       {jsonOpen && createPortal(
