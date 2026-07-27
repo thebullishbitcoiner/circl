@@ -1694,6 +1694,8 @@ export default function ProfilePage({
           return (
             <BadgeDefDetail
               defEvent={selectedBadgeDef}
+              profiles={profiles}
+              onOpenProfile={onOpenProfile}
               onBack={() => setSelectedBadgeDef(null)}
             />
           );
@@ -1767,6 +1769,8 @@ export default function ProfilePage({
                         key={def.id}
                         defEvent={def}
                         awardEvent={null}
+                        profiles={profiles}
+                        onOpenProfile={onOpenProfile}
                         onClick={() => setSelectedBadgeDef(def)}
                         delay={i * 0.03}
                       />
@@ -1791,6 +1795,8 @@ export default function ProfilePage({
                       key={pair.eTag}
                       awardEvent={awardEvent}
                       defEvent={defEvent}
+                      profiles={profiles}
+                      onOpenProfile={onOpenProfile}
                       onClick={setSelectedBadge}
                       delay={i * 0.03}
                     />
@@ -1822,6 +1828,8 @@ export default function ProfilePage({
                           key={award.id}
                           awardEvent={award}
                           defEvent={defEvent}
+                          profiles={profiles}
+                          onOpenProfile={onOpenProfile}
                           onClick={setSelectedBadge}
                           onAccept={() => handleBadgeAccept(award)}
                           delay={i * 0.03}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { DEFAULT_RELAYS, NOSTR_CLIENT_TAG } from "../constants.js";
 import { isHexPubkey, normPubkey } from "../utils.js";
-import { pool, validRelays, publishWithStatus } from "../nostr.js";
+import { pool, validRelays, publishWithStatus, eventStore } from "../nostr.js";
 import useMailboxes from "./useMailboxes.js";
 import useBlockedRelays from "./useBlockedRelays.js";
 import usePrivateRelays from "./usePrivateRelays.js";
@@ -141,6 +141,9 @@ export default function useAuth() {
       10000,
       "Extension did not sign in time."
     );
+    // Add to the local store immediately so reactive readers (e.g. useProfiles)
+    // reflect the change right away instead of waiting on a relay round-trip.
+    eventStore.add(signed);
     // Explicit relay override (e.g. private relays for drafts) takes priority;
     // otherwise publish to own outboxes, union with bootstrap relays as fallback
     const publishRelays = opts.relays?.length > 0

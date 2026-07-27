@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import NoteJsonModal from "./NoteJsonModal.jsx";
 import Avatar from "./Avatar.jsx";
+import NoteText from "./NoteText.jsx";
 import { relativeTime, nip19, displayName } from "../utils.js";
 import { broadcastEvent } from "../nostr.js";
 
@@ -105,7 +106,15 @@ export default function BadgeDetail({ awardEvent, defEvent, profiles, isAccepted
       {/* Badge body */}
       <div style={{ padding: "12px 16px" }}>
         {name && <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 6 }}>{name}</div>}
-        {description && <div style={{ fontSize: 14, color: "var(--text-secondary, var(--text-faint))", marginBottom: 12 }}>{description}</div>}
+        {description && (
+          <NoteText
+            content={description}
+            profiles={profiles}
+            onOpenProfile={onOpenProfile}
+            className=""
+            style={{ fontSize: 14, color: "var(--text-secondary, var(--text-faint))", marginBottom: 12 }}
+          />
+        )}
 
         {/* Accept button shown only for own profile + unaccepted badges */}
         {handleAccept && (

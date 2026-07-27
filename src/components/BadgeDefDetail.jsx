@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import NoteJsonModal from "./NoteJsonModal.jsx";
+import NoteText from "./NoteText.jsx";
 import { nip19 } from "../utils.js";
 import { broadcastEvent } from "../nostr.js";
 
@@ -22,7 +23,7 @@ function DefContextMenu({ defEvent, onClose, onViewJson }) {
   );
 }
 
-export default function BadgeDefDetail({ defEvent, onBack }) {
+export default function BadgeDefDetail({ defEvent, profiles, onOpenProfile, onBack }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
 
@@ -67,7 +68,15 @@ export default function BadgeDefDetail({ defEvent, onBack }) {
       {/* Badge body */}
       <div style={{ padding: "12px 16px" }}>
         {name && <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 6 }}>{name}</div>}
-        {desc && <div style={{ fontSize: 14, color: "var(--text-secondary, var(--text-faint))", marginBottom: 12 }}>{desc}</div>}
+        {desc && (
+          <NoteText
+            content={desc}
+            profiles={profiles}
+            onOpenProfile={onOpenProfile}
+            className=""
+            style={{ fontSize: 14, color: "var(--text-secondary, var(--text-faint))", marginBottom: 12 }}
+          />
+        )}
         {d && (
           <div style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "monospace", wordBreak: "break-all", marginTop: 8 }}>
             {d}

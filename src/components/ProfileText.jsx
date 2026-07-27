@@ -1,4 +1,4 @@
-import { nip19, displayName } from "../utils.js";
+import { displayName, decodeMentionToken } from "../utils.js";
 
 function toHref(raw) {
   if (typeof raw !== "string" || !raw) return null;
@@ -16,19 +16,6 @@ function splitTrailingPunctuation(token) {
   const m = token.match(/^(.*?)([),.!?:;]+)?$/);
   if (!m) return [token, ""];
   return [m[1], m[2] || ""];
-}
-
-const NPUB_RE = /^(?:nostr:)?(npub1[a-z0-9]{6,})$/i;
-
-function decodeNpub(token) {
-  const m = token.match(NPUB_RE);
-  if (!m) return null;
-  try {
-    const { type, data } = nip19.decode(m[1]);
-    return type === "npub" ? data : null;
-  } catch {
-    return null;
-  }
 }
 
 export default function ProfileText({ text, className = "", style, clampLines, profiles, onOpenProfile }) {
@@ -56,8 +43,9 @@ export default function ProfileText({ text, className = "", style, clampLines, p
             {parts.map((part, idx) => {
               const [core, trailing] = splitTrailingPunctuation(part);
 
-              const pubkey = decodeNpub(core);
-              if (pubkey) {
+              const decoded = decodeMentionToken(core);
+              if (decoded) {
+                const pubkey = decoded.pubkey;
                 const name = displayName(pubkey, profiles);
                 return (
                   <span key={`${lineIdx}-${idx}`}>
@@ -68,7 +56,7 @@ export default function ProfileText({ text, className = "", style, clampLines, p
                     >
                       @{name}
                     </span>
-                    {trailing}
+                    {decoded.trailing}{trailing}
                   </span>
                 );
               }

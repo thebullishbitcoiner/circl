@@ -1,6 +1,7 @@
 import { memo } from "react";
+import NoteText from "./NoteText.jsx";
 
-function BadgeCard({ awardEvent, defEvent, onClick, onAccept, delay = 0 }) {
+function BadgeCard({ awardEvent, defEvent, profiles, onOpenProfile, onClick, onAccept, delay = 0 }) {
   const name        = defEvent?.tags?.find(t => t[0] === "name")?.[1]        || "";
   const description = defEvent?.tags?.find(t => t[0] === "description")?.[1] || "";
   const image       = defEvent?.tags?.find(t => t[0] === "image")?.[1]       || null;
@@ -29,7 +30,14 @@ function BadgeCard({ awardEvent, defEvent, onClick, onAccept, delay = 0 }) {
       </div>
       <div className="listing-tile-body">
         {name        && <div className="listing-tile-title">{name}</div>}
-        {description && <div className="listing-tile-summary">{description}</div>}
+        {description && (
+          <NoteText
+            content={description}
+            profiles={profiles}
+            onOpenProfile={onOpenProfile}
+            className="listing-tile-summary"
+          />
+        )}
       </div>
     </div>
   );

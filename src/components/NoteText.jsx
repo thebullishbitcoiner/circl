@@ -1,26 +1,8 @@
 import { Fragment } from "react";
-import { displayName, nip19 } from "../utils.js";
+import { displayName, decodeMentionToken, MENTION_BODY_SRC } from "../utils.js";
 
 function trimUrlToken(url) {
   return url.replace(/(?:[),.;:!?*»\]}]|[^\x00-\x7F])+$/, "");
-}
-
-// Tries to decode a nostr bech32 string (without the "nostr:" prefix), tolerating
-// trailing chars absorbed by the greedy split regex (e.g. "nd" from "and").
-// Returns { pk, trailing } or null if undecodable.
-function decodeNostrRef(raw) {
-  const maxTrim = Math.min(8, raw.length - 10);
-  for (let trim = 0; trim <= maxTrim; trim++) {
-    const attempt = trim === 0 ? raw : raw.slice(0, -trim);
-    try {
-      const d = nip19.decode(attempt);
-      if (d?.type === "npub" && d.data)
-        return { pk: d.data, trailing: trim > 0 ? raw.slice(-trim) : "" };
-      if (d?.type === "nprofile" && d.data?.pubkey)
-        return { pk: d.data.pubkey, trailing: trim > 0 ? raw.slice(-trim) : "" };
-    } catch {}
-  }
-  return null;
 }
 
 // Matches garbage left behind when the bech32 regex stops at a non-bech32 char that
@@ -33,7 +15,7 @@ const BECH32_GARBAGE_RE = /^[^\s1]{0,12}1[023456789acdefghjklmnpqrstuvwxyz]{30,}
 const _TLD = "com|net|org|io|co|app|dev|xyz|me|info|biz|gov|edu|tv|fm|gg|ai|so|uk|us|ca|au|de|fr|jp|br|ru|in|it|nl|es|pl|se|no|fi|ch|be|nz|mx|sg|hk|za|ae|ng|ke|ly|sh|social|media|news";
 const _BARE = `(?:www\\.[^\\s<>'"]+|[a-zA-Z0-9][a-zA-Z0-9.-]*\\.(?:${_TLD})[^\\s<>'"]*)`;
 const SPLIT_RE = new RegExp(
-  `(https?://[^\\s<>'"]+|(?<!\\S)${_BARE}|nostr:(?:npub1|nprofile1)[023456789acdefghjklmnpqrstuvwxyz]+|#[a-zA-Z0-9][a-zA-Z0-9_]+|(?<!\\S)@\\S+|:[a-zA-Z0-9_]+:)`,
+  `(https?://[^\\s<>'"]+|(?<!\\S)${_BARE}|nostr:${MENTION_BODY_SRC}|(?<!\\S)${MENTION_BODY_SRC}|#[a-zA-Z0-9][a-zA-Z0-9_]+|(?<!\\S)@\\S+|:[a-zA-Z0-9_]+:)`,
   "gi"
 );
 const BARE_URL_RE = new RegExp(`^(?:www\\.|[a-zA-Z0-9][a-zA-Z0-9.-]*\\.(?:${_TLD}))`, "i");
@@ -81,6 +63,19 @@ export default function NoteText({ content, profiles, onOpenProfile, onOpenHasht
     if (match) onOpenProfile(match[0]);
   };
 
+  const renderMention = (key, { pubkey, trailing }) => (
+    <Fragment key={key}>
+      <span
+        className="ix-mention"
+        style={{ cursor: "pointer" }}
+        onClick={e => { e.stopPropagation(); onOpenProfile?.(pubkey); }}
+      >
+        @{displayName(pubkey, profiles)}
+      </span>
+      {trailing}
+    </Fragment>
+  );
+
   const elements = [];
   let prevWasDecodedNostr = false;
 
@@ -98,13 +93,19 @@ export default function NoteText({ content, profiles, onOpenProfile, onOpenHasht
       prevWasDecodedNostr = false;
 
     } else if (part.startsWith("@")) {
-      elements.push(
-        <span key={i} className="ix-mention" style={{ cursor: "pointer" }}
-          onClick={e => { e.stopPropagation(); handleMention(part); }}>
-          {part}
-        </span>
-      );
-      prevWasDecodedNostr = false;
+      const decoded = decodeMentionToken(part);
+      if (decoded) {
+        elements.push(renderMention(i, decoded));
+        prevWasDecodedNostr = true;
+      } else {
+        elements.push(
+          <span key={i} className="ix-mention" style={{ cursor: "pointer" }}
+            onClick={e => { e.stopPropagation(); handleMention(part); }}>
+            {part}
+          </span>
+        );
+        prevWasDecodedNostr = false;
+      }
 
     } else if (/^:[a-zA-Z0-9_]+:$/.test(part)) {
       const name = part.slice(1, -1);
@@ -144,22 +145,10 @@ export default function NoteText({ content, profiles, onOpenProfile, onOpenHasht
       );
       prevWasDecodedNostr = false;
 
-    } else if (/^nostr:(npub1|nprofile1)/i.test(part)) {
-      const decoded = decodeNostrRef(part.slice(6));
+    } else if (/^(?:nostr:)?(?:npub1|nprofile1)/i.test(part)) {
+      const decoded = decodeMentionToken(part);
       if (decoded) {
-        const { pk, trailing } = decoded;
-        elements.push(
-          <Fragment key={i}>
-            <span
-              className="ix-mention"
-              style={{ cursor: "pointer" }}
-              onClick={e => { e.stopPropagation(); onOpenProfile?.(pk); }}
-            >
-              @{displayName(pk, profiles)}
-            </span>
-            {trailing}
-          </Fragment>
-        );
+        elements.push(renderMention(i, decoded));
         prevWasDecodedNostr = true;
       } else {
         elements.push(part);

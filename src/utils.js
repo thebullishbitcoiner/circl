@@ -48,6 +48,36 @@ export const truncNpub = pk => {
   } catch { return (pk?.slice(0, 8) ?? "") + "…"; }
 };
 
+/**
+ * Bech32 body of an npub/nprofile mention, without any "nostr:"/"@" prefix.
+ * Shared source so every mention-matching regex in the app (note text, profile
+ * bio, listing/badge descriptions, ...) recognizes the same set of forms.
+ */
+export const MENTION_BODY_SRC = "(?:npub1|nprofile1)[023456789acdefghjklmnpqrstuvwxyz]+";
+
+/**
+ * Decodes an npub/nprofile mention token — bare, "nostr:"-prefixed, and/or
+ * "@"-prefixed all work — tolerating trailing non-bech32 characters absorbed
+ * by a greedy text split (e.g. "nd" left over from "...npub1abc...and").
+ * Returns { pubkey, trailing } or null if nothing decodable is found.
+ */
+export function decodeMentionToken(raw) {
+  if (typeof raw !== "string") return null;
+  const body = raw.replace(/^(?:nostr:)?@?/i, "");
+  const maxTrim = Math.max(Math.min(8, body.length - 10), 0);
+  for (let trim = 0; trim <= maxTrim; trim++) {
+    const attempt = trim === 0 ? body : body.slice(0, -trim);
+    try {
+      const d = nip19.decode(attempt);
+      if (d?.type === "npub" && d.data)
+        return { pubkey: d.data, trailing: trim > 0 ? body.slice(-trim) : "" };
+      if (d?.type === "nprofile" && d.data?.pubkey)
+        return { pubkey: d.data.pubkey, trailing: trim > 0 ? body.slice(-trim) : "" };
+    } catch { /* not decodable at this trim length, try shorter */ }
+  }
+  return null;
+}
+
 export const shortNpub = truncNpub;
 
 export const nip05OrNpub = (pk, profiles) => {
@@ -318,15 +348,13 @@ export const extractContentTags = (content, { existingPubkeys = new Set(), exclu
   for (const ht of hashtags) tags.push(["t", ht]);
 
   const taggedPubkeys = new Set(existingPubkeys);
-  for (const m of content.matchAll(/nostr:(npub1[a-z0-9]+|nprofile1[a-z0-9]+)/g)) {
-    try {
-      const decoded = nip19.decode(m[1]);
-      const pk = decoded.type === "npub" ? decoded.data : decoded.type === "nprofile" ? decoded.data.pubkey : null;
-      if (pk && !taggedPubkeys.has(pk) && !excludedMentions.has(pk)) {
-        tags.push(["p", pk, "", "mention"]);
-        taggedPubkeys.add(pk);
-      }
-    } catch { /* invalid bech32, skip */ }
+  for (const m of content.matchAll(new RegExp(`nostr:(${MENTION_BODY_SRC})`, "gi"))) {
+    const decoded = decodeMentionToken(m[1]);
+    const pk = decoded?.pubkey;
+    if (pk && !taggedPubkeys.has(pk) && !excludedMentions.has(pk)) {
+      tags.push(["p", pk, "", "mention"]);
+      taggedPubkeys.add(pk);
+    }
   }
   return tags;
 };
