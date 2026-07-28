@@ -12,5 +12,5 @@ export default function useDarkMode() {
   }, [dark]);
 
   const toggle = useCallback(() => setDark(d => !d), []);
-  return { dark, toggle };
+  return { dark, toggle, setDark };
 }

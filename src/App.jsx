@@ -30,10 +30,12 @@ import usePublish from "./hooks/usePublish.js";
 import useIsMobile from "./hooks/useIsMobile.js";
 import useDarkMode from "./hooks/useDarkMode.js";
 import useTextSize from "./hooks/useTextSize.js";
+import useContentSettings from "./hooks/useContentSettings.js";
 import useWallet from "./hooks/useWallet.js";
 import useZap from "./hooks/useZap.js";
 import useZapSettings from "./hooks/useZapSettings.js";
 import useWalletData from "./hooks/useWalletData.js";
+import useAppSettingsSync from "./hooks/useAppSettingsSync.js";
 
 import LoginScreen from "./components/LoginScreen.jsx";
 import SettingsPage from "./components/SettingsPage.jsx";
@@ -248,8 +250,9 @@ export default function App() {
   const { publish, publishEvent, publishHighlight } = usePublish({ signAndPublish, pubkey });
   const draftCtx = useDrafts({ pubkey, signAndPublish, privateRelayUrls });
   const isMobile = useIsMobile();
-  const { dark, toggle: toggleDark } = useDarkMode();
+  const { dark, toggle: toggleDark, setDark } = useDarkMode();
   const { textSize, setTextSize } = useTextSize();
+  const contentSettings = useContentSettings();
 
   const [activeNav, setActiveNav] = useState("home");
   const [profileScrollTrigger, setProfileScrollTrigger] = useState(0);
@@ -331,6 +334,13 @@ export default function App() {
   const { wallet, saveWallet, disconnect: disconnectWallet } = useWallet();
   const { sendZap } = useZap(wallet);
   const { zapSettings, saveZapSettings } = useZapSettings();
+  useAppSettingsSync({
+    pubkey, signAndPublish,
+    dark, setDark,
+    textSize, setTextSize,
+    contentSettings,
+    zapSettings, saveZapSettings,
+  });
   const { balance: walletBalance, transactions: walletTxs, flow24h: walletFlow24h, hasMore: walletHasMore, loadMore: walletLoadMore, loadingMore: walletLoadingMore, loading: walletLoading, error: walletError, refresh: refreshWallet } = useWalletData(wallet);
   const [floatingCompose, setFloatingCompose] = useState(false);
   const [composeCircle, setComposeCircle] = useState(null);
