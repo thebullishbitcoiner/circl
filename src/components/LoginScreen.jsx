@@ -31,7 +31,18 @@ export default function LoginScreen({ onLogin, status, error }) {
             {status === "checking" ? "Connecting…" : "Login with Nostr"}
           </button>
           {error && <div className="login-error">{error}</div>}
-          <div className="login-note">Requires a NIP-07 extension like Alby, nos2x, or keys.band</div>
+          <div className="login-note">
+            Requires a NIP-07 extension like{" "}
+            <a href="https://getalby.com/alby-extension" target="_blank" rel="noreferrer">Alby</a>,{" "}
+            <a
+              href="https://chromewebstore.google.com/detail/nos2x/kpgefcfmnafjgpblomihpgmejjdanjjp"
+              target="_blank"
+              rel="noreferrer"
+            >
+              nos2x
+            </a>, or{" "}
+            <a href="https://sidecar.top/" target="_blank" rel="noreferrer">Sidecar</a>.
+          </div>
         </div>
 
         <div className="login-scroll-hint">↓</div>
