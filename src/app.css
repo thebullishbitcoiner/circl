@@ -686,8 +686,8 @@
   .profile-name{font-family:'DM Sans',sans-serif;font-size:22px;font-weight:700;letter-spacing:-.3px;margin-bottom:2px;}
   .profile-follows-you{display:inline-flex;align-items:center;font-family:'DM Sans',sans-serif;font-size:calc(var(--font-base) - 2px);color:var(--text-faint);background:var(--surface);border:1px solid var(--border);border-radius:50px;padding:2px 8px;}
   .profile-nip05{font-size:var(--font-base);color:var(--primary);display:flex;align-items:center;gap:3px;margin-bottom:6px;}
-  .profile-website{display:inline-block;font-family:'DM Sans',sans-serif;font-size:var(--font-base);color:var(--primary);text-decoration:underline;margin-bottom:12px;}
-  .profile-website:hover{text-decoration-thickness:2px;}
+  .profile-website{display:inline-flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;font-size:var(--font-base);font-weight:600;color:var(--primary);text-decoration:none;margin-bottom:12px;}
+  .profile-website:hover{text-decoration:underline;}
   .profile-nip05-dot{width:5px;height:5px;border-radius:50%;background:var(--primary);}
   .profile-npub{font-family:monospace;font-size:calc(var(--font-base) - 2px);color:var(--text-faint);margin-bottom:4px;display:flex;align-items:center;gap:5px;}
   .profile-about{font-family:'DM Sans',sans-serif;font-size:var(--font-base);line-height:1.6;color:var(--text-muted);margin-bottom:8px;word-break:break-word;overflow-wrap:anywhere;}
