@@ -21,6 +21,7 @@
   }
   .dark body { background: var(--bg); color: var(--text); }
   .dark .login-hero-section { background-image: radial-gradient(circle at 15% 50%,rgba(167,139,250,.1) 0%,transparent 55%),radial-gradient(circle at 85% 20%,rgba(129,140,248,.08) 0%,transparent 50%),radial-gradient(circle at 60% 80%,rgba(167,139,250,.05) 0%,transparent 40%); }
+  .dark .login-hero-content::before { opacity:.18;filter:brightness(2) saturate(.7); }
   .dark .bottom-nav { background: rgba(15,13,20,.95); }
   .dark .feed-header { background: rgba(15,13,20,.92); }
   .dark .panel-bar   { background: rgba(15,13,20,.92); }
@@ -34,12 +35,15 @@
   /* ── Login ── */
   .login-page{position:fixed;inset:0;overflow-y:auto;background:var(--bg);animation:fadeUp .5s ease both;}
   /* Hero section — full viewport height */
-  .login-hero-section{min-height:100dvh;display:flex;flex-direction:column;background:var(--bg);background-image:radial-gradient(circle at 15% 50%,rgba(109,40,217,.12) 0%,transparent 55%),radial-gradient(circle at 85% 20%,rgba(99,102,241,.1) 0%,transparent 50%),radial-gradient(circle at 60% 80%,rgba(109,40,217,.06) 0%,transparent 40%);}
+  .login-hero-section{min-height:100dvh;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);background-image:radial-gradient(circle at 15% 50%,rgba(109,40,217,.12) 0%,transparent 55%),radial-gradient(circle at 85% 20%,rgba(99,102,241,.1) 0%,transparent 50%),radial-gradient(circle at 60% 80%,rgba(109,40,217,.06) 0%,transparent 40%);}
   .login-topbar{display:flex;align-items:center;padding:20px 32px;flex-shrink:0;}
   .login-topbar-logo{display:flex;align-items:center;gap:8px;text-decoration:none;}
   .login-topbar-name{font-family:'DM Sans',sans-serif;font-size:18px;font-weight:700;color:var(--primary);letter-spacing:-.3px;}
   /* Hero content — centered in remaining space */
-  .login-hero-content{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 24px 40px;}
+  .login-hero-content{position:relative;isolation:isolate;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 24px 40px;}
+  .login-hero-content::before{content:"";position:absolute;z-index:-1;top:50%;left:50%;width:min(760px,135vw,calc(100dvh - 88px));aspect-ratio:1;background:url("/circl-logo-outline.svg") center/contain no-repeat;opacity:.05;pointer-events:none;animation:loginLogoOrbit 120s linear infinite;}
+  @keyframes loginLogoOrbit{from{transform:translate(-50%,-50%) rotate(0);}to{transform:translate(-50%,-50%) rotate(360deg);}}
+  @media (prefers-reduced-motion:reduce){.login-hero-content::before{animation:none;transform:translate(-50%,-50%);}}
   .login-badge{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:50px;padding:5px 14px;font-size:12px;font-weight:500;color:var(--text-muted);margin-bottom:28px;background:var(--surface);}
   .login-headline{font-family:'DM Sans',sans-serif;font-size:clamp(38px,6vw,72px);font-weight:700;line-height:1.1;letter-spacing:-2px;color:var(--text);margin-bottom:20px;max-width:700px;}
   .login-headline-gradient{background:linear-gradient(135deg,var(--primary) 0%,#6366F1 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
