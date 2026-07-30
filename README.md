@@ -42,6 +42,10 @@ vercel
 - **NIP-07** — browser extension key management (private key never touches the app)
 - **Rizful** — Lightning wallet connect (NWC) for real zaps
 
+## Brand assets
+
+[Download the Circl logo (SVG)](public/circl-logo.svg)
+
 ## Relays
 
 Default relays in `src/App.jsx`:
