@@ -78,7 +78,7 @@ import SwipePanel from "./components/SwipePanel.jsx";
 import ZapGoalPage from "./components/ZapGoalPage.jsx";
 import Avatar from "./components/Avatar.jsx";
 import NoteContent from "./components/NoteContent.jsx";
-import { SbHome, SbBell, SbBook, SbZap, SbSearch, SbWallet, NavHome, NavBell, NavBook, NavZap, NavSearch, NavWallet, Bk } from "./components/icons.jsx";
+import { SbHome, SbBell, SbBook, SbZap, SbSearch, SbWallet, NavHome, NavBell, NavBook, NavZap, NavSearch, NavWallet, Bk, SunI, MoonI, SettingsI, LogoutI } from "./components/icons.jsx";
 import { AudioProvider, useAudio } from "./contexts/AudioContext.jsx";
 import AudioPlayer from "./components/AudioPlayer.jsx";
 import AudioPlayerCard from "./components/AudioPlayerCard.jsx";
@@ -650,19 +650,45 @@ export default function App() {
             </svg>
             <span className="nav-label">Circles</span>
           </button>
-          <button className={`nav-item ${settingsOpen ? "active" : ""}`} onClick={() => { clearNav(); setSettingsOpen(true); }}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="nav-icon">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-            <span className="nav-label">Settings</span>
-          </button>
           <button className="compose-btn" onClick={() => setFloatingCompose(true)}>+ New Note</button>
-          <div className="sidebar-profile" onClick={() => navigate("profile")}>
-            <div className="sidebar-av">{myProfile?.picture ? <img src={myProfile.picture} alt="me" /> : avatarInitial(pubkey, profiles)}</div>
-            <div><div className="sidebar-name">{myDisplayName}</div><div className="sidebar-npub">{myNpub}</div></div>
+          <div className="sidebar-user-row">
+            <button type="button" className="sidebar-profile" onClick={() => navigate("profile")}>
+              <span className="sidebar-av">{myProfile?.picture ? <img src={myProfile.picture} alt="" /> : avatarInitial(pubkey, profiles)}</span>
+              <span className="sidebar-profile-copy">
+                <span className="sidebar-name">{myDisplayName}</span>
+                <span className="sidebar-npub">{myNpub}</span>
+              </span>
+            </button>
+            <div className="sidebar-account-actions">
+              <button
+                type="button"
+                className="sidebar-account-action sidebar-theme-toggle"
+                onClick={toggleDark}
+                aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+                title={dark ? "Switch to light mode" : "Switch to dark mode"}
+              >
+                {dark ? <SunI /> : <MoonI />}
+              </button>
+              <button
+                type="button"
+                className={`sidebar-account-action${settingsOpen ? " active" : ""}`}
+                onClick={() => { clearNav(); setSettingsOpen(true); }}
+                aria-label="Settings"
+                title="Settings"
+              >
+                <SettingsI />
+              </button>
+              <button
+                type="button"
+                className="sidebar-account-action sidebar-signout-button"
+                onClick={logout}
+                aria-label="Sign out"
+                title="Sign out"
+              >
+                <LogoutI />
+              </button>
+            </div>
           </div>
-          <button className="logout-btn" onClick={logout}>Sign out</button>
         </aside>
 
         <div className="view-container">
