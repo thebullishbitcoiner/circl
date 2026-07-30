@@ -1,11 +1,30 @@
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import useProfiles from "../hooks/useProfiles.js";
 import useSearchRelays from "../hooks/useSearchRelays.js";
 import { pool, eventStore } from "../nostr.js";
+import { DEFAULT_RELAYS } from "../constants.js";
 import { displayName, relativeTime, nip19, normPubkey, isHexPubkey, truncNpub } from "../utils.js";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import MutedNoteGate from "./MutedNoteGate.jsx";
+
+const NOSTR_ID_PREFIXES = ["npub1", "nprofile1", "note1", "nevent1", "naddr1"];
+
+/** Decodes a pasted/typed npub, nprofile, note, nevent, or naddr string (bare or "nostr:"-prefixed). */
+function parseNostrIdentifier(raw) {
+  if (typeof raw !== "string") return null;
+  const s = raw.trim().replace(/^nostr:/i, "");
+  if (!NOSTR_ID_PREFIXES.some(p => s.startsWith(p))) return null;
+  try {
+    const d = nip19.decode(s);
+    if (d?.type === "npub" && d.data) return { type: "npub", pubkey: normPubkey(d.data) };
+    if (d?.type === "nprofile" && d.data?.pubkey) return { type: "nprofile", pubkey: normPubkey(d.data.pubkey), relays: d.data.relays || [] };
+    if (d?.type === "note" && d.data) return { type: "note", id: d.data };
+    if (d?.type === "nevent" && d.data?.id) return { type: "nevent", id: d.data.id, relays: d.data.relays || [] };
+    if (d?.type === "naddr" && d.data) return { type: "naddr", kind: d.data.kind, pubkey: d.data.pubkey, identifier: d.data.identifier, relays: d.data.relays || [] };
+  } catch {}
+  return null;
+}
 
 const DEFAULT_SEARCH_RELAYS = [
   "wss://relay.primal.net",
@@ -168,6 +187,45 @@ function HashtagSuggestion({ tag, onOpenHashtag }) {
   );
 }
 
+function IdentifierSuggestion({ ident, profiles, onOpen }) {
+  if (ident.type === "npub" || ident.type === "nprofile") {
+    const pk   = ident.pubkey;
+    const p    = profiles?.[pk] || {};
+    const name = p.display_name || p.name || "";
+    const sub  = p.nip05 || truncNpub(pk);
+    return (
+      <div className="search-result" role="button" tabIndex={0}
+        onClick={() => onOpen(ident)}
+        onKeyDown={e => { if (e.key === "Enter" || e.key === " ") onOpen(ident); }}
+      >
+        <div style={{ flexShrink: 0 }}>
+          <Avatar pk={pk} profiles={profiles} size={40} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="search-result-name">{name || sub}</div>
+          {name && sub && <div className="search-result-sub">{sub}</div>}
+        </div>
+      </div>
+    );
+  }
+
+  const label = ident.type === "naddr" ? "Nostr address" : "Nostr note";
+  return (
+    <div className="search-result" role="button" tabIndex={0}
+      onClick={() => onOpen(ident)}
+      onKeyDown={e => { if (e.key === "Enter" || e.key === " ") onOpen(ident); }}
+    >
+      <IconCircle>
+        <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </IconCircle>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="search-result-name">{label}</div>
+        <div className="search-result-sub">Tap to open</div>
+      </div>
+    </div>
+  );
+}
+
 function Spinner() {
   return (
     <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
@@ -176,7 +234,7 @@ function Spinner() {
   );
 }
 
-export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThread, onOpenHashtag }) {
+export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThread, onOpenHashtag, onOpenArticle, resolveEventById }) {
   const configuredRelays = useSearchRelays(pubkey);
   const searchRelays = configuredRelays.length > 0 ? configuredRelays.map(r => r.url) : DEFAULT_SEARCH_RELAYS;
   const [query,          setQuery]          = useState("");
@@ -185,13 +243,18 @@ export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThre
   const [mode,           setMode]           = useState("suggest"); // "suggest" | "notes"
   const [loadingSuggest, setLoadingSuggest] = useState(false);
   const [loadingNotes,   setLoadingNotes]   = useState(false);
+  const [resolvingIdent, setResolvingIdent] = useState(false);
   const [recentSearches, setRecentSearches] = useState(() => loadRecent());
+
+  const trimmedQuery = query.trim();
+  const identifier = useMemo(() => parseNostrIdentifier(trimmedQuery), [trimmedQuery]);
 
   const resultPks = useMemo(() => {
     const pks = new Set(noteResults.map(ev => ev.pubkey));
     for (const ev of suggestions) if (ev.pubkey) pks.add(ev.pubkey);
+    if (identifier?.type === "npub" || identifier?.type === "nprofile") pks.add(identifier.pubkey);
     return [...pks];
-  }, [noteResults, suggestions]);
+  }, [noteResults, suggestions, identifier]);
   const { profiles: resultProfiles } = useProfiles({ pubkeys: resultPks });
   const mergedProfiles = useMemo(() => ({ ...profiles, ...resultProfiles }), [profiles, resultProfiles]);
 
@@ -313,21 +376,82 @@ export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThre
     setNoteResults([]);
     clearTimeout(debounceRef.current);
 
-    if (!q.trim()) {
+    const trimmed = q.trim();
+    if (!trimmed) {
       setSuggestions([]);
       suggestSubRef.current?.unsubscribe();
       setLoadingSuggest(false);
       return;
     }
-    if (q.trim().startsWith("#")) return;
-    debounceRef.current = setTimeout(() => runPeopleSearch(q.trim()), SUGGEST_DEBOUNCE_MS);
+    if (trimmed.startsWith("#")) return;
+    if (parseNostrIdentifier(trimmed)) {
+      suggestSubRef.current?.unsubscribe();
+      setSuggestions([]);
+      setLoadingSuggest(false);
+      return;
+    }
+    debounceRef.current = setTimeout(() => runPeopleSearch(trimmed), SUGGEST_DEBOUNCE_MS);
   };
+
+  const handleOpenIdentifier = useCallback(async ident => {
+    if (!ident) return;
+
+    if (ident.type === "npub" || ident.type === "nprofile") {
+      addRecent({ type: "people", pubkey: ident.pubkey });
+      onOpenProfile?.(ident.pubkey);
+      return;
+    }
+
+    if (ident.type === "note" || ident.type === "nevent") {
+      if (!resolveEventById) return;
+      setResolvingIdent(true);
+      const ev = await resolveEventById(ident.id, ident.relays || []);
+      setResolvingIdent(false);
+      if (!ev) return;
+      if (ev.kind === 30023 && onOpenArticle) onOpenArticle(ev);
+      else onOpenThread?.(ev);
+      return;
+    }
+
+    // naddr
+    setResolvingIdent(true);
+    const connected = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
+    const relayUrls = ident.relays?.length ? [...new Set([...ident.relays, ...connected])] : connected;
+    const filter = { kinds: [ident.kind], authors: [ident.pubkey], limit: 1 };
+    if (ident.identifier) filter["#d"] = [ident.identifier];
+    let handled = false;
+    const sub = pool.request(relayUrls, [filter]).subscribe({
+      next: ev => {
+        if (handled || !ev?.id) return;
+        handled = true;
+        eventStore.add(ev);
+        setResolvingIdent(false);
+        sub.unsubscribe();
+        if (ev.kind === 30023 && onOpenArticle) onOpenArticle(ev);
+        else onOpenThread?.(ev);
+      },
+      complete: () => setResolvingIdent(false),
+      error:    () => setResolvingIdent(false),
+    });
+    setTimeout(() => { if (!handled) { sub.unsubscribe(); setResolvingIdent(false); } }, 8000);
+  }, [resolveEventById, onOpenProfile, onOpenThread, onOpenArticle, addRecent]);
+
+  // A complete npub/nprofile/note/nevent/naddr should open right away, no Enter needed.
+  const autoOpenedRef = useRef(null);
+  useEffect(() => {
+    if (!identifier) return;
+    const key = JSON.stringify(identifier);
+    if (autoOpenedRef.current === key) return;
+    autoOpenedRef.current = key;
+    handleOpenIdentifier(identifier);
+  }, [identifier, handleOpenIdentifier]);
 
   const handleKeyDown = e => {
     if (e.key === "Enter" && query.trim()) {
       clearTimeout(debounceRef.current);
       suggestSubRef.current?.unsubscribe();
       setSuggestions([]);
+      if (identifier) return; // already auto-opened
       if (query.trim().startsWith("#")) {
         const tag = query.trim().slice(1);
         addRecent({ type: "hashtag", query: tag });
@@ -346,7 +470,8 @@ export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThre
     suggestSubRef.current?.unsubscribe();
     noteSubRef.current?.unsubscribe();
     setQuery(""); setSuggestions([]); setNoteResults([]);
-    setMode("suggest"); setLoadingSuggest(false); setLoadingNotes(false);
+    setMode("suggest"); setLoadingSuggest(false); setLoadingNotes(false); setResolvingIdent(false);
+    autoOpenedRef.current = null;
   };
 
   const handleSelectRecent = item => {
@@ -365,7 +490,7 @@ export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThre
     }
   };
 
-  const loading = mode === "suggest" ? loadingSuggest : loadingNotes;
+  const loading = mode === "suggest" ? (identifier ? resolvingIdent : loadingSuggest) : loadingNotes;
   const results = mode === "suggest" ? suggestions    : noteResults;
   const showRecent = !query && recentSearches.length > 0;
 
@@ -392,7 +517,7 @@ export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThre
             </button>
           )}
         </div>
-        {query.trim() && mode === "suggest" && (
+        {query.trim() && mode === "suggest" && !identifier && (
           <div style={{ fontSize: 11, color: "var(--text-faint)", textAlign: "center", marginTop: 8, fontFamily: "'DM Sans',sans-serif" }}>
             {query.trim().startsWith("#") ? `Press Enter to browse ${query.trim()}` : "Press Enter to search notes"}
           </div>
@@ -430,10 +555,13 @@ export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThre
           </div>
         )}
 
-        {mode === "suggest" && query.trim().startsWith("#") && (
+        {!loading && mode === "suggest" && identifier && (
+          <IdentifierSuggestion ident={identifier} profiles={mergedProfiles} onOpen={handleOpenIdentifier} />
+        )}
+        {mode === "suggest" && !identifier && query.trim().startsWith("#") && (
           <HashtagSuggestion tag={query.trim().slice(1)} onOpenHashtag={tag => { addRecent({ type: "hashtag", query: tag }); onOpenHashtag?.(tag); }} />
         )}
-        {!(mode === "suggest" && query.trim().startsWith("#")) && results.map(ev =>
+        {!(mode === "suggest" && (identifier || query.trim().startsWith("#"))) && results.map(ev =>
           mode === "suggest"
             ? <ProfileSuggestion key={ev.pubkey} ev={ev} onOpenProfile={pk => { addRecent({ type: "people", pubkey: pk }); onOpenProfile?.(pk); }} />
             : <NoteResult key={ev.id} ev={ev} profiles={mergedProfiles} onOpenProfile={onOpenProfile} onOpenThread={onOpenThread} />

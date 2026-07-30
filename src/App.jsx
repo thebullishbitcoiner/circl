@@ -816,6 +816,8 @@ export default function App() {
                     onOpenProfile={handleOpenProfile}
                     onOpenThread={handleOpenThread}
                     onOpenHashtag={handleOpenHashtag}
+                    onOpenArticle={handleOpenArticle}
+                    resolveEventById={resolveEventById}
                   />
                 </div>
               )}
