@@ -12,10 +12,10 @@ export default function LoginScreen({ onLogin, status, error }) {
     <div className="login-page">
       <section className="login-hero-section">
         <div className="login-topbar">
-          <div className="login-topbar-logo">
-            <img src="/logo.png" alt="Circl" style={{ height: 26, width: "auto" }} />
+          <a className="login-topbar-logo home-logo-button" href="/" aria-label="Go to home">
+            <img src="/circl-logo.svg" alt="" className="home-logo-mark" style={{ height: 26, width: "auto" }} />
             <span className="login-topbar-name">Circl</span>
-          </div>
+          </a>
         </div>
 
         <div className="login-hero-content">

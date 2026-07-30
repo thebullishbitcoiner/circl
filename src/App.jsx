@@ -616,7 +616,10 @@ export default function App() {
       <div className="app-shell">
 
         <aside className={`sidebar ${isMobile ? "collapsed" : ""}`}>
-          <div className="logo"><img src="/logo.png" alt="Circl" style={{ height: 28, width: "auto" }} /></div>
+          <button type="button" className="logo home-logo-button" onClick={() => navigate("home")} aria-label="Go to home">
+            <img src="/circl-logo.svg" alt="" className="home-logo-mark" style={{ height: 28, width: "auto" }} />
+            <span className="login-topbar-name sidebar-logo-name" aria-hidden="true">Circl</span>
+          </button>
           {navItems.map(item => (
             <button key={item.id} className={`nav-item ${!settingsOpen && activeNav === item.id ? "active" : ""}`} onClick={() => navigate(item.id)}>
               <div style={{ position: "relative", display: "inline-flex" }}>
@@ -1361,7 +1364,9 @@ export default function App() {
                       <div className="slide-panel-scroll">
                         <div className="panel-bar">
                           <button type="button" className="back-btn" onClick={handleBack}><Bk s={16} /></button>
-                          <img src="/logo.png" alt="Circl" className="panel-bar-logo" style={{ height: 22, width: "auto" }} />
+                          <button type="button" className="panel-bar-logo home-logo-button" onClick={() => navigate("home")} aria-label="Go to home">
+                            <img src="/circl-logo.svg" alt="" className="home-logo-mark" style={{ height: 22, width: "auto" }} />
+                          </button>
                         </div>
                         <div style={{ padding: "20px 20px 80px" }}>
                           <div className="note-card" style={{ borderRadius: 14, border: "1px solid var(--border)", marginBottom: 16 }}>
