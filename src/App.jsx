@@ -618,6 +618,7 @@ export default function App() {
         <aside className={`sidebar ${isMobile ? "collapsed" : ""}`}>
           <button type="button" className="logo home-logo-button" onClick={() => navigate("home")} aria-label="Go to home">
             <img src="/circl-logo.svg" alt="" className="home-logo-mark" style={{ height: 28, width: "auto" }} />
+            <span className="login-topbar-name sidebar-logo-name" aria-hidden="true">Circl</span>
           </button>
           {navItems.map(item => (
             <button key={item.id} className={`nav-item ${!settingsOpen && activeNav === item.id ? "active" : ""}`} onClick={() => navigate(item.id)}>

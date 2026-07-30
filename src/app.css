@@ -90,6 +90,10 @@
   .sidebar.collapsed{width:0;padding:0;opacity:0;pointer-events:none;overflow:hidden;}
 
   .logo{font-family:'DM Sans',sans-serif;font-size:23px;font-weight:600;color:var(--primary);padding:4px 11px 15px;display:flex;align-items:center;gap:6px;letter-spacing:-.3px;white-space:nowrap;}
+  .sidebar-logo-name{max-width:0;opacity:0;overflow:hidden;transform:translateX(-5px);transition:max-width .3s ease,opacity .25s ease,transform .3s ease;}
+  @media (min-width:650px) and (hover:hover) and (pointer:fine) {
+    .logo:hover .sidebar-logo-name,.logo:focus-visible .sidebar-logo-name{max-width:64px;opacity:1;transform:translateX(0);}
+  }
   .home-logo-button{border:none;background:none;color:inherit;font:inherit;cursor:pointer;}
   .home-logo-button:focus-visible{outline:2px solid var(--primary);outline-offset:3px;border-radius:4px;}
   .home-logo-mark{display:block;transform-origin:center;}
