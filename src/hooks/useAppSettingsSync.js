@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { isHexPubkey, normPubkey, hasNip44 } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
 import { DEFAULT_RELAYS } from "../constants.js";
+import {
+  isLocalDarkPreferenceNewer,
+  readStoredDarkPreference,
+} from "./useDarkMode.js";
 
 const SETTINGS_KIND = 30078;
 const SETTINGS_D_TAG = "circl-settings";
@@ -85,9 +89,18 @@ export default function useAppSettingsSync({
       // applySnapshot is about to write into the local hooks' state — using a
       // partial/stale base here would make the very next render look diverged
       // and trigger a spurious immediate re-publish.
-      const merged = { ...buildSnapshot({ dark, textSize, contentSettings, zapSettings }), ...parsed };
-      applySnapshot(merged, { setDark, setTextSize, contentSettings, saveZapSettings });
-      syncedSnapshotRef.current = JSON.stringify(merged);
+      const remoteSnapshot = { ...buildSnapshot({ dark, textSize, contentSettings, zapSettings }), ...parsed };
+      const localDark = readStoredDarkPreference();
+      const keepLocalDark = typeof parsed.dark === "boolean"
+        && isLocalDarkPreferenceNewer(localDark.updatedAt, raw.created_at);
+      const appliedSnapshot = keepLocalDark
+        ? { ...remoteSnapshot, dark: localDark.dark }
+        : remoteSnapshot;
+
+      applySnapshot(appliedSnapshot, { setDark, setTextSize, contentSettings, saveZapSettings });
+      // Keep the relay snapshot as the comparison target when a newer local
+      // theme wins, so the publish effect sends that preference upstream.
+      syncedSnapshotRef.current = JSON.stringify(remoteSnapshot);
     };
 
     const sub = pool.request(relayUrls, [
