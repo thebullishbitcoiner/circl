@@ -207,6 +207,23 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
     [persist]
   );
 
+  // Removes a raw bookmark tag directly by key, for entries that never resolved to
+  // an event (e.g. an unsupported addressable kind) and so have no event object to
+  // derive the tag from via toggle()/bookmarkTagFromEvent.
+  const removeTag = useCallback(
+    async tag => {
+      const k = bookmarkKey(tag);
+      if (!k) return;
+      const prev = itemsRef.current;
+      const next = prev.filter(t => bookmarkKey(t) !== k);
+      if (next.length === prev.length) return;
+      itemsRef.current = next;
+      setItems(next);
+      try { await persist(next); } catch (e) { itemsRef.current = prev; setItems(prev); throw e; }
+    },
+    [persist]
+  );
+
   const isBookmarked = useCallback(
     event => {
       if (!event?.id) return false;
@@ -218,5 +235,5 @@ export default function useBookmarks({ pubkey, signAndPublish, refreshKey = 0 } 
     [items]
   );
 
-  return { toggle, isBookmarked, bookmarkItems: items, nip44Bookmarks: hasNip44() };
+  return { toggle, isBookmarked, bookmarkItems: items, nip44Bookmarks: hasNip44(), removeTag };
 }

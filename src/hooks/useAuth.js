@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { DEFAULT_RELAYS, NOSTR_CLIENT_TAG } from "../constants.js";
 import { isHexPubkey, normPubkey } from "../utils.js";
-import { pool, validRelays, publishWithStatus, eventStore } from "../nostr.js";
+import { pool, validRelays, publishWithStatus, eventStore, setActivePubkey } from "../nostr.js";
 import { isReplaceable, getReplaceableIdentifier } from "applesauce-core/helpers/event";
 import useMailboxes from "./useMailboxes.js";
 import useBlockedRelays from "./useBlockedRelays.js";
@@ -28,6 +28,7 @@ export default function useAuth() {
     if (!isHexPubkey(pk)) return;
     for (const url of DEFAULT_RELAYS) pool.relay(url);
     setPubkey(pk);
+    setActivePubkey(pk);
     setStatus("ready");
   }, []);
 
@@ -45,6 +46,7 @@ export default function useAuth() {
       if (!isHexPubkey(pk)) throw new Error("Extension returned an invalid pubkey.");
       for (const url of DEFAULT_RELAYS) pool.relay(url);
       setPubkey(pk);
+      setActivePubkey(pk);
       setStatus("ready");
       sessionStorage.setItem("circl_pk", pk);
     } catch (e) {
@@ -58,6 +60,7 @@ export default function useAuth() {
       try { pool.remove(url); } catch {}
     }
     setPubkey(null);
+    setActivePubkey(null);
     setStatus("idle");
     sessionStorage.removeItem("circl_pk");
   }, []);

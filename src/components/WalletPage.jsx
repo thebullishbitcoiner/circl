@@ -350,7 +350,7 @@ function ReceiveView({ nwcUri, lnAddress, onDismiss }) {
   );
 }
 
-export default function WalletPage({ wallet, balance, transactions, flow24h, hasMore, loadMore, loadingMore, loading, error, onRefresh, profiles, onOpenProfile, onOpenTransaction, sendZap }) {
+export default function WalletPage({ wallet, walletLocked, balance, transactions, flow24h, hasMore, loadMore, loadingMore, loading, error, onRefresh, profiles, onOpenProfile, onOpenTransaction, sendZap }) {
   const handleRefresh = useCallback(() => { if (!loading) onRefresh?.(); }, [loading, onRefresh]);
   const [sendOpen,    setSendOpen]    = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
@@ -366,8 +366,12 @@ export default function WalletPage({ wallet, balance, transactions, flow24h, has
   if (!wallet?.nwc_uri) {
     return (
       <div className="empty-state">
-        <div className="empty-state-title">No wallet connected</div>
-        <div className="empty-state-sub">Connect a wallet in Settings to see your balance and transaction history</div>
+        <div className="empty-state-title">{walletLocked ? "Wallet can't be unlocked" : "No wallet connected"}</div>
+        <div className="empty-state-sub">
+          {walletLocked
+            ? "A wallet is connected for this account, but your current signer doesn't support NIP-44 decryption. Update your extension, or disconnect it in Settings."
+            : "Connect a wallet in Settings to see your balance and transaction history"}
+        </div>
       </div>
     );
   }

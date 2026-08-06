@@ -32,14 +32,19 @@ function loadAll() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; }
 }
 
-function loadRecent(pubkeys) {
-  return loadAll()[profileKey(pubkeys)] || [];
+// Namespaced by the viewer's own pubkey so switching accounts never surfaces
+// another account's search history, then by the target profile(s) searched.
+function loadRecent(myPubkey, pubkeys) {
+  return loadAll()[myPubkey]?.[profileKey(pubkeys)] || [];
 }
 
-function saveRecent(pubkeys, searches) {
+function saveRecent(myPubkey, pubkeys, searches) {
   const all = loadAll();
-  if (searches.length) all[profileKey(pubkeys)] = searches;
-  else delete all[profileKey(pubkeys)];
+  const mine = all[myPubkey] || {};
+  if (searches.length) mine[profileKey(pubkeys)] = searches;
+  else delete mine[profileKey(pubkeys)];
+  if (Object.keys(mine).length) all[myPubkey] = mine;
+  else delete all[myPubkey];
   if (Object.keys(all).length) localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
   else localStorage.removeItem(STORAGE_KEY);
 }
@@ -98,7 +103,7 @@ export default function ProfileSearchPage({ pubkeys, myPubkey, profiles, onBack,
   const [noteResults,    setNoteResults]    = useState([]);
   const [loading,        setLoading]        = useState(false);
   const [hasSearched,    setHasSearched]    = useState(false);
-  const [recentSearches, setRecentSearches] = useState(() => loadRecent(pubkeys));
+  const [recentSearches, setRecentSearches] = useState(() => loadRecent(myPubkey, pubkeys));
   const [timeFilter,     setTimeFilter]     = useState(null);
 
   const noteSubRef  = useRef(null);
@@ -116,21 +121,21 @@ export default function ProfileSearchPage({ pubkeys, myPubkey, profiles, onBack,
         { query: q, time: time ?? null, ts: Date.now() },
         ...prev.filter(r => !(r.query === q && (r.time ?? null) === (time ?? null))),
       ].slice(0, MAX_RECENT);
-      saveRecent(pubkeys, next);
+      saveRecent(myPubkey, pubkeys, next);
       return next;
     });
-  }, [pubkeys]);
+  }, [myPubkey, pubkeys]);
 
   const removeRecent = useCallback((item) => {
     setRecentSearches(prev => {
       const next = prev.filter(r => !(r.query === item.query && (r.time ?? null) === (item.time ?? null)));
-      saveRecent(pubkeys, next);
+      saveRecent(myPubkey, pubkeys, next);
       return next;
     });
-  }, [pubkeys]);
+  }, [myPubkey, pubkeys]);
 
   const clearRecent = () => {
-    saveRecent(pubkeys, []);
+    saveRecent(myPubkey, pubkeys, []);
     setRecentSearches([]);
   };
 

@@ -4,6 +4,7 @@ import { pool, eventStore, relayUrls$ } from "../nostr.js";
 
 const EMOJI_LIST_KIND = 10030;
 const EMOJI_SET_KIND  = 30030;
+const CACHE_KEY = "circl_custom_emoji";
 
 function hasNip44() {
   return (
@@ -13,28 +14,49 @@ function hasNip44() {
   );
 }
 
+function readCache(pk) {
+  try { return JSON.parse(localStorage.getItem(CACHE_KEY))?.[pk] ?? null; } catch { return null; }
+}
+function writeCache(pk, emojis, sets, created_at) {
+  try {
+    const store = JSON.parse(localStorage.getItem(CACHE_KEY) ?? "{}");
+    store[pk] = { created_at, emojis, sets };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(store));
+  } catch {}
+}
+
 export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
-  const [emojis,  setEmojis]  = useState([]);  // individual ["emoji"] tags
-  const [sets,    setSets]    = useState([]);  // resolved bookmarked sets [{aTag,title,emojis}]
+  const cached0 = readCache(normPubkey(pubkey));
+  const [emojis,  setEmojis]  = useState(cached0?.emojis ?? []);  // individual ["emoji"] tags
+  const [sets,    setSets]    = useState(cached0?.sets ?? []);    // resolved bookmarked sets [{aTag,title,emojis}]
   const [loading, setLoading] = useState(false);
 
-  const emojisRef    = useRef([]);
-  const setsRef      = useRef([]);
+  const emojisRef    = useRef(emojis);
+  const setsRef      = useRef(sets);
   // Gates publish() until the initial relay fetch (+ decrypt) has resolved, so a mutation
   // fired before load can't publish a list containing only the new item and wipe the rest.
-  const settledRef   = useRef(false);
+  const settledRef   = useRef(!!cached0);
   useEffect(() => { emojisRef.current = emojis; }, [emojis]);
   useEffect(() => { setsRef.current   = sets;   }, [sets]);
 
   useEffect(() => {
     const pk = normPubkey(pubkey);
-    if (!isHexPubkey(pk)) { setEmojis([]); setSets([]); return; }
+    if (!isHexPubkey(pk)) { setEmojis([]); setSets([]); settledRef.current = false; return; }
 
     settledRef.current = false;
     let cancelled = false;
     setLoading(true);
-    setEmojis([]);
-    setSets([]);
+
+    // Restore from cache immediately so a transient decrypt hiccup (or the
+    // relay round-trip itself) never has to fall back to an empty list.
+    const cached = readCache(pk);
+    if (cached) {
+      setEmojis(cached.emojis ?? []);
+      setSets(cached.sets ?? []);
+    } else {
+      setEmojis([]);
+      setSets([]);
+    }
 
     const received = [];
     let listSettled = false;
@@ -104,14 +126,18 @@ export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
 
       if (decryptFailed) {
         // Signer may still be warming up (common on mobile) — self-heal with
-        // a couple of delayed background retries instead of showing an
-        // empty list, same pattern as useBookmarks.js/useMutes.js.
-        if (bgRetryCount < 2) {
+        // a couple of delayed background retries instead of showing an empty
+        // list. Unconditionally returns either way: a failed decrypt must
+        // never fall through to publish an empty/wrong list over cached state
+        // (that's how a transient hiccup could permanently wipe a real,
+        // still-encrypted-but-undecryptable list from relays on next edit).
+        settledRef.current = true;
+        if (!cancelled && bgRetryCount < 2) {
           bgRetryCount++;
           listSettled = false;
           setTimeout(() => { if (!cancelled) finishList(); }, 5000);
-          return;
         }
+        return;
       }
 
       // individual emojis
@@ -127,7 +153,12 @@ export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
       if (!cancelled) setEmojis(parsedEmojis);
 
       if (aTags.length === 0) {
-        if (!cancelled) { setSets([]); settledRef.current = true; setLoading(false); }
+        if (!cancelled) {
+          setSets([]);
+          writeCache(pk, parsedEmojis, [], latest.created_at);
+          settledRef.current = true;
+          setLoading(false);
+        }
         return;
       }
 
@@ -171,7 +202,10 @@ export default function useCustomEmojiList({ pubkey, signAndPublish } = {}) {
           ).values()];
           return { aTag, title, emojis: setEmojis };
         });
-        setSets(resolved); settledRef.current = true; setLoading(false);
+        setSets(resolved);
+        writeCache(pk, parsedEmojis, resolved, latest.created_at);
+        settledRef.current = true;
+        setLoading(false);
       }
 
       // store cleanup ref so outer cleanup can reach it

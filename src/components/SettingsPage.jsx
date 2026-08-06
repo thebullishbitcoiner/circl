@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import useMailboxes from "../hooks/useMailboxes.js";
 import useSearchRelays from "../hooks/useSearchRelays.js";
@@ -8,8 +8,9 @@ import { MailboxesFactory } from "applesauce-core";
 import CustomEmojiSettingsPage from "./CustomEmojiSettingsPage.jsx";
 import useContentSettings from "../hooks/useContentSettings.js";
 import ZapModal from "./ZapModal.jsx";
-import { displayName } from "../utils.js";
-import { DEV_LUD16, DEV_PUBKEY } from "../constants.js";
+import { displayName, hasNip44 } from "../utils.js";
+import { pool } from "../nostr.js";
+import { DEV_LUD16, DEV_PUBKEY, DEFAULT_RELAYS } from "../constants.js";
 
 // ── Wallet helpers ────────────────────────────────────────────────────────────
 
@@ -461,7 +462,7 @@ function SubPage({ title, onBack, children }) {
 
 // ── Sub-pages ─────────────────────────────────────────────────────────────────
 
-function WalletSubPage({ onBack, pubkey, wallet, onWalletConnected, onWalletDisconnect }) {
+function WalletSubPage({ onBack, pubkey, wallet, walletLocked, onWalletConnected, onWalletDisconnect }) {
   const [walletTab, setWalletTab] = useState("rizful");
 
   const tabBtn = (id) => ({
@@ -477,7 +478,22 @@ function WalletSubPage({ onBack, pubkey, wallet, onWalletConnected, onWalletDisc
 
   return (
     <SubPage title="Wallet" onBack={onBack}>
-      {wallet?.nwc_uri ? (
+      {walletLocked ? (
+        <>
+          <div style={{ margin: "12px 16px 4px", padding: "14px 16px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#E0A03C", flexShrink: 0 }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", fontFamily: "'DM Sans',sans-serif" }}>Wallet can't be unlocked</span>
+            </div>
+            <div style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", lineHeight: 1.4 }}>
+              A wallet is connected for this account, but your current signer doesn't support NIP-44 decryption. Update your extension, or disconnect below to remove the saved connection.
+            </div>
+          </div>
+          <div className="settings-row" style={{ marginTop: 4 }} onClick={onWalletDisconnect}>
+            <div className="settings-row-label" style={{ color: "#E05C8A" }}>Disconnect wallet</div>
+          </div>
+        </>
+      ) : wallet?.nwc_uri ? (
         <>
           <div style={{ margin: "12px 16px 4px", padding: "14px 16px", background: "var(--surface)", borderRadius: 12, border: "1px solid var(--border)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -836,6 +852,7 @@ const KEY_LABELS = {
   circl_bookmarks:     "Bookmark list (decrypted)",
   circl_circles:       "Circles (decrypted)",
   circl_zap_req_cache: "Zap request cache",
+  circl_custom_emoji:  "Custom emoji list (decrypted)",
 };
 
 function formatBytes(n) {
@@ -844,36 +861,178 @@ function formatBytes(n) {
   return `${(n / 1024 / 1024).toFixed(2)} MB`;
 }
 
-function getAppKeys() {
+// Keys stored as { [pubkey]: ... } — size/detail/delete must be scoped to the
+// active account so one account's storage view never shows or wipes another's.
+const PUBKEY_NAMESPACED_KEYS = new Set([
+  "circl_wallet", "circl_mutes", "circl_bookmarks", "circl_circles", "circl_pins",
+  "circl_zap_req_cache", "circl_blossom_v1", "circl_notif_seen_v1",
+  "circl_recent_searches", "circl_profile_search", "circl_custom_emoji",
+]);
+
+function getAppKeys(pubkey) {
   const out = [];
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (!key?.startsWith("circl_")) continue;
       const raw = localStorage.getItem(key) ?? "";
-      out.push({ key, size: raw.length });
+      const namespaced = PUBKEY_NAMESPACED_KEYS.has(key);
+      if (!namespaced) { out.push({ key, size: raw.length, otherAccounts: 0, namespaced }); continue; }
+
+      let mySize = 0, otherAccounts = 0;
+      try {
+        const parsed = JSON.parse(raw) ?? {};
+        for (const pk of Object.keys(parsed)) {
+          if (pk === pubkey) mySize += JSON.stringify(parsed[pk]).length;
+          else otherAccounts++;
+        }
+      } catch { mySize = raw.length; }
+      out.push({ key, size: mySize, otherAccounts, namespaced });
     }
   } catch {}
   return out.sort((a, b) => a.key.localeCompare(b.key));
 }
 
-function StorageDetailPage({ storageKey, onBack, onDeleted }) {
+function deleteAppKey(key, pubkey, namespaced) {
+  if (!namespaced) { localStorage.removeItem(key); return; }
+  try {
+    const store = JSON.parse(localStorage.getItem(key) ?? "{}");
+    delete store[pubkey];
+    if (Object.keys(store).length) localStorage.setItem(key, JSON.stringify(store));
+    else localStorage.removeItem(key);
+  } catch { /* leave as-is rather than risk wiping other accounts on a parse error */ }
+}
+
+// Deliberately separate from per-row delete (which is account-scoped by default) —
+// this is the one explicit path left to fully wipe every account's local data on
+// this device at once (e.g. before handing off/reselling the device).
+function clearAllAppStorage() {
+  try {
+    const toRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith("circl_")) toRemove.push(key);
+    }
+    toRemove.forEach(k => localStorage.removeItem(k));
+  } catch {}
+}
+
+// Single-event replaceable/encrypted list kinds — good candidates for a live
+// "what's actually on relays right now" fetch, independent of anything cached
+// locally. Circles (kind 30000) is intentionally excluded: it's N addressable
+// events (one per circle), not a single list, so it doesn't fit this shape.
+const RELAY_DEBUG_KIND = {
+  circl_bookmarks:    10003,
+  circl_mutes:        10000,
+  circl_custom_emoji: 10030,
+};
+
+function RelayDebugFetch({ storageKey, pubkey }) {
+  const kind = RELAY_DEBUG_KIND[storageKey];
+  const [state, setState] = useState("idle"); // idle | loading | done
+  const [result, setResult] = useState(null);
+
+  if (!kind || !pubkey) return null;
+
+  const run = async () => {
+    setState("loading");
+    setResult(null);
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
+    const received = [];
+    await new Promise(resolve => {
+      const sub = pool.request(relayUrls, [{ kinds: [kind], authors: [pubkey] }]).subscribe({
+        next: raw => received.push(raw),
+        complete: () => { sub.unsubscribe(); resolve(); },
+        error: () => { sub.unsubscribe(); resolve(); },
+      });
+      setTimeout(() => { sub.unsubscribe(); resolve(); }, 8000);
+    });
+
+    let latest = null;
+    for (const ev of received) if (!latest || ev.created_at > latest.created_at) latest = ev;
+
+    if (!latest) {
+      setResult({ found: false, eventsSeen: received.length, relaysQueried: relayUrls });
+      setState("done");
+      return;
+    }
+
+    const content = (latest.content || "").trim();
+    let decryptedTags = null, decryptError = null;
+    if (content) {
+      if (!hasNip44()) {
+        decryptError = "Signer does not support NIP-44";
+      } else {
+        try {
+          const plain = await window.nostr.nip44.decrypt(latest.pubkey, latest.content);
+          decryptedTags = JSON.parse(plain);
+        } catch (e) { decryptError = e?.message || "Decrypt failed"; }
+      }
+    }
+
+    setResult({
+      found: true,
+      eventsSeen: received.length,
+      relaysQueried: relayUrls,
+      id: latest.id,
+      created_at: latest.created_at,
+      created_at_readable: new Date(latest.created_at * 1000).toLocaleString(),
+      publicTags: latest.tags,
+      rawContentLength: content.length,
+      decryptedTags,
+      decryptError,
+    });
+    setState("done");
+  };
+
+  return (
+    <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+      <button
+        onClick={run}
+        disabled={state === "loading"}
+        style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "transparent", color: "var(--text)", fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans',sans-serif", cursor: state === "loading" ? "default" : "pointer" }}
+      >
+        {state === "loading" ? "Fetching from relays…" : "Fetch live from relays"}
+      </button>
+      {result && (
+        <pre style={{
+          marginTop: 10, fontFamily: "monospace", fontSize: 11, color: "var(--text)",
+          background: "var(--surface)", border: "1px solid var(--border)",
+          borderRadius: 8, padding: 12, overflow: "auto", maxHeight: "40vh", whiteSpace: "pre",
+        }}>{JSON.stringify(result, null, 2)}</pre>
+      )}
+    </div>
+  );
+}
+
+function StorageDetailPage({ storageKey, pubkey, namespaced, onBack, onDeleted }) {
   const raw = localStorage.getItem(storageKey) ?? "";
   let pretty = raw;
   let summary = null;
+  let otherAccounts = 0;
+  let sizeBytes = raw.length;
   try {
     const parsed = JSON.parse(raw);
-    pretty = JSON.stringify(parsed, null, 2);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
-      summary = `${Object.keys(parsed).length} entries`;
-    else if (Array.isArray(parsed))
-      summary = `${parsed.length} items`;
+    if (namespaced && parsed && typeof parsed === "object") {
+      otherAccounts = Object.keys(parsed).filter(pk => pk !== pubkey).length;
+      const mine = parsed[pubkey];
+      pretty = mine !== undefined ? JSON.stringify(mine, null, 2) : "(no data stored for this account)";
+      sizeBytes = mine !== undefined ? JSON.stringify(mine).length : 0;
+      if (mine && typeof mine === "object" && !Array.isArray(mine)) summary = `${Object.keys(mine).length} entries`;
+      else if (Array.isArray(mine)) summary = `${mine.length} items`;
+    } else {
+      pretty = JSON.stringify(parsed, null, 2);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
+        summary = `${Object.keys(parsed).length} entries`;
+      else if (Array.isArray(parsed))
+        summary = `${parsed.length} items`;
+    }
   } catch {}
   const MAX_DISPLAY = 60000;
   const display = pretty.length > MAX_DISPLAY ? pretty.slice(0, MAX_DISPLAY) + "\n\n… [truncated]" : pretty;
 
   function del() {
-    localStorage.removeItem(storageKey);
+    deleteAppKey(storageKey, pubkey, namespaced);
     onDeleted();
   }
 
@@ -882,12 +1041,17 @@ function StorageDetailPage({ storageKey, onBack, onDeleted }) {
       <div style={{ padding: "12px 16px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
           <span style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif" }}>
-            {summary ? `${summary} · ` : ""}{formatBytes(raw.length)}
+            {summary ? `${summary} · ` : ""}{formatBytes(sizeBytes)}
           </span>
           <button onClick={del} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #E05C8A", background: "transparent", color: "#E05C8A", fontSize: 12, fontFamily: "'DM Sans',sans-serif", cursor: "pointer" }}>
             Delete
           </button>
         </div>
+        {otherAccounts > 0 && (
+          <div style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", marginBottom: 12 }}>
+            {otherAccounts} other account{otherAccounts !== 1 ? "s" : ""} on this device also {otherAccounts !== 1 ? "have" : "has"} data under this key (not shown here, not affected by Delete).
+          </div>
+        )}
         <pre style={{
           fontFamily: "monospace", fontSize: 11, color: "var(--text)",
           background: "var(--surface)", border: "1px solid var(--border)",
@@ -895,21 +1059,42 @@ function StorageDetailPage({ storageKey, onBack, onDeleted }) {
           overflow: "auto", maxHeight: "62vh",
           whiteSpace: "pre",
         }}>{display}</pre>
+        <RelayDebugFetch storageKey={storageKey} pubkey={pubkey} />
       </div>
     </SubPage>
   );
 }
 
-function StorageSubPage({ onBack }) {
-  const [keys, setKeys] = useState(getAppKeys);
+function StorageSubPage({ onBack, pubkey }) {
+  const [keys, setKeys] = useState(() => getAppKeys(pubkey));
   const [selectedKey, setSelectedKey] = useState(null);
+  const [confirmingWipeAll, setConfirmingWipeAll] = useState(false);
+  const wipeConfirmTimer = useRef(null);
+  const refresh = () => setKeys(getAppKeys(pubkey));
+
+  useEffect(() => () => clearTimeout(wipeConfirmTimer.current), []);
+
+  const handleWipeAllClick = () => {
+    if (!confirmingWipeAll) {
+      setConfirmingWipeAll(true);
+      wipeConfirmTimer.current = setTimeout(() => setConfirmingWipeAll(false), 4000);
+      return;
+    }
+    clearTimeout(wipeConfirmTimer.current);
+    clearAllAppStorage();
+    setConfirmingWipeAll(false);
+    refresh();
+  };
 
   if (selectedKey) {
+    const entry = keys.find(k => k.key === selectedKey);
     return (
       <StorageDetailPage
         storageKey={selectedKey}
+        pubkey={pubkey}
+        namespaced={entry?.namespaced ?? false}
         onBack={() => setSelectedKey(null)}
-        onDeleted={() => { setSelectedKey(null); setKeys(getAppKeys()); }}
+        onDeleted={() => { setSelectedKey(null); refresh(); }}
       />
     );
   }
@@ -926,9 +1111,9 @@ function StorageSubPage({ onBack }) {
         ) : (
           <>
             <div style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", marginBottom: 10 }}>
-              {keys.length} item{keys.length !== 1 ? "s" : ""} · {formatBytes(totalSize)} total
+              {keys.length} item{keys.length !== 1 ? "s" : ""} · {formatBytes(totalSize)} for this account
             </div>
-            {keys.map(({ key, size }, i) => (
+            {keys.map(({ key, size, otherAccounts }, i) => (
               <div
                 key={key}
                 style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 0", borderBottom: i < keys.length - 1 ? "1px solid var(--border)" : "none", cursor: "pointer" }}
@@ -939,16 +1124,38 @@ function StorageSubPage({ onBack }) {
                   {KEY_LABELS[key] && (
                     <div style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", marginTop: 2 }}>{KEY_LABELS[key]}</div>
                   )}
+                  {otherAccounts > 0 && (
+                    <div style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", marginTop: 2 }}>
+                      + {otherAccounts} other account{otherAccounts !== 1 ? "s" : ""} on this device
+                    </div>
+                  )}
                 </div>
                 <span style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", flexShrink: 0 }}>{formatBytes(size)}</span>
                 <button
-                  onClick={e => { e.stopPropagation(); localStorage.removeItem(key); setKeys(getAppKeys()); }}
+                  onClick={e => { e.stopPropagation(); deleteAppKey(key, pubkey, PUBKEY_NAMESPACED_KEYS.has(key)); refresh(); }}
                   style={{ padding: "3px 9px", borderRadius: 6, border: "1px solid var(--border)", background: "transparent", color: "var(--text-faint)", fontSize: "calc(var(--font-base) + 2px)", fontFamily: "'DM Sans',sans-serif", cursor: "pointer", lineHeight: 1, flexShrink: 0 }}
                 >×</button>
               </div>
             ))}
           </>
         )}
+        <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid var(--border)", paddingBottom: 16 }}>
+          <div style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", marginBottom: 8 }}>
+            Danger zone
+          </div>
+          <button
+            onClick={handleWipeAllClick}
+            style={{
+              width: "100%", padding: "10px 12px", borderRadius: 8,
+              border: `1px solid ${confirmingWipeAll ? "#E05C8A" : "var(--border)"}`,
+              background: confirmingWipeAll ? "#E05C8A" : "transparent",
+              color: confirmingWipeAll ? "#fff" : "#E05C8A",
+              fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans',sans-serif", cursor: "pointer",
+            }}
+          >
+            {confirmingWipeAll ? "Tap again to permanently clear all accounts' data" : "Clear all data for every account on this device"}
+          </button>
+        </div>
       </div>
     </SubPage>
   );
@@ -957,7 +1164,7 @@ function StorageSubPage({ onBack }) {
 // ── Main settings page ────────────────────────────────────────────────────────
 
 export default function SettingsPage({
-  onBack, dark, toggleDark, onLogout, pubkey, wallet, onWalletConnected, onWalletDisconnect,
+  onBack, dark, toggleDark, onLogout, pubkey, wallet, walletLocked, onWalletConnected, onWalletDisconnect,
   zapSettings = { amount: 21, msg: "" }, onSaveZapSettings,
   textSize = "medium", onTextSizeChange,
   signAndPublish,
@@ -976,7 +1183,7 @@ export default function SettingsPage({
   };
 
   if (subPage === "wallet") {
-    return <WalletSubPage onBack={() => setSubPage(null)} pubkey={pubkey} wallet={wallet} onWalletConnected={onWalletConnected} onWalletDisconnect={onWalletDisconnect} />;
+    return <WalletSubPage onBack={() => setSubPage(null)} pubkey={pubkey} wallet={wallet} walletLocked={walletLocked} onWalletConnected={onWalletConnected} onWalletDisconnect={onWalletDisconnect} />;
   }
   if (subPage === "zaps") {
     return <ZapsSubPage onBack={() => setSubPage(null)} zapSettings={zapSettings} onSaveZapSettings={onSaveZapSettings} />;
@@ -1005,12 +1212,12 @@ export default function SettingsPage({
     return <BlossomSubPage onBack={() => setSubPage(null)} servers={blossomServers} saveServers={saveBlossomServers} />;
   }
   if (subPage === "storage") {
-    return <StorageSubPage onBack={() => setSubPage(null)} />;
+    return <StorageSubPage onBack={() => setSubPage(null)} pubkey={pubkey} />;
   }
 
   const walletSub = wallet?.nwc_uri
     ? (wallet.lightning_address ? wallet.lightning_address : "Connected")
-    : "Not connected";
+    : walletLocked ? "Can't unlock (update signer)" : "Not connected";
 
   const totalEmojiCount = (customEmojis?.length ?? 0) + sets.reduce((n, s) => n + s.emojis.length, 0);
 

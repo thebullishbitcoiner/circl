@@ -1,5 +1,6 @@
 import * as nip19Lib from "nostr-tools/nip19";
 import { decodeInvoice } from "@getalby/lightning-tools";
+import { getActivePubkey } from "./nostr.js";
 import {
   getCalendarEventTitle,
   getCalendarEventSummary,
@@ -568,7 +569,10 @@ export function parseStreamEvent(event) {
 const ZAP_REQ_CACHE_KEY = "circl_zap_req_cache";
 const ZAP_REQ_CACHE_MAX = 200;
 
-// In-memory cache — parsed once, avoids repeated JSON.parse on wallet list renders
+// In-memory cache — parsed once, avoids repeated JSON.parse on wallet list renders.
+// Namespaced by pubkey ({ [pubkey]: { [paymentHash]: entry } }): entries record
+// *my* outgoing zap targets/comments for whichever account sent them, so switching
+// accounts must never surface another account's zap activity.
 let _zapReqMemCache = null;
 function getZapReqMemCache() {
   if (!_zapReqMemCache) {
@@ -580,9 +584,11 @@ function getZapReqMemCache() {
 
 export function cacheZapReq(paymentHash, zapReq) {
   try {
-    if (!paymentHash) return;
+    const pk = getActivePubkey();
+    if (!paymentHash || !pk) return;
     const key = String(paymentHash).toLowerCase();
-    const prev = getZapReqMemCache();
+    const all = getZapReqMemCache();
+    const prev = all[pk] ?? {};
     const tags = zapReq.tags ?? [];
     const entry = {
       sender:   zapReq.pubkey ?? null,
@@ -592,11 +598,12 @@ export function cacheZapReq(paymentHash, zapReq) {
       time:     new Date().toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }),
     };
     delete prev[key];
-    const next = { [key]: entry, ...prev };
-    const keys = Object.keys(next);
-    if (keys.length > ZAP_REQ_CACHE_MAX) keys.slice(ZAP_REQ_CACHE_MAX).forEach(k => delete next[k]);
-    _zapReqMemCache = next;
-    const serialized = JSON.stringify(next);
+    const nextForPk = { [key]: entry, ...prev };
+    const keys = Object.keys(nextForPk);
+    if (keys.length > ZAP_REQ_CACHE_MAX) keys.slice(ZAP_REQ_CACHE_MAX).forEach(k => delete nextForPk[k]);
+    all[pk] = nextForPk;
+    _zapReqMemCache = all;
+    const serialized = JSON.stringify(all);
     try {
       localStorage.setItem(ZAP_REQ_CACHE_KEY, serialized);
     } catch {
@@ -608,8 +615,11 @@ export function cacheZapReq(paymentHash, zapReq) {
 }
 
 export function getZapReqFromCache(paymentHash) {
-  try { return paymentHash ? (getZapReqMemCache()[String(paymentHash).toLowerCase()] ?? null) : null; }
-  catch { return null; }
+  try {
+    const pk = getActivePubkey();
+    if (!paymentHash || !pk) return null;
+    return getZapReqMemCache()[pk]?.[String(paymentHash).toLowerCase()] ?? null;
+  } catch { return null; }
 }
 
 /**

@@ -27,6 +27,18 @@ function safeNormalize(url) {
   try { return normalizeURL(url); } catch { return url; }
 }
 
+// ── Active pubkey (for modules deep in the tree that need it without prop-drilling,
+// e.g. nwcPay.js decrypting the locally-stored NWC secret) ─────────────────
+let activePubkey = null;
+
+export function setActivePubkey(pk) {
+  activePubkey = pk;
+}
+
+export function getActivePubkey() {
+  return activePubkey;
+}
+
 let blockedRelayUrls = new Set();
 
 export function setBlockedRelayUrls(urls) {

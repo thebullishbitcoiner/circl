@@ -38,8 +38,31 @@ const SUGGEST_DEBOUNCE_MS = 350;
 const RECENT_KEY    = "circl_recent_searches";
 const MAX_RECENT    = 21;
 
-function loadRecent() {
-  try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || []; } catch { return []; }
+function readRawRecent() {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY)); } catch { return null; }
+}
+
+// Namespaced by pubkey so switching accounts never surfaces another account's search history.
+function loadRecent(pubkey) {
+  const raw = readRawRecent();
+  if (Array.isArray(raw)) {
+    // Pre-namespacing install: a single flat search-history array. Claim it
+    // for whichever account loads first — the old shape also made
+    // subsequent saves silently fail (JSON.stringify drops non-index
+    // properties set directly on an array), so this doubles as the fix.
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify({ [pubkey]: raw })); } catch {}
+    return raw;
+  }
+  return (raw && typeof raw === "object" ? raw[pubkey] : null) || [];
+}
+
+function saveRecent(pubkey, searches) {
+  const raw = readRawRecent();
+  const all = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  if (searches.length) all[pubkey] = searches;
+  else delete all[pubkey];
+  if (Object.keys(all).length) localStorage.setItem(RECENT_KEY, JSON.stringify(all));
+  else localStorage.removeItem(RECENT_KEY);
 }
 
 function IconCircle({ children, color = "var(--primary)" }) {
@@ -244,7 +267,7 @@ export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThre
   const [loadingSuggest, setLoadingSuggest] = useState(false);
   const [loadingNotes,   setLoadingNotes]   = useState(false);
   const [resolvingIdent, setResolvingIdent] = useState(false);
-  const [recentSearches, setRecentSearches] = useState(() => loadRecent());
+  const [recentSearches, setRecentSearches] = useState(() => loadRecent(pubkey));
 
   const trimmedQuery = query.trim();
   const identifier = useMemo(() => parseNostrIdentifier(trimmedQuery), [trimmedQuery]);
@@ -269,24 +292,23 @@ export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThre
     setRecentSearches(prev => {
       const key = entry.type === "people" ? entry.pubkey : entry.query;
       const next = [{ ...entry, ts: Date.now() }, ...prev.filter(r => !(r.type === entry.type && (r.type === "people" ? r.pubkey === key : r.query === key)))].slice(0, MAX_RECENT);
-      localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+      saveRecent(pubkey, next);
       return next;
     });
-  }, []);
+  }, [pubkey]);
 
   const clearRecent = () => {
-    localStorage.removeItem(RECENT_KEY);
+    saveRecent(pubkey, []);
     setRecentSearches([]);
   };
 
   const removeRecent = useCallback((item) => {
     setRecentSearches(prev => {
       const next = prev.filter(r => !(r.type === item.type && (r.type === "people" ? r.pubkey === item.pubkey : r.query === item.query)));
-      if (next.length) localStorage.setItem(RECENT_KEY, JSON.stringify(next));
-      else localStorage.removeItem(RECENT_KEY);
+      saveRecent(pubkey, next);
       return next;
     });
-  }, []);
+  }, [pubkey]);
 
   const runPeopleSearch = useCallback(async q => {
     abortRef.current?.abort();

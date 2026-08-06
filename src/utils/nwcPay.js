@@ -1,16 +1,30 @@
 import { NWCClient } from "@getalby/sdk/nwc";
+import { getActivePubkey } from "../nostr.js";
+import { hasNip44 } from "../utils.js";
+
+function readWalletRecord() {
+  const pk = getActivePubkey();
+  if (!pk) return null;
+  try {
+    const store = JSON.parse(localStorage.getItem("circl_wallet")) ?? {};
+    return store[pk] ?? null;
+  } catch { return null; }
+}
 
 /** Returns { ok: true } or { ok: false, reason, noWallet? } */
 export async function payWithNWC(invoice) {
-  let walletData;
+  const rec = readWalletRecord();
+  if (!rec?.nwc_uri_enc) return { ok: false, noWallet: true, reason: "No wallet connected" };
+  if (!hasNip44()) return { ok: false, reason: "Signer does not support NIP-44 decryption" };
+
+  let nwc_uri;
   try {
-    const raw = localStorage.getItem("circl_wallet");
-    walletData = raw ? JSON.parse(raw) : null;
-  } catch { walletData = null; }
+    nwc_uri = await window.nostr.nip44.decrypt(getActivePubkey(), rec.nwc_uri_enc);
+  } catch {
+    return { ok: false, reason: "Could not unlock wallet connection" };
+  }
 
-  if (!walletData?.nwc_uri) return { ok: false, noWallet: true, reason: "No wallet connected" };
-
-  const client = new NWCClient({ nostrWalletConnectUrl: walletData.nwc_uri });
+  const client = new NWCClient({ nostrWalletConnectUrl: nwc_uri });
   try {
     await client.payInvoice({ invoice });
     return { ok: true };
@@ -22,8 +36,5 @@ export async function payWithNWC(invoice) {
 }
 
 export function hasWallet() {
-  try {
-    const raw = localStorage.getItem("circl_wallet");
-    return !!(raw && JSON.parse(raw)?.nwc_uri);
-  } catch { return false; }
+  return !!readWalletRecord()?.nwc_uri_enc;
 }

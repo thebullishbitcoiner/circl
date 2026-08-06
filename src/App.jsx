@@ -84,6 +84,20 @@ import AudioPlayer from "./components/AudioPlayer.jsx";
 import AudioPlayerCard from "./components/AudioPlayerCard.jsx";
 import PublishStatusCard from "./components/PublishStatusCard.jsx";
 import PublishStatusModal from "./components/PublishStatusModal.jsx";
+
+const UNRESOLVED_ADDR_KIND_LABELS = { 30030: "Emoji set", 30000: "List", 10002: "Relay list", 0: "Profile", 3: "Contact list" };
+
+// Human label for a bookmark tag useBookmarkedEvents couldn't resolve to a
+// renderable card — just enough to identify what's being removed.
+function describeUnresolvedBookmark(tag) {
+  if (tag[0] === "e") return `Note ${tag[1]?.slice(0, 12)}…`;
+  const m = typeof tag[1] === "string" && tag[1].match(/^(\d+):[0-9a-fA-F]{64}:([\s\S]*)$/);
+  if (!m) return "Unsupported bookmark";
+  const kind = parseInt(m[1], 10);
+  const label = UNRESOLVED_ADDR_KIND_LABELS[kind] ?? `Kind ${kind}`;
+  return m[2] ? `${label}: ${m[2]}` : label;
+}
+
 export default function App() {
   const { pubkey, status, error, login, logout, signAndPublish, privateRelayUrls } = useAuth();
   const { follows, loading: fl, follow: followPk, unfollow: unfollowPk, refresh: refreshFollows } = useFollows({ pubkey, signAndPublish });
@@ -151,14 +165,14 @@ export default function App() {
   });
   const { items: notificationEvents, loading: notifLoading } = useNotifications({ pubkey });
   const [bookmarkRefreshKey, setBookmarkRefreshKey] = useState(0);
-  const { toggle: toggleBm, isBookmarked, bookmarkItems } = useBookmarks({ pubkey, signAndPublish, refreshKey: bookmarkRefreshKey });
+  const { toggle: toggleBm, isBookmarked, bookmarkItems, removeTag: removeBookmarkTag } = useBookmarks({ pubkey, signAndPublish, refreshKey: bookmarkRefreshKey });
   const { togglePin, isPinned, pinnedIds } = usePinnedNotes({ pubkey, signAndPublish });
   const { mutes, hashtags: mutedHashtags, words: mutedWords, threads: mutedThreads, muteEvent, mute: muteUser, unmute: unmuteUser, muteHashtag, muteWord, muteThread, unmuteHashtag, unmuteWord, unmuteThread, isMuted, isContentMuted } = useMutes({ pubkey, signAndPublish });
   const { circles, createCircle, renameCircle, deleteCircle, addMember: addCircleMember, removeMember: removeCircleMember } = useCircles({ pubkey, signAndPublish });
   const { emojis: customEmojis, sets: customEmojiSets, allCustomEmojis, addEmoji, removeEmoji, addSet: addEmojiSet, removeSet: removeEmojiSet, loading: customEmojiLoading } = useCustomEmojiList({ pubkey, signAndPublish });
   const { servers: blossomServers, saveServers: saveBlossomServers } = useBlossomServers({ pubkey, signAndPublish });
   const bookmarkLocalPool = useMemo(() => [...events, ...notificationEvents], [events, notificationEvents]);
-  const { events: bookmarkFeedEvents, loading: bookmarkFeedLoading } = useBookmarkedEvents({
+  const { events: bookmarkFeedEvents, unresolved: unresolvedBookmarks, loading: bookmarkFeedLoading } = useBookmarkedEvents({
     bookmarkTags: bookmarkItems,
     localEvents: bookmarkLocalPool,
   });
@@ -256,9 +270,24 @@ export default function App() {
 
   const [activeNav, setActiveNav] = useState("home");
   const [profileScrollTrigger, setProfileScrollTrigger] = useState(0);
-  const [lastNotifSeenAt, setLastNotifSeenAt] = useState(() => {
-    try { return parseInt(localStorage.getItem("circl_notif_seen_v1") || "0", 10); } catch { return 0; }
-  });
+  const [lastNotifSeenAt, setLastNotifSeenAt] = useState(0);
+  useEffect(() => {
+    if (!pubkey) { setLastNotifSeenAt(0); return; }
+    try {
+      const raw = JSON.parse(localStorage.getItem("circl_notif_seen_v1"));
+      if (typeof raw === "number") {
+        // Pre-namespacing install: a single flat timestamp. Claim it for
+        // whichever account loads first — the old shape also made
+        // subsequent saves silently throw (strict-mode assignment to a
+        // property of a primitive number), so this doubles as the fix.
+        localStorage.setItem("circl_notif_seen_v1", JSON.stringify({ [pubkey]: raw }));
+        setLastNotifSeenAt(raw);
+        return;
+      }
+      const store = raw && typeof raw === "object" ? raw : {};
+      setLastNotifSeenAt(store[pubkey] ?? 0);
+    } catch { setLastNotifSeenAt(0); }
+  }, [pubkey]);
   const [openStreamEvent, setOpenStreamEvent] = useState(null);
   const [navStack, setNavStack] = useState([]);
 
@@ -331,7 +360,7 @@ export default function App() {
     setFloatingCompose(true);
   };
 
-  const { wallet, saveWallet, disconnect: disconnectWallet } = useWallet();
+  const { wallet, locked: walletLocked, saveWallet, disconnect: disconnectWallet } = useWallet(pubkey);
   const { sendZap } = useZap(wallet);
   const { zapSettings, saveZapSettings } = useZapSettings();
   useAppSettingsSync({
@@ -547,7 +576,12 @@ export default function App() {
     if (nav === "notifications") {
       const now = Math.floor(Date.now() / 1000);
       setLastNotifSeenAt(now);
-      try { localStorage.setItem("circl_notif_seen_v1", String(now)); } catch {}
+      try {
+        const raw = JSON.parse(localStorage.getItem("circl_notif_seen_v1"));
+        const store = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+        store[pubkey] = now;
+        localStorage.setItem("circl_notif_seen_v1", JSON.stringify(store));
+      } catch {}
     }
     if (nav === "zaps" && activeNav !== "zaps") refreshWallet();
   };
@@ -798,6 +832,34 @@ export default function App() {
                         );
                       })()
                 )}
+                {activeNav === "bookmarks" && !bookmarkFeedLoading && unresolvedBookmarks.length > 0 && (
+                  <div style={{ padding: "12px 16px", borderTop: displayEvs.length > 0 ? "1px solid var(--border)" : "none" }}>
+                    <div style={{ fontSize: 11, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", marginBottom: 8 }}>
+                      {unresolvedBookmarks.length} bookmark{unresolvedBookmarks.length !== 1 ? "s" : ""} couldn't be shown here
+                    </div>
+                    {unresolvedBookmarks.map(({ tag, reason }) => (
+                      <div key={`${tag[0]}:${tag[1]}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontFamily: "'DM Sans',sans-serif", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {describeUnresolvedBookmark(tag)}
+                          </div>
+                          <div style={{ fontSize: 11, fontFamily: "'DM Sans',sans-serif", color: "var(--text-faint)", marginTop: 2 }}>
+                            {reason === "unsupported"
+                              ? "Not bookmarkable content — safe to remove"
+                              : "Couldn't load from your relays — may still exist elsewhere"}
+                          </div>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            try { await removeBookmarkTag(tag); showToast("Removed from bookmarks"); }
+                            catch (e) { showToast(e?.message || "Could not remove"); }
+                          }}
+                          style={{ padding: "3px 9px", borderRadius: 6, border: "1px solid var(--border)", background: "transparent", color: "var(--text-faint)", fontSize: 12, fontFamily: "'DM Sans',sans-serif", cursor: "pointer", flexShrink: 0 }}
+                        >Remove</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {activeNav === "notifications" && (
                   notifLoading && notificationEvents.length === 0
                     ? [0, 1, 2, 3].map(i => <SkelCard key={i} />)
@@ -821,6 +883,7 @@ export default function App() {
                 {activeNav === "zaps" && (
                   <WalletPage
                     wallet={wallet}
+                    walletLocked={walletLocked}
                     balance={walletBalance}
                     transactions={walletTxs}
                     flow24h={walletFlow24h}
@@ -1576,9 +1639,14 @@ export default function App() {
                   onLogout={() => { logout(); setSettingsOpen(false); }}
                   pubkey={pubkey}
                   wallet={wallet}
-                  onWalletConnected={data => {
-                    saveWallet(data);
-                    showToast(data.lightning_address ? `⚡ ${data.lightning_address} connected!` : "⚡ Wallet connected!");
+                  walletLocked={walletLocked}
+                  onWalletConnected={async data => {
+                    try {
+                      await saveWallet(data);
+                      showToast(data.lightning_address ? `⚡ ${data.lightning_address} connected!` : "⚡ Wallet connected!");
+                    } catch (e) {
+                      showToast(e?.message || "Could not save wallet connection");
+                    }
                   }}
                   onWalletDisconnect={() => {
                     disconnectWallet();

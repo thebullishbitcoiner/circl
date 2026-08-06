@@ -6,21 +6,37 @@ import { DEFAULT_RELAYS } from "../constants.js";
 const SERVER_LIST_KIND = 10063;
 const LS_KEY = "circl_blossom_v1";
 
-function loadFromStorage() {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch { return []; }
+function readRawStore() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY)); } catch { return null; }
 }
 
-function saveToStorage(servers) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(servers)); } catch {}
+// Namespaced by pubkey so switching accounts never surfaces another account's server list.
+function loadFromStorage(pubkey) {
+  const raw = readRawStore();
+  if (Array.isArray(raw)) {
+    // Pre-namespacing install: a single flat server list. Claim it for
+    // whichever account loads first rather than losing it — the old shape
+    // also made subsequent saves silently fail (JSON.stringify drops
+    // non-index properties set directly on an array), so this doubles as
+    // the fix for that.
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ [pubkey]: raw })); } catch {}
+    return raw;
+  }
+  const parsed = raw && typeof raw === "object" ? raw[pubkey] : undefined;
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+function saveToStorage(pubkey, servers) {
+  try {
+    const raw = readRawStore();
+    const store = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+    store[pubkey] = servers;
+    localStorage.setItem(LS_KEY, JSON.stringify(store));
+  } catch {}
 }
 
 export default function useBlossomServers({ pubkey, signAndPublish } = {}) {
-  const [servers, setServers] = useState(() => loadFromStorage());
+  const [servers, setServers] = useState(() => loadFromStorage(pubkey));
 
   const serversRef  = useRef(servers);
   const hasMutated  = useRef(false);
@@ -28,8 +44,14 @@ export default function useBlossomServers({ pubkey, signAndPublish } = {}) {
 
   useEffect(() => {
     const pk = normPubkey(pubkey);
-    if (!isHexPubkey(pk)) { return; }
+    if (!isHexPubkey(pk)) {
+      serversRef.current = [];
+      setServers([]);
+      return;
+    }
 
+    serversRef.current = loadFromStorage(pk);
+    setServers(serversRef.current);
     hasMutated.current = false;
     let cancelled = false;
     const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
@@ -53,7 +75,7 @@ export default function useBlossomServers({ pubkey, signAndPublish } = {}) {
         if (!cancelled) {
           serversRef.current = parsed;
           setServers(parsed);
-          saveToStorage(parsed);
+          saveToStorage(pk, parsed);
         }
       },
       error: () => {},
@@ -69,7 +91,7 @@ export default function useBlossomServers({ pubkey, signAndPublish } = {}) {
     const prev = serversRef.current;
     serversRef.current = newList;
     setServers(newList);
-    saveToStorage(newList);
+    saveToStorage(pk, newList);
     try {
       await signAndPublish({
         kind: SERVER_LIST_KIND,
@@ -79,7 +101,7 @@ export default function useBlossomServers({ pubkey, signAndPublish } = {}) {
     } catch (e) {
       serversRef.current = prev;
       setServers(prev);
-      saveToStorage(prev);
+      saveToStorage(pk, prev);
       throw e;
     }
   }, [signAndPublish, pubkey]);
