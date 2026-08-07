@@ -18,12 +18,13 @@ export default function PollInline({
   const [zapTarget, setZapTarget] = useState(null);
   const [showZapModal, setShowZapModal] = useState(false);
   const [localModal, setLocalModal] = useState(null);
+  const [viewResults, setViewResults] = useState(false);
 
   const effectiveVote = localVote ?? myVote;
   const effectiveCounts = localCounts ?? voteCounts;
   const effectiveTotal = localCounts ? Object.values(localCounts).reduce((s, v) => s + v, 0) : total;
   const hasVoted = !!effectiveVote;
-  const showResults = hasVoted || isExpired;
+  const showResults = hasVoted || isExpired || viewResults;
   const recipientLnAddr = profiles[event.pubkey]?.lud16 || profiles[event.pubkey]?.lud06 || null;
 
   const dismiss = () => { onDismissModal?.(); setLocalModal(null); };
@@ -90,6 +91,14 @@ export default function PollInline({
           <button type="button" className="poll-votes-link" onClick={() => onOpenVotes?.({ event, options, voteEvents, isZapPoll })}>
             {voterCount} vote{voterCount !== 1 ? "s" : ""}
           </button>
+          {!hasVoted && !isExpired && (
+            <>
+              {" · "}
+              <button type="button" className="poll-votes-link" onClick={() => setViewResults(v => !v)}>
+                {viewResults ? "Hide results" : "View results"}
+              </button>
+            </>
+          )}
           {expiry && <>{" · "}<span>{isExpired ? "Ended" : (() => { const s = expiry - Math.floor(Date.now() / 1000); const d = Math.floor(s / 86400); const h = Math.floor((s % 86400) / 3600); return d > 0 ? `${d}d ${h}h left` : h > 0 ? `${h}h left` : "Ending soon"; })()}</span></>}
         </div>
       )}

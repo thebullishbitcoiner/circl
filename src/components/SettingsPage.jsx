@@ -1164,7 +1164,7 @@ function StorageSubPage({ onBack, pubkey }) {
 // ── Main settings page ────────────────────────────────────────────────────────
 
 export default function SettingsPage({
-  onBack, dark, toggleDark, onLogout, pubkey, wallet, walletLocked, onWalletConnected, onWalletDisconnect,
+  onBack, dark, toggleDark, pubkey, wallet, walletLocked, onWalletConnected, onWalletDisconnect,
   zapSettings = { amount: 21, msg: "" }, onSaveZapSettings,
   textSize = "medium", onTextSizeChange,
   signAndPublish,
@@ -1303,11 +1303,6 @@ export default function SettingsPage({
           <div className="settings-zap-dev-cta-title">Enjoying Circl?</div>
           <div className="settings-zap-dev-cta-sub">ZAP THE DEV!</div>
         </div>
-      </div>
-
-      <div className="settings-section-title" style={{ marginTop: 16 }}>Account</div>
-      <div className="settings-row" onClick={onLogout}>
-        <div className="settings-row-label" style={{ color: "#E05C8A" }}>Sign out</div>
       </div>
 
       <div style={{ position: "sticky", bottom: 0, padding: "12px 16px", fontSize: 11, color: "var(--text-muted)", fontFamily: "'DM Sans', sans-serif", background: "var(--bg)" }}>

@@ -1636,7 +1636,6 @@ export default function App() {
                   onBack={() => setSettingsOpen(false)}
                   dark={dark}
                   toggleDark={toggleDark}
-                  onLogout={() => { logout(); setSettingsOpen(false); }}
                   pubkey={pubkey}
                   wallet={wallet}
                   walletLocked={walletLocked}
@@ -1787,6 +1786,12 @@ export default function App() {
                 </svg>
               </div>
               Settings
+            </button>
+            <button className="action-sheet-btn" onClick={() => { setMoreOpen(false); logout(); }}>
+              <div className="action-sheet-btn-icon">
+                <LogoutI />
+              </div>
+              Sign out
             </button>
             <button className="action-sheet-cancel" onClick={() => setMoreOpen(false)}>Cancel</button>
           </div>

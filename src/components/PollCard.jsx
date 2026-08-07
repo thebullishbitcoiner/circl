@@ -48,6 +48,7 @@ function PollCard({
   const [showZapModal, setShowZapModal] = useState(false);
   const [localVote, setLocalVote] = useState(null);
   const [localVoteCounts, setLocalVoteCounts] = useState(null);
+  const [viewResults, setViewResults] = useState(false);
 
   const { options, voteCounts, myVote, total, isExpired, expiry, loading, polltype, zapLimits, voteEvents, voterCount } = usePollData({ event, myPubkey });
   const isZapPoll = event.kind === 6969;
@@ -57,7 +58,7 @@ function PollCard({
     ? Object.values(localVoteCounts).reduce((s, v) => s + v, 0)
     : total;
   const hasVoted = !!effectiveVote;
-  const showResults = hasVoted || isExpired;
+  const showResults = hasVoted || isExpired || viewResults;
 
   const recipientLnAddr = profiles[event.pubkey]?.lud16 || profiles[event.pubkey]?.lud06 || null;
 
@@ -208,6 +209,14 @@ function PollCard({
                 >
                   {voterCount} vote{voterCount !== 1 ? "s" : ""}
                 </button>
+                {!hasVoted && !isExpired && (
+                  <>
+                    {" · "}
+                    <button type="button" className="poll-votes-link" onClick={() => setViewResults(v => !v)}>
+                      {viewResults ? "Hide results" : "View results"}
+                    </button>
+                  </>
+                )}
                 {expiry && <>{" · "}<ExpiryLine expiry={expiry} isExpired={isExpired} /></>}
               </div>
             )}

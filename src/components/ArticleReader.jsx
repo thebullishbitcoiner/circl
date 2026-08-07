@@ -56,6 +56,7 @@ export default function ArticleReader({
   const ref = useRef(null);
   const bodyRef = useRef(null);
   const progressBarRef = useRef(null);
+  const knownCommentIds = useRef(new Set());
   const art  = parseArticle(event);
   const name = displayName(event.pubkey, profiles);
 
@@ -73,18 +74,18 @@ export default function ArticleReader({
 
   // Subscribe to replies/comments
   useEffect(() => {
+    knownCommentIds.current = new Set();
     const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const dTag = event.tags?.find(t => t[0] === "d")?.[1] ?? "";
     const addr = `${event.kind}:${event.pubkey}:${dTag}`;
-    const known = new Map();
     const sub = pool.subscription(relayUrls, [
       { kinds: [1, 1111], "#e": [event.id] },
       { kinds: [1111], "#a": [addr] },
     ]).subscribe({
       next: ev => {
-        if (known.has(ev.id)) return;
+        if (knownCommentIds.current.has(ev.id)) return;
         if (ev.tags?.some(t => t[0] === "q")) return;
-        known.set(ev.id, ev);
+        knownCommentIds.current.add(ev.id);
         eventStore.add(ev);
         setComments(prev => [...prev, ev].sort((a, b) => a.created_at - b.created_at));
       },
@@ -103,7 +104,10 @@ export default function ArticleReader({
   }, [comments.length]);
 
   function addComment(ev) {
-    if (ev) setComments(prev => [...prev, ev].sort((a, b) => a.created_at - b.created_at));
+    if (ev && !knownCommentIds.current.has(ev.id)) {
+      knownCommentIds.current.add(ev.id);
+      setComments(prev => [...prev, ev].sort((a, b) => a.created_at - b.created_at));
+    }
     onPrepend?.(ev);
   }
 

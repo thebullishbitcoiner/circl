@@ -795,6 +795,10 @@
   .thread-connector-line.chain{background:rgba(109,40,217,.35);}
 
   .thread-replies-label{padding:12px 18px 4px;font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.6px;font-weight:500;border-top:1px solid var(--border);}
+  .thread-muted-toggle{display:flex;align-items:center;gap:6px;width:100%;padding:12px 18px;background:none;border:none;border-top:1px solid var(--border);cursor:pointer;color:var(--text-faint);font-size:10.5px;font-weight:500;font-family:'DM Sans',sans-serif;text-transform:uppercase;letter-spacing:.6px;}
+  .thread-muted-toggle svg{transition:transform .2s;flex-shrink:0;}
+  .thread-muted-toggle.open svg{transform:rotate(90deg);}
+  .thread-muted-toggle-count{margin-left:auto;font-weight:400;text-transform:none;letter-spacing:0;}
   .thread-reply-note{padding:13px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;}
 
   /* ── Notifications ── */

@@ -182,7 +182,7 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap, addLoc
   }, [(follows || []).filter(isHexPubkey).join(",")]);
 
   const prependEvent = useCallback(e => {
-    if (!e || seen.current.has(e.id)) return;
+    if (!e || !MAIN_FEED_KINDS.includes(e.kind) || seen.current.has(e.id)) return;
     seen.current.add(e.id);
     setEvents(prev => sortFeedEventsChronological([e, ...prev]));
   }, []);

@@ -1,6 +1,5 @@
 import { useRef, useEffect, useState, useMemo } from "react";
 import { useNavigation } from "../context/NavigationContext.jsx";
-import MutedNoteGate from "./MutedNoteGate.jsx";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteActions from "./NoteActions.jsx";
@@ -437,12 +436,14 @@ export default function ThreadView({
   resolveEventById, onOpenPollVotes,
   customEmojis,
 }) {
+  const { isMuted, isContentMuted } = useNavigation();
   const containerRef = useRef(null);
   const focusRef     = useRef(null);
   const authorPk     = focusedEvent.pubkey;
   const [threadMenuId, setThreadMenuId]     = useState(null);
   const [threadJsonEvent, setThreadJsonEvent] = useState(null);
   const [fetchedEvents, setFetchedEvents] = useState([]);
+  const [mutedRepliesOpen, setMutedRepliesOpen] = useState(false);
 
   const allEvents = useMemo(() => {
     const map = new Map(events.map(e => [e.id, e]));
@@ -557,6 +558,14 @@ export default function ThreadView({
     return directReplyParentId(e) === focusedEvent.id;
   }).sort((a, b) => a.created_at - b.created_at);
 
+  const isReplyMuted = e => {
+    const contentReason = isContentMuted?.(e);
+    if (contentReason && contentReason !== "thread") return true;
+    return !!isMuted?.(e.pubkey);
+  };
+  const visibleReplies = otherReplies.filter(e => !isReplyMuted(e));
+  const mutedReplies   = otherReplies.filter(isReplyMuted);
+
   const rowProps = {
     profiles: mergedProfiles, allEvents,
     onOpenProfile, onOpenThread, onOpenHashtag,
@@ -574,6 +583,7 @@ export default function ThreadView({
   useEffect(() => {
     setThreadMenuId(null);
     setThreadJsonEvent(null);
+    setMutedRepliesOpen(false);
   }, [focusedEvent.id]);
 
   useEffect(() => {
@@ -614,13 +624,28 @@ export default function ThreadView({
         );
       })}
 
-      {otherReplies.length > 0 && (
+      {visibleReplies.length > 0 && (
         <>
-          <div className="thread-replies-label">{otherReplies.length} {otherReplies.length === 1 ? "reply" : "replies"}</div>
-          {otherReplies.map(e => (
-            <MutedNoteGate key={e.id} event={e} profiles={mergedProfiles} skipThreadMute onOpenProfile={onOpenProfile}>
-              <ThreadNoteRow event={e} variant="reply" hasConnector={false} {...rowProps} />
-            </MutedNoteGate>
+          <div className="thread-replies-label">{visibleReplies.length} {visibleReplies.length === 1 ? "reply" : "replies"}</div>
+          {visibleReplies.map(e => (
+            <ThreadNoteRow key={e.id} event={e} variant="reply" hasConnector={false} {...rowProps} />
+          ))}
+        </>
+      )}
+
+      {mutedReplies.length > 0 && (
+        <>
+          <button
+            type="button"
+            className={`thread-muted-toggle${mutedRepliesOpen ? " open" : ""}`}
+            onClick={() => setMutedRepliesOpen(v => !v)}
+          >
+            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><polyline points="9 18 15 12 9 6" /></svg>
+            Muted replies
+            <span className="thread-muted-toggle-count">{mutedReplies.length}</span>
+          </button>
+          {mutedRepliesOpen && mutedReplies.map(e => (
+            <ThreadNoteRow key={e.id} event={e} variant="reply" hasConnector={false} {...rowProps} />
           ))}
         </>
       )}
