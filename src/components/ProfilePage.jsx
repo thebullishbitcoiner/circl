@@ -28,6 +28,7 @@ import HighlightCard from "./HighlightCard.jsx";
 import PollInline from "./PollInline.jsx";
 import useActiveStream from "../hooks/useActiveStream.js";
 import ListingCard from "./ListingCard.jsx";
+import { useIsInnerCircl, useInnerCirclBadgeYear } from "../hooks/useInnerCirclBadge.js";
 import ListingDetail from "./ListingDetail.jsx";
 import PodcastShowCard from "./PodcastShowCard.jsx";
 import PodcastEpisodeRow from "./PodcastEpisodeRow.jsx";
@@ -192,6 +193,8 @@ export default function ProfilePage({
   const [showProfileMetadata, setShowProfileMetadata] = useState(false);
   const [zapAnimCoords, setZapAnimCoords] = useState(null);
   const avatarRef = useRef(null);
+  const isInnerCircl = useIsInnerCircl(pubkey);
+  const innerCirclBadgeYear = useInnerCirclBadgeYear(pubkey);
 
   const [pinnedNoteIds, setPinnedNoteIds] = useState([]);
   const [pinnedEvents, setPinnedEvents] = useState([]);
@@ -1123,16 +1126,23 @@ export default function ProfilePage({
       <div className="profile-identity" style={{ paddingBottom: 16 }}>
         <div className="profile-av-wrap">
           <div style={{ position: "relative", display: "inline-block" }}>
-            <div
-              ref={avatarRef}
-              className={`profile-av${activeStream ? " profile-av-live" : ""}`}
-              onClick={activeStream ? () => onOpenStream?.(activeStream) : (p.picture ? () => setLightboxUrl(p.picture) : undefined)}
-              style={(activeStream || p.picture) ? { cursor: "pointer" } : undefined}
-            >
-              {p.picture
-                ? <img src={p.picture} alt={name} onError={e => { e.target.style.display = "none"; }} />
-                : name[0]?.toUpperCase()}
-            </div>
+            {(() => {
+              const avatarInner = (
+                <div
+                  ref={avatarRef}
+                  className={`profile-av${activeStream ? " profile-av-live" : ""}${isInnerCircl ? " profile-av-inner-circl" : ""}`}
+                  onClick={activeStream ? () => onOpenStream?.(activeStream) : (p.picture ? () => setLightboxUrl(p.picture) : undefined)}
+                  style={(activeStream || p.picture) ? { cursor: "pointer" } : undefined}
+                >
+                  {p.picture
+                    ? <img src={p.picture} alt={name} onError={e => { e.target.style.display = "none"; }} />
+                    : name[0]?.toUpperCase()}
+                </div>
+              );
+              return isInnerCircl
+                ? <div className="profile-av-inner-circl-ring">{avatarInner}</div>
+                : avatarInner;
+            })()}
             {activeStream && <div className="profile-av-live-badge">LIVE</div>}
           </div>
           {isOwn && (
@@ -1165,7 +1175,15 @@ export default function ProfilePage({
             </div>
           )}
         </div>
-        <div className="profile-name">{name}</div>
+        <div className="profile-name">
+          {name}
+          {isInnerCircl && (
+            <span className="inner-circl-chip">
+              <span className="inner-circl-chip-caption">Inner Circl</span>
+              <span className="inner-circl-chip-date">{innerCirclBadgeYear}</span>
+            </span>
+          )}
+        </div>
         {p.nip05 && <div className="profile-nip05">{p.nip05}</div>}
         <NpubCopy pubkey={pubkey} />
         {(p.lud16 || p.lud06) && <LightningCopy address={p.lud16 || p.lud06} />}

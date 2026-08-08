@@ -24,3 +24,22 @@ export const GIPHY_KEY = "IOwWNUHzMmRh28umCJjJhKmaoOg71esr";
 export const DEV_LUD16 = "bullish@rizful.com";
 export const DEV_NPUB = "npub15ypxpg429uyjmp0zczuza902chuvvr4pn35wfzv8rx6cej4z8clq6jmpcx";
 export const DEV_PUBKEY = decode(DEV_NPUB).data;
+
+/** Inner Circl badge ring (NIP-58): shown on avatars issued a matching kind-8
+ *  award by the platform account. Placeholder — replace once the platform
+ *  Nostr account exists. */
+export const PLATFORM_NPUB = "npub1...";
+function safeDecodeNpub(npub) {
+  try { return decode(npub).data; } catch { return null; }
+}
+export const PLATFORM_PUBKEY = safeDecodeNpub(PLATFORM_NPUB);
+export const INNER_CIRCL_BADGE_D_TAG = "inner-circl";
+export const INNER_CIRCL_BADGE_A_TAG = `30009:${PLATFORM_PUBKEY}:${INNER_CIRCL_BADGE_D_TAG}`;
+
+// TEMP: hardcoded for visual testing until the platform account issues real
+// awards. Remove this + its usage in useInnerCirclBadge.js once real
+// badges are flowing.
+export const TEST_INNER_CIRCL_NPUBS = [
+  "npub15ypxpg429uyjmp0zczuza902chuvvr4pn35wfzv8rx6cej4z8clq6jmpcx",
+];
+export const TEST_INNER_CIRCL_PUBKEYS = TEST_INNER_CIRCL_NPUBS.map(safeDecodeNpub).filter(Boolean);
