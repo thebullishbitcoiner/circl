@@ -1181,7 +1181,7 @@ export default function ProfilePage({
           {name}
           {isInnerCircl && (
             <span className="inner-circl-chip">
-              <span className="inner-circl-chip-caption">Inner Circl</span>
+              <span className="inner-circl-chip-caption">Inner Circle</span>
               <span className="inner-circl-chip-date">{innerCirclBadgeYear}</span>
             </span>
           )}

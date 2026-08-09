@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
 import { pool, eventStore } from "../nostr.js";
-import {
-  DEFAULT_RELAYS,
-  PLATFORM_PUBKEY,
-  INNER_CIRCL_BADGE_A_TAG,
-  TEST_INNER_CIRCL_PUBKEYS,
-} from "../constants.js";
+import { DEFAULT_RELAYS, PLATFORM_PUBKEY, INNER_CIRCL_BADGE_A_TAG } from "../constants.js";
 
 // Module-scope: pubkey -> earliest award `created_at` (seconds) for the
 // Inner Circl badge (kind 8) issued by the platform account, referencing
 // the Inner Circl badge definition (kind 30009).
 const innerCirclAwards = new Map();
+
+// Module-scope: pubkeys registered in /.well-known/nostr.json. Piggybacked
+// as the Inner Circl membership list for now, until real badge awards (above)
+// are flowing from the platform account.
+const nostrJsonPubkeys = new Set();
+
 const listeners = new Set();
 let started = false;
 
@@ -34,10 +35,30 @@ function addAward(event) {
   if (changed) notify();
 }
 
+function loadNostrJsonMembers() {
+  fetch("/.well-known/nostr.json")
+    .then(r => (r.ok ? r.json() : null))
+    .then(data => {
+      const names = data?.names || {};
+      let changed = false;
+      for (const pk of Object.values(names)) {
+        if (typeof pk === "string" && /^[0-9a-f]{64}$/i.test(pk) && !nostrJsonPubkeys.has(pk)) {
+          nostrJsonPubkeys.add(pk);
+          changed = true;
+        }
+      }
+      if (changed) notify();
+    })
+    .catch(() => {});
+}
+
 function start() {
-  if (started || !PLATFORM_PUBKEY) return;
+  if (started) return;
   started = true;
 
+  loadNostrJsonMembers();
+
+  if (!PLATFORM_PUBKEY) return;
   const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
   pool.request(relayUrls, [{ kinds: [8], authors: [PLATFORM_PUBKEY] }]).subscribe({
     next: event => { eventStore.add(event); addAward(event); },
@@ -61,7 +82,7 @@ function useSubscribed() {
 /** Whether `pk` has been issued the platform's Inner Circl badge. */
 export function useIsInnerCircl(pk) {
   useSubscribed();
-  return !!pk && (TEST_INNER_CIRCL_PUBKEYS.includes(pk) || innerCirclAwards.has(pk));
+  return !!pk && (nostrJsonPubkeys.has(pk) || innerCirclAwards.has(pk));
 }
 
 /** The year `pk`'s Inner Circl badge was issued, or null if not a member. */
@@ -70,6 +91,6 @@ export function useInnerCirclBadgeYear(pk) {
   if (!pk) return null;
   const createdAt = innerCirclAwards.get(pk);
   if (createdAt !== undefined) return new Date(createdAt * 1000).getFullYear();
-  if (TEST_INNER_CIRCL_PUBKEYS.includes(pk)) return new Date().getFullYear();
+  if (nostrJsonPubkeys.has(pk)) return new Date().getFullYear();
   return null;
 }

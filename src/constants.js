@@ -35,11 +35,3 @@ function safeDecodeNpub(npub) {
 export const PLATFORM_PUBKEY = safeDecodeNpub(PLATFORM_NPUB);
 export const INNER_CIRCL_BADGE_D_TAG = "inner-circl";
 export const INNER_CIRCL_BADGE_A_TAG = `30009:${PLATFORM_PUBKEY}:${INNER_CIRCL_BADGE_D_TAG}`;
-
-// TEMP: hardcoded for visual testing until the platform account issues real
-// awards. Remove this + its usage in useInnerCirclBadge.js once real
-// badges are flowing.
-export const TEST_INNER_CIRCL_NPUBS = [
-  "npub15ypxpg429uyjmp0zczuza902chuvvr4pn35wfzv8rx6cej4z8clq6jmpcx",
-];
-export const TEST_INNER_CIRCL_PUBKEYS = TEST_INNER_CIRCL_NPUBS.map(safeDecodeNpub).filter(Boolean);
