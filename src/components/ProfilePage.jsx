@@ -157,7 +157,7 @@ export default function ProfilePage({
   onBack, onOpenProfile, onOpenNote, onOpenThread, onOpenHashtag, onOpenZaps, onOpenReactions, onOpenReposts,
   myProfile, onPublish, publishEvent, publishHighlight, onPrepend, onBookmark, isBookmarked,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
-  onRequestModal, onDismissModal, backLabel = "Your Circle", resolveEventById,
+  onRequestModal, onDismissModal, backLabel = "Your Circle", resolveEventById, showBack = true,
   onOpenCircle, onFollow, onUnfollow, onOpenPollVotes, onOpenArticle, onOpenStream,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
   scrollToTopTrigger,
@@ -1098,13 +1098,15 @@ export default function ProfilePage({
         ) : (
           <div className="profile-banner-glyph">◎</div>
         )}
-        <button
-          className="back-btn"
-          onClick={e => { e.stopPropagation(); onBack(); }}
-          style={{ position: "absolute", top: 12, left: 12, background: "rgba(0,0,0,.25)", backdropFilter: "blur(8px)", color: "white" }}
-        >
-          <Bk s={16} />
-        </button>
+        {showBack && (
+          <button
+            className="back-btn"
+            onClick={e => { e.stopPropagation(); onBack(); }}
+            style={{ position: "absolute", top: 12, left: 12, background: "rgba(0,0,0,.25)", backdropFilter: "blur(8px)", color: "white" }}
+          >
+            <Bk s={16} />
+          </button>
+        )}
         <div style={{ position: "absolute", top: 12, right: 12 }}>
           <button
             type="button"

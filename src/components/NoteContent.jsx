@@ -393,10 +393,20 @@ function VideoPlayer({ src, autoPlay, muted, loop }) {
     }
     el.addEventListener("play", onPlay);
 
+    // Nav panels (thread/profile/etc.) slide over the current view without
+    // unmounting it, so IntersectionObserver still sees it as visible.
+    function onPauseAll() { el.pause(); }
+    window.addEventListener("circl:pauseallvideos", onPauseAll);
+
+    function onVisibilityChange() { if (document.hidden) el.pause(); }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     return () => {
       observer.disconnect();
       window.removeEventListener("circl:videoplaying", onOtherPlay);
       el.removeEventListener("play", onPlay);
+      window.removeEventListener("circl:pauseallvideos", onPauseAll);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 

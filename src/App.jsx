@@ -295,6 +295,13 @@ export default function App() {
   const popNav = () => setNavStack(s => s.slice(0, -1));
   const clearNav = () => setNavStack([]);
 
+  // Nav panels overlay the current view instead of unmounting it, so any
+  // still-playing video (feed, thread, background-kept profile) needs an
+  // explicit signal to stop — IntersectionObserver alone can't see it.
+  useEffect(() => {
+    window.dispatchEvent(new Event("circl:pauseallvideos"));
+  }, [navStack]);
+
   const topEntry = navStack[navStack.length - 1] ?? null;
   // Walk the stack so profile relays persist when drilling into a note from a profile page
   const viewedProfilePubkey = (() => {
@@ -1056,6 +1063,7 @@ export default function App() {
                         events={mergedFeedPool}
                         isOwn={profileEntry.payload === pubkey}
                         backLabel={backLabel}
+                        showBack={idx > 0}
                         onBack={handleBack}
                         onOpenProfile={handleOpenProfile}
                         onOpenNote={handleOpenNote}
