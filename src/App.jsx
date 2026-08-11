@@ -73,6 +73,8 @@ import MyCirclesPage from "./components/MyCirclesPage.jsx";
 import CircleDetailPage from "./components/CircleDetailPage.jsx";
 import EditProfilePage from "./components/EditProfilePage.jsx";
 import HashtagFeed from "./components/HashtagFeed.jsx";
+import Nip05DomainFeed from "./components/Nip05DomainFeed.jsx";
+import Nip05DomainMembers from "./components/Nip05DomainMembers.jsx";
 import { ZapsScreen, ReactionsScreen, RepostsScreen, PollVotesScreen } from "./components/ListScreens.jsx";
 import SwipePanel from "./components/SwipePanel.jsx";
 import ZapGoalPage from "./components/ZapGoalPage.jsx";
@@ -337,6 +339,8 @@ export default function App() {
   const handleOpenReactions = ({ eventId, reactions }) => pushNav({ type: "reactions", payload: { eventId, reactions } });
   const handleOpenReposts = ({ eventId, reposts }) => pushNav({ type: "reposts", payload: { eventId, reposts } });
   const handleOpenHashtag = tag => pushNav({ type: "hashtag", payload: tag });
+  const handleOpenNip05Domain = domain => pushNav({ type: "nip05-domain", payload: domain });
+  const handleOpenNip05DomainMembers = domain => pushNav({ type: "nip05-domain-members", payload: domain });
   const handleOpenPollVotes = ({ event, options, voteEvents, isZapPoll }) =>
     pushNav({ type: "poll-votes", payload: { event, options, voteEvents, isZapPoll } });
 
@@ -1069,6 +1073,7 @@ export default function App() {
                         onOpenNote={handleOpenNote}
                         onOpenThread={handleOpenThread}
                         onOpenHashtag={handleOpenHashtag}
+                        onOpenNip05Domain={handleOpenNip05Domain}
                         onOpenZaps={handleOpenZaps}
                         onOpenReactions={handleOpenReactions}
                         onOpenReposts={handleOpenReposts}
@@ -1617,6 +1622,60 @@ export default function App() {
                           `⚡ Zap failed: ${reason}`
                         )}
                         customEmojis={allCustomEmojis}
+                      />
+                    );
+                  }
+
+                  if (top.type === "nip05-domain") {
+                    return (
+                      <Nip05DomainFeed
+                        key={top.payload}
+                        domain={top.payload}
+                        profiles={profiles}
+                        onBack={handleBack}
+                        onOpenProfile={handleOpenProfile}
+                        onOpenThread={handleOpenThread}
+                        onOpenHashtag={handleOpenHashtag}
+                        onOpenMembers={handleOpenNip05DomainMembers}
+                        myPubkey={pubkey}
+                        myProfile={myProfile}
+                        onBookmark={handleBookmark}
+                        isBookmarked={isBookmarked}
+                        getLocalZaps={getLocalZaps}
+                        addLocalZap={addLocalZap}
+                        getLocalReactions={getLocalReactions}
+                        setLocalReaction={setLocalReaction}
+                        publishEvent={publishEvent}
+                        onPrepend={prependEvent}
+                        onOpenZaps={handleOpenZaps}
+                        onOpenReactions={handleOpenReactions}
+                        onOpenReposts={handleOpenReposts}
+                        resolveEventById={resolveEventById}
+                        sendZap={sendZap}
+                        defaultZapAmount={zapSettings.amount}
+                        defaultZapMsg={zapSettings.msg}
+                        onZapFail={reason => showToast(
+                          reason === "no_lud16"  ? "⚡ No lightning address" :
+                          reason === "no_wallet" ? "⚡ No wallet connected" :
+                          `⚡ Zap failed: ${reason}`
+                        )}
+                        customEmojis={allCustomEmojis}
+                      />
+                    );
+                  }
+
+                  if (top.type === "nip05-domain-members") {
+                    return (
+                      <Nip05DomainMembers
+                        key={top.payload}
+                        domain={top.payload}
+                        profiles={profiles}
+                        onOpenProfile={handleOpenProfile}
+                        onBack={handleBack}
+                        myPubkey={pubkey}
+                        myFollows={follows}
+                        onFollow={followPk}
+                        onUnfollow={unfollowPk}
                       />
                     );
                   }
