@@ -579,7 +579,7 @@ export default function App() {
     setVisibleCount(20);
     setSettingsOpen(false);
     clearNav();
-    if (nav === "profile") { refreshFollows(); pushNav({ type: "profile", payload: pubkey }); }
+    if (nav === "profile") { refreshFollows(); pushNav({ type: "profile", payload: pubkey, isTabRoot: true }); }
     if (nav === "notifications") {
       const now = Math.floor(Date.now() / 1000);
       setLastNotifSeenAt(now);
@@ -1063,7 +1063,7 @@ export default function App() {
                         events={mergedFeedPool}
                         isOwn={profileEntry.payload === pubkey}
                         backLabel={backLabel}
-                        showBack={idx > 0}
+                        showBack={idx > 0 || !profileEntry.isTabRoot}
                         onBack={handleBack}
                         onOpenProfile={handleOpenProfile}
                         onOpenNote={handleOpenNote}
