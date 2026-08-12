@@ -8,14 +8,36 @@ import FeedItem from "./FeedItem.jsx";
 import { Bk } from "./icons.jsx";
 
 const MAX_AUTHORS = 500;
+const MAX_RENDERED_NOTES = 150; // bound per-flush render cost regardless of how large a domain is
 const FEED_KINDS = [1, 6, 30023]; // notes (incl. quote reposts), reposts, articles
 const FLUSH_INTERVAL_MS = 200; // batch incoming events so a relay burst doesn't cause a re-render per event
+const PROFILES_FLUSH_INTERVAL_MS = 300; // throttle re-renders from useProfiles' per-event updates
 
 const domainNotesCache = new Map(); // domain → { notes, ts }
 const DOMAIN_NOTES_CACHE_TTL = 5 * 60 * 1000;
 
 const hasNonMentionETag = e => e.tags.some(t => t[0] === "e" && t[3] !== "mention");
 const isReplyEvent = e => e.kind === 1 && hasNonMentionETag(e) && !isQuoteRepost(e);
+
+// useProfiles fires one state update per incoming kind-0 event with no
+// batching of its own — for a domain with hundreds of members, that's
+// hundreds of re-renders of the whole note list trickling in over time.
+// Throttle our own consumption of it instead of touching shared code.
+function useThrottledValue(value, delay) {
+  const [throttled, setThrottled] = useState(value);
+  const latest = useRef(value);
+  latest.current = value;
+  const timer = useRef(null);
+  useEffect(() => {
+    if (timer.current) return;
+    timer.current = setTimeout(() => {
+      timer.current = null;
+      setThrottled(latest.current);
+    }, delay);
+  }, [value, delay]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  return throttled;
+}
 
 export default function Nip05DomainFeed({
   domain, profiles: profilesProp, onBack, onOpenProfile, onOpenThread, onOpenHashtag, onOpenMembers,
@@ -28,7 +50,8 @@ export default function Nip05DomainFeed({
 }) {
   const { pubkeys, loading: pubkeysLoading } = useNip05DomainMembers(domain);
   const { profiles: fetchedProfiles } = useProfiles({ pubkeys });
-  const profiles = useMemo(() => ({ ...fetchedProfiles, ...profilesProp }), [profilesProp, fetchedProfiles]);
+  const mergedProfiles = useMemo(() => ({ ...fetchedProfiles, ...profilesProp }), [profilesProp, fetchedProfiles]);
+  const profiles = useThrottledValue(mergedProfiles, PROFILES_FLUSH_INTERVAL_MS);
 
   const [notes, setNotes] = useState([]);
   const [notesLoading, setNotesLoading] = useState(true);
@@ -67,7 +90,7 @@ export default function Nip05DomainFeed({
         const seen = new Set(prev.map(e => e.id));
         const additions = incoming.filter(e => !seen.has(e.id));
         if (additions.length === 0) return prev;
-        const next = [...additions, ...prev].sort((a, b) => b.created_at - a.created_at);
+        const next = [...additions, ...prev].sort((a, b) => b.created_at - a.created_at).slice(0, MAX_RENDERED_NOTES);
         domainNotesCache.set(domain, { notes: next, ts: Date.now() });
         return next;
       });
