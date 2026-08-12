@@ -9,6 +9,7 @@ import { Bk } from "./icons.jsx";
 
 const MAX_AUTHORS = 500;
 const FEED_KINDS = [1, 6, 30023]; // notes (incl. quote reposts), reposts, articles
+const FLUSH_INTERVAL_MS = 200; // batch incoming events so a relay burst doesn't cause a re-render per event
 
 const domainNotesCache = new Map(); // domain → { notes, ts }
 const DOMAIN_NOTES_CACHE_TTL = 5 * 60 * 1000;
@@ -51,24 +52,41 @@ export default function Nip05DomainFeed({
     setNotes([]);
     setNotesLoading(true);
 
+    // Buffer incoming events and flush on a timer instead of one setState per
+    // event — a burst of relay results (up to 500 authors × 3 kinds) can
+    // otherwise trigger dozens of full-list re-renders within milliseconds,
+    // which was making the header feel unresponsive during load.
+    let buffer = [];
+    let flushTimer = null;
+    const flush = () => {
+      flushTimer = null;
+      if (buffer.length === 0) return;
+      const incoming = buffer;
+      buffer = [];
+      setNotes(prev => {
+        const seen = new Set(prev.map(e => e.id));
+        const additions = incoming.filter(e => !seen.has(e.id));
+        if (additions.length === 0) return prev;
+        const next = [...additions, ...prev].sort((a, b) => b.created_at - a.created_at);
+        domainNotesCache.set(domain, { notes: next, ts: Date.now() });
+        return next;
+      });
+    };
+
     const sub = pool.group(relayUrls, false).request([{ kinds: FEED_KINDS, authors, limit: 100 }]).subscribe({
       next: ev => {
         eventStore.add(ev);
         if (isReplyEvent(ev)) return;
-        setNotes(prev => {
-          if (prev.some(e => e.id === ev.id)) return prev;
-          const next = [ev, ...prev].sort((a, b) => b.created_at - a.created_at);
-          domainNotesCache.set(domain, { notes: next, ts: Date.now() });
-          return next;
-        });
+        buffer.push(ev);
+        if (!flushTimer) flushTimer = setTimeout(flush, FLUSH_INTERVAL_MS);
       },
-      error: () => setNotesLoading(false),
-      complete: () => setNotesLoading(false),
+      error: () => { flush(); setNotesLoading(false); },
+      complete: () => { flush(); setNotesLoading(false); },
     });
 
     subRef.current = sub;
     const t = setTimeout(() => setNotesLoading(false), 8000);
-    return () => { sub.unsubscribe(); clearTimeout(t); };
+    return () => { sub.unsubscribe(); clearTimeout(t); clearTimeout(flushTimer); };
   }, [domain, pubkeysLoading, pubkeys]);
 
   const loading = pubkeysLoading || notesLoading;
