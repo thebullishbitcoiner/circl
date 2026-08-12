@@ -155,6 +155,7 @@
     transition:border-color .15s;
   }
   .bottom-profile-av.active{border-color:var(--primary);}
+  .inner-circl-ring .bottom-profile-av.active{border-color:transparent;}
   .bottom-profile-av img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
 
   /* Settings nav button */
