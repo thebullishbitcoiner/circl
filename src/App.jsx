@@ -34,6 +34,7 @@ import useContentSettings from "./hooks/useContentSettings.js";
 import useWallet from "./hooks/useWallet.js";
 import useZap from "./hooks/useZap.js";
 import useZapSettings from "./hooks/useZapSettings.js";
+import { useIsInnerCircl } from "./hooks/useInnerCirclBadge.js";
 import useWalletData from "./hooks/useWalletData.js";
 import useAppSettingsSync from "./hooks/useAppSettingsSync.js";
 
@@ -102,6 +103,7 @@ function describeUnresolvedBookmark(tag) {
 
 export default function App() {
   const { pubkey, status, error, login, logout, signAndPublish, privateRelayUrls } = useAuth();
+  const isInnerCircl = useIsInnerCircl(pubkey);
   const { follows, loading: fl, follow: followPk, unfollow: unfollowPk, refresh: refreshFollows } = useFollows({ pubkey, signAndPublish });
 
   const [likes, setLikes] = useState({});
@@ -701,7 +703,12 @@ export default function App() {
           <button className="compose-btn" onClick={() => setFloatingCompose(true)}>+ New Note</button>
           <div className="sidebar-user-row">
             <button type="button" className="sidebar-profile" onClick={() => navigate("profile")}>
-              <span className="sidebar-av">{myProfile?.picture ? <img src={myProfile.picture} alt="" /> : avatarInitial(pubkey, profiles)}</span>
+              {(() => {
+                const av = <span className="sidebar-av">{myProfile?.picture ? <img src={myProfile.picture} alt="" /> : avatarInitial(pubkey, profiles)}</span>;
+                return isInnerCircl
+                  ? <span className="inner-circl-ring" style={{ padding: 2 }}>{av}</span>
+                  : av;
+              })()}
               <span className="sidebar-profile-copy">
                 <span className="sidebar-name">{myDisplayName}</span>
                 <span className="sidebar-npub">{myNpub}</span>
@@ -1783,11 +1790,18 @@ export default function App() {
               navigate("profile");
             }}
           >
-            <div className={`bottom-profile-av${!settingsOpen && activeNav === "profile" ? " active" : ""}`}>
-              {myProfile?.picture
-                ? <img src={myProfile.picture} alt="" onError={e => { e.target.style.display = "none"; }} />
-                : avatarInitial(pubkey, { [pubkey]: myProfile })}
-            </div>
+            {(() => {
+              const av = (
+                <div className={`bottom-profile-av${!settingsOpen && activeNav === "profile" ? " active" : ""}`}>
+                  {myProfile?.picture
+                    ? <img src={myProfile.picture} alt="" onError={e => { e.target.style.display = "none"; }} />
+                    : avatarInitial(pubkey, { [pubkey]: myProfile })}
+                </div>
+              );
+              return isInnerCircl
+                ? <div className="inner-circl-ring" style={{ padding: 2 }}>{av}</div>
+                : av;
+            })()}
           </button>
 
           {navItems.slice(3).map(item => (

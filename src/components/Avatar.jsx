@@ -21,7 +21,7 @@ function Avatar({ pk, profiles, size = 36, className = "" }) {
 
   const ringWidth = Math.max(2, Math.round(size * 0.045));
   return (
-    <div className="avatar-inner-circl-ring" style={{ width: size, height: size, padding: ringWidth }}>
+    <div className="inner-circl-ring" style={{ width: size, height: size, padding: ringWidth }}>
       <div className={`avatar ${className}`} style={{ width: "100%", height: "100%", fontSize: size * 0.4 }}>
         {content}
       </div>

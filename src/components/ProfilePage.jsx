@@ -1146,7 +1146,7 @@ export default function ProfilePage({
                 </div>
               );
               return isInnerCircl
-                ? <div className="profile-av-inner-circl-ring">{avatarInner}</div>
+                ? <div className="inner-circl-ring" style={{ padding: 4 }}>{avatarInner}</div>
                 : avatarInner;
             })()}
             {activeStream && <div className="profile-av-live-badge">LIVE</div>}
