@@ -9,6 +9,8 @@ import { Bk } from "./icons.jsx";
 
 const MAX_AUTHORS = 500;
 const MAX_RENDERED_NOTES = 150; // bound per-flush render cost regardless of how large a domain is
+const VISIBLE_STEP = 20; // window of mounted cards; grows as the user scrolls, like ProfilePage's notes tab
+const SCROLL_THRESHOLD_PX = 300;
 const FEED_KINDS = [1, 6, 30023]; // notes (incl. quote reposts), reposts, articles
 const FLUSH_INTERVAL_MS = 200; // batch incoming events so a relay burst doesn't cause a re-render per event
 const PROFILES_FLUSH_INTERVAL_MS = 300; // throttle re-renders from useProfiles' per-event updates
@@ -55,9 +57,19 @@ export default function Nip05DomainFeed({
 
   const [notes, setNotes] = useState([]);
   const [notesLoading, setNotesLoading] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(VISIBLE_STEP);
+  const notesLenRef = useRef(0);
+  notesLenRef.current = notes.length;
   const subRef = useRef(null);
 
+  const handleScroll = e => {
+    const el = e.currentTarget;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight > SCROLL_THRESHOLD_PX) return;
+    setVisibleCount(n => Math.min(n + VISIBLE_STEP, notesLenRef.current));
+  };
+
   useEffect(() => {
+    setVisibleCount(VISIBLE_STEP);
     if (pubkeysLoading || pubkeys.length === 0) {
       if (!pubkeysLoading) setNotesLoading(false);
       return;
@@ -115,7 +127,7 @@ export default function Nip05DomainFeed({
   const loading = pubkeysLoading || notesLoading;
 
   return (
-    <div className="slide-panel-scroll">
+    <div className="slide-panel-scroll" onScroll={handleScroll}>
       <div className="panel-bar">
         <button type="button" className="back-btn" onClick={onBack}><Bk s={16} /></button>
         <span className="panel-bar-logo">{domain}</span>
@@ -151,7 +163,7 @@ export default function Nip05DomainFeed({
         </div>
       )}
 
-      {notes.map((ev, i) => (
+      {notes.slice(0, visibleCount).map((ev, i) => (
         <FeedItem
           key={ev.id}
           event={ev}
