@@ -28,6 +28,7 @@ import FeedItem from "./FeedItem.jsx";
 import StreamCard from "./StreamCard.jsx";
 import HighlightCard from "./HighlightCard.jsx";
 import PollInline from "./PollInline.jsx";
+import DomainFavicon from "./DomainFavicon.jsx";
 import useActiveStream from "../hooks/useActiveStream.js";
 import ListingCard from "./ListingCard.jsx";
 import { useIsInnerCircl, useInnerCirclBadgeYear } from "../hooks/useInnerCirclBadge.js";
@@ -1202,6 +1203,7 @@ export default function ProfilePage({
             >
               {nip05Parsed.domain}
             </span>
+            <DomainFavicon domain={nip05Parsed.domain} className="profile-nip05-favicon" />
           </div>
         )}
         <NpubCopy pubkey={pubkey} />

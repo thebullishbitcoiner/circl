@@ -5,7 +5,8 @@ import { isQuoteRepost } from "../utils.js";
 import { useNip05DomainMembers } from "../hooks/useNip05DomainMembers.js";
 import useProfiles from "../hooks/useProfiles.js";
 import FeedItem from "./FeedItem.jsx";
-import { Bk } from "./icons.jsx";
+import DomainFavicon from "./DomainFavicon.jsx";
+import { Bk, ExtL } from "./icons.jsx";
 
 const MAX_AUTHORS = 500;
 const MAX_RENDERED_NOTES = 150; // bound per-flush render cost regardless of how large a domain is
@@ -130,7 +131,20 @@ export default function Nip05DomainFeed({
     <div className="slide-panel-scroll" onScroll={handleScroll}>
       <div className="panel-bar">
         <button type="button" className="back-btn" onClick={onBack}><Bk s={16} /></button>
-        <span className="panel-bar-logo">{domain}</span>
+        <span className="panel-bar-logo panel-bar-logo-domain">
+          <DomainFavicon domain={domain} className="panel-bar-favicon" />
+          <span className="panel-bar-domain-text">{domain}</span>
+          <a
+            href={`https://${domain}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
+            title="Open in new tab"
+            className="panel-bar-external-link"
+          >
+            <ExtL s={13} />
+          </a>
+        </span>
         {!pubkeysLoading && pubkeys.length > 0 && (
           <button
             type="button"
