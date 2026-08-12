@@ -1637,6 +1637,7 @@ export default function App() {
                         onOpenThread={handleOpenThread}
                         onOpenHashtag={handleOpenHashtag}
                         onOpenMembers={handleOpenNip05DomainMembers}
+                        onOpenArticle={handleOpenArticle}
                         myPubkey={pubkey}
                         myProfile={myProfile}
                         onBookmark={handleBookmark}

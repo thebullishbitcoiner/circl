@@ -6,7 +6,7 @@ import MutedNoteGate from "./MutedNoteGate.jsx";
 import PollCard from "./PollCard.jsx";
 import NoteActions from "./NoteActions.jsx";
 import ProfileText from "./ProfileText.jsx";
-import { Bk, CkC } from "./icons.jsx";
+import { Bk, CkC, AlC } from "./icons.jsx";
 import ProfileContextMenu from "./ProfileContextMenu.jsx";
 import { displayName, nip05OrNpub, relativeTime, shortNpub, truncNpub, avatarUrl, isQuoteRepost, isHexPubkey, replyCount, repostAndQuoteCount, normPubkey, directReplyParentId, parseKind6EmbeddedEvent, nip19, parseNoteMediaSegments, zapperPubkeyFromKind9735 } from "../utils.js";
 import useProfiles from "../hooks/useProfiles.js";
@@ -322,7 +322,7 @@ export default function ProfilePage({
   const websiteHref = normalizeWebsite(p.website);
   const websiteLabel = websiteHref ? websiteHref.replace(/^https?:\/\//, "").replace(/\/$/, "") : "";
   const nip05Parsed = useMemo(() => parseNip05(p.nip05), [p.nip05]);
-  const { verified: nip05Verified } = useNip05Verified(p.nip05, pubkey);
+  const { verified: nip05Verified, loading: nip05CheckLoading } = useNip05Verified(p.nip05, pubkey);
 
   const { extras, loading: ixLoading } = useInteractions({ myPubkey, otherPubkey: pubkey, feedEvents: events, active: !isOwn && tab === "between" });
 
@@ -1192,8 +1192,10 @@ export default function ProfilePage({
         </div>
         {p.nip05 && nip05Parsed && (
           <div className="profile-nip05">
-            {nip05Parsed.name !== "_" && <span className="profile-nip05-name">@{nip05Parsed.name}</span>}
-            {nip05Verified && <span className="profile-nip05-verified"><CkC s={12} /></span>}
+            {nip05Parsed.name !== "_" && <span className="profile-nip05-name">{nip05Parsed.name}</span>}
+            {!nip05CheckLoading && (nip05Verified
+              ? <span className="profile-nip05-verified"><CkC s={12} /></span>
+              : <span className="profile-nip05-unverified"><AlC s={12} /></span>)}
             <span
               className="profile-nip05-domain"
               onClick={() => onOpenNip05Domain?.(nip05Parsed.domain)}

@@ -35,3 +35,10 @@ function safeDecodeNpub(npub) {
 export const PLATFORM_PUBKEY = safeDecodeNpub(PLATFORM_NPUB);
 export const INNER_CIRCL_BADGE_D_TAG = "inner-circl";
 export const INNER_CIRCL_BADGE_A_TAG = `30009:${PLATFORM_PUBKEY}:${INNER_CIRCL_BADGE_D_TAG}`;
+
+/** Manually curated Inner Circl membership, until real kind-8 badge awards
+ *  are flowing from the platform account above. Separate from NIP-05
+ *  (.well-known/nostr.json), which is just identity resolution. */
+export const INNER_CIRCL_MEMBER_PUBKEYS = [
+  "a10260a2aa2f092d85e2c0b82e95eac5f8c60ea19c68e4898719b58ccaa23e3e", // thebullishbitcoiner
+];

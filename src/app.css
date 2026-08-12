@@ -732,6 +732,7 @@
   .profile-nip05-domain{cursor:pointer;}
   .profile-nip05-domain:hover{text-decoration:underline;}
   .profile-nip05-verified{display:inline-flex;color:var(--primary);}
+  .profile-nip05-unverified{display:inline-flex;color:var(--text-faint);}
   .profile-website{display:inline-flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;font-size:var(--font-base);font-weight:600;color:var(--primary);text-decoration:none;margin-bottom:12px;}
   .profile-website:hover{text-decoration:underline;}
   .profile-nip05-dot{width:5px;height:5px;border-radius:50%;background:var(--primary);}
