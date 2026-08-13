@@ -18,6 +18,24 @@ import PollInline from "./PollInline.jsx";
 import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
 import CalendarInlineCard from "./CalendarInlineCard.jsx";
 
+// Remembers which row (parent/reply/self-reply) was clicked to open a sub-thread, keyed by
+// the root note's id, so navigating back can scroll that same row back into view. Keyed by
+// id rather than raw scrollTop pixels since replies can stream in and shift row offsets.
+const lastOpenedChildId = new Map();
+
+// Caches ancestors/replies fetched per thread (keyed by root note id) so navigating away
+// and back doesn't re-fetch everything from relays from scratch — both a UX win (no flash
+// of an empty thread) and what makes the scroll-restore above actually work: the target
+// row is already in the DOM on first render instead of streaming back in over time.
+const threadEventCache = new Map();
+const THREAD_EVENT_CACHE_LIMIT = 30;
+function cacheThreadEvents(rootId, events) {
+  threadEventCache.set(rootId, events);
+  if (threadEventCache.size > THREAD_EVENT_CACHE_LIMIT) {
+    threadEventCache.delete(threadEventCache.keys().next().value);
+  }
+}
+
 function ThreadVoiceScrubZone({ amplitudes, progress, onScrub }) {
   const zoneRef     = useRef(null);
   const dragging    = useRef(false);
@@ -215,6 +233,7 @@ function ThreadNoteRow({
     <>
     <div
       ref={focused ? focusRef : null}
+      data-note-id={event.id}
       className={`thread-note${focused ? " focused" : ""}${isParent ? " parent" : ""}${isSelf ? " self-thread" : ""}${isReply ? " reply" : ""}${hasConnector ? " has-connector" : ""}`}
       style={threadMenuId === event.id ? { zIndex: 1 } : undefined}
       onClick={clickable ? () => onOpenThread?.(event) : undefined}
@@ -442,8 +461,27 @@ export default function ThreadView({
   const authorPk     = focusedEvent.pubkey;
   const [threadMenuId, setThreadMenuId]     = useState(null);
   const [threadJsonEvent, setThreadJsonEvent] = useState(null);
-  const [fetchedEvents, setFetchedEvents] = useState([]);
+  const [fetchedEvents, setFetchedEvents] = useState(() => threadEventCache.get(focusedEvent.id) ?? []);
   const [mutedRepliesOpen, setMutedRepliesOpen] = useState(false);
+
+  // Consume (once) the "return to this row" request left by the sub-thread we came
+  // back from. Cached replies (see threadEventCache above) mean the target row is
+  // usually already in the DOM by the first render; the effect below still retries
+  // as allEvents changes in case it's a reply that hasn't been fetched before.
+  //
+  // Reading only (no delete) here: render bodies run twice under StrictMode in dev,
+  // and mutating a shared module-level Map as a render side effect meant the first
+  // (discarded) pass would consume the entry before the real pass could read it. The
+  // actual delete happens in a useEffect below, which is safe to run more than once.
+  const pendingChildIdRef = useRef(undefined);
+  if (pendingChildIdRef.current === undefined) {
+    pendingChildIdRef.current = lastOpenedChildId.get(focusedEvent.id) ?? null;
+  }
+  const scrollRestoredRef = useRef(false);
+
+  useEffect(() => {
+    lastOpenedChildId.delete(focusedEvent.id);
+  }, [focusedEvent.id]);
 
   const allEvents = useMemo(() => {
     const map = new Map(events.map(e => [e.id, e]));
@@ -467,11 +505,12 @@ export default function ThreadView({
   const { profiles: localProfiles } = useProfiles({ pubkeys: threadPubkeys });
   const mergedProfiles = useMemo(() => ({ ...profiles, ...localProfiles }), [profiles, localProfiles]);
 
-  // Fetch ancestor chain and subscribe to replies whenever the focused event changes
+  // Fetch ancestor chain and subscribe to replies whenever the focused event changes.
+  // Seeds from threadEventCache so a revisit only fetches what's actually new.
   useEffect(() => {
-    setFetchedEvents([]);
     const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const known = new Map(events.map(e => [e.id, e]));
+    for (const e of threadEventCache.get(focusedEvent.id) ?? []) known.set(e.id, e);
     const subs = [];
 
     // Walk up ancestors: fetch missing parent IDs from e-tags, up to 5 levels
@@ -544,6 +583,10 @@ export default function ThreadView({
     return () => subs.forEach(s => s.unsubscribe());
   }, [focusedEvent.id]); // eslint-disable-line
 
+  useEffect(() => {
+    cacheThreadEvents(focusedEvent.id, fetchedEvents);
+  }, [focusedEvent.id, fetchedEvents]);
+
   const parents    = buildParentChain(focusedEvent, allEvents);
   const selfChain  = buildSelfReplyChain(focusedEvent, allEvents, authorPk);
 
@@ -566,9 +609,14 @@ export default function ThreadView({
   const visibleReplies = otherReplies.filter(e => !isReplyMuted(e));
   const mutedReplies   = otherReplies.filter(isReplyMuted);
 
+  const handleRowOpenThread = clickedEvent => {
+    lastOpenedChildId.set(focusedEvent.id, clickedEvent.id);
+    onOpenThread?.(clickedEvent);
+  };
+
   const rowProps = {
     profiles: mergedProfiles, allEvents,
-    onOpenProfile, onOpenThread, onOpenHashtag,
+    onOpenProfile, onOpenThread: handleRowOpenThread, onOpenHashtag,
     onOpenZaps, onOpenReactions, onOpenReposts,
     myPubkey, myProfile, onPublish, publishEvent, onPrepend,
     publishHighlight,
@@ -586,16 +634,46 @@ export default function ThreadView({
     setMutedRepliesOpen(false);
   }, [focusedEvent.id]);
 
+  // No pending "return to this row" request (fresh thread open, not a back-navigation):
+  // center the focused note once, same as before.
   useEffect(() => {
+    if (pendingChildIdRef.current) return;
     const timer = setTimeout(() => {
-      if (focusRef.current && containerRef.current) {
-        const c  = containerRef.current;
+      const c = containerRef.current;
+      if (c && focusRef.current) {
         const el = focusRef.current;
         c.scrollTop = el.offsetTop - (c.clientHeight - el.offsetHeight) / 2;
       }
     }, 80);
     return () => clearTimeout(timer);
   }, [focusedEvent.id]);
+
+  // Pending request: the target row's replies may still be streaming in from relays
+  // (fetchedEvents/subscriptions are reset per mount), so retry as allEvents grows
+  // instead of trying once. Give up and center the focused note after 5s.
+  useEffect(() => {
+    if (!pendingChildIdRef.current || scrollRestoredRef.current) return;
+    const c = containerRef.current;
+    if (!c) return;
+    const el = c.querySelector(`[data-note-id="${CSS.escape(pendingChildIdRef.current)}"]`);
+    if (!el) return;
+    c.scrollTop = el.offsetTop - (c.clientHeight - el.offsetHeight) / 2;
+    scrollRestoredRef.current = true;
+  }, [allEvents]);
+
+  useEffect(() => {
+    if (!pendingChildIdRef.current) return;
+    const timer = setTimeout(() => {
+      if (scrollRestoredRef.current) return;
+      const c = containerRef.current;
+      if (c && focusRef.current) {
+        const el = focusRef.current;
+        c.scrollTop = el.offsetTop - (c.clientHeight - el.offsetHeight) / 2;
+      }
+      scrollRestoredRef.current = true;
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div ref={containerRef} className="slide-panel-scroll">
