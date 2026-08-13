@@ -6,7 +6,7 @@ import PollPreview from "./PollPreview.jsx";
 import CalendarInlineCard from "./CalendarInlineCard.jsx";
 import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
 import LightningCard from "./LightningCard.jsx";
-import { parseNoteMediaSegments, groupNoteMediaSegments, displayName, relativeTime, nip19, isHexPubkey, normPubkey, fmtSats, parseBolt11Msats, zapCommentFromKind9735, zapperPubkeyFromKind9735, firstLinkPreviewUrl, parseArticle } from "../utils.js";
+import { parseNoteMediaSegments, groupNoteMediaSegments, displayName, relativeTime, nip19, isHexPubkey, normPubkey, fmtSats, parseBolt11Msats, zapCommentFromKind9735, zapperPubkeyFromKind9735, firstLinkPreviewUrl, parseArticle, videoPosterUrl } from "../utils.js";
 import LinkPreviewCard from "./LinkPreviewCard.jsx";
 import NoteAudioAttachment from "./NoteAudioAttachment.jsx";
 import PodcastPreviewChip from "./PodcastPreviewChip.jsx";
@@ -342,7 +342,7 @@ export function MediaMosaic({ items, onItemClick }) {
         >
           {item.type === "video" ? (
             <>
-              <video src={item.url} playsInline preload="metadata" muted />
+              <video src={item.url} poster={videoPosterUrl(item.url)} playsInline preload="metadata" muted />
               <span className="note-mosaic-play">
                 <svg viewBox="0 0 24 24" fill="currentColor" width="36" height="36"><polygon points="5,3 19,12 5,21" /></svg>
               </span>
@@ -414,6 +414,7 @@ function VideoPlayer({ src, autoPlay, muted, loop }) {
     <video
       ref={ref}
       src={src}
+      poster={videoPosterUrl(src)}
       controls
       playsInline
       preload="metadata"

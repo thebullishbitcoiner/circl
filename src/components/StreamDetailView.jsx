@@ -6,7 +6,7 @@ import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
 import ZapModal from "./ZapModal.jsx";
 import ZapAnimation from "./ZapAnimation.jsx";
-import { displayName, relativeTime, parseStreamEvent, fmtSats, fmtSatsVal, parseBolt11Msats, zapCommentFromKind9735, zapperPubkeyFromKind9735, nip19 } from "../utils.js";
+import { displayName, relativeTime, parseStreamEvent, fmtSats, fmtSatsVal, parseBolt11Msats, zapCommentFromKind9735, zapperPubkeyFromKind9735, nip19, videoPosterUrl } from "../utils.js";
 import NoteText from "./NoteText.jsx";
 import useStreamChat from "../hooks/useStreamChat.js";
 import useProfiles from "../hooks/useProfiles.js";
@@ -64,6 +64,7 @@ function StreamPlayer({ urls }) {
       <video
         className="stream-video"
         src={playUrl}
+        poster={videoPosterUrl(playUrl)}
         controls
         autoPlay={false}
         playsInline

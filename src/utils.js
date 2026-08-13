@@ -446,6 +446,34 @@ const WAVLAKE_RE   = /(?:^|[./])wavlake\.com\/track\//i;
 const IMAGE_HOST_RE =
   /(pbs\.twimg\.com|imagedelivery\.net|nostr\.build|void\.cat|cdn\.void\.cat|i\.imgur\.com)/i;
 
+const NOSTR_BUILD_HOST_RE = /nostr\.build/i;
+const BLOSSOM_BAND_HOST_RE = /blossom\.band/i;
+
+/**
+ * Deterministic poster-frame URL for a nostr.build- or blossom.band-hosted
+ * video (nostr.build's poster-frame feature, Aug 2026). Returns null for
+ * other hosts. Old/un-backfilled videos resolve to nostr.build's own neutral
+ * placeholder image rather than a 404, so it's safe to render unconditionally.
+ */
+export function videoPosterUrl(url) {
+  if (!url || typeof url !== "string") return null;
+  if (BLOSSOM_BAND_HOST_RE.test(url)) return url.includes("?") ? `${url}&poster` : `${url}?poster`;
+  if (NOSTR_BUILD_HOST_RE.test(url)) return `${url.split("?")[0].replace(/\/+$/, "")}/poster.jpg`;
+  return null;
+}
+
+/** Builds a NIP-92 `imeta` tag for one uploaded media item, e.g. { url, mimeType, sha256, dim, thumb, image }. */
+export function imetaTagForMedia(m) {
+  if (!m?.url) return null;
+  const parts = [`url ${m.url}`];
+  if (m.mimeType) parts.push(`m ${m.mimeType}`);
+  if (m.sha256) parts.push(`x ${m.sha256}`);
+  if (m.dim) parts.push(`dim ${m.dim}`);
+  if (m.thumb) parts.push(`thumb ${m.thumb}`);
+  if (m.image) parts.push(`image ${m.image}`);
+  return ["imeta", ...parts];
+}
+
 export function trimMediaUrl(url) {
   if (!url || typeof url !== "string") return url;
   return url.replace(/(?:[),.;:!?*»\]}]|[^\x00-\x7F])+$/, "");

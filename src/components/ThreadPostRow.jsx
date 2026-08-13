@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import Avatar from "./Avatar.jsx";
-import { avatarInitial } from "../utils.js";
+import { avatarInitial, videoPosterUrl } from "../utils.js";
 import EmojiPicker from "./EmojiPicker.jsx";
 import useRichTextEditor from "../hooks/useRichTextEditor.js";
 import useGifPicker from "../hooks/useGifPicker.js";
-import { uploadFile } from "../utils/upload.js";
+import { uploadFileWithMeta } from "../utils/upload.js";
 
 const CHAR_LIMIT = 280;
 
@@ -25,8 +25,8 @@ export default function ThreadPostRow({
     const errors = [];
     for (const file of files) {
       try {
-        const url = await uploadFile(file, { blossomServers, myPubkey });
-        setMedia(m => [...m, { url, type: file.type.startsWith("video/") ? "video" : "image" }]);
+        const uploaded = await uploadFileWithMeta(file, { blossomServers, myPubkey });
+        setMedia(m => [...m, { ...uploaded, type: file.type.startsWith("video/") ? "video" : "image" }]);
       } catch (err) {
         errors.push(err.message);
       }
@@ -104,7 +104,7 @@ export default function ThreadPostRow({
                 {post.media.map((m, i) => (
                   <div key={i} className="compose-preview">
                     {m.type === "video"
-                      ? <video src={m.url} muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ? <video src={m.url} poster={videoPosterUrl(m.url)} muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       : <img src={m.url} alt="" />}
                     <button className="compose-preview-remove" onClick={() => setMedia(ms => ms.filter((_, j) => j !== i))}>✕</button>
                   </div>

@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import Avatar from "./Avatar.jsx";
 import EmojiPicker from "./EmojiPicker.jsx";
-import { replyTagsForPublish, kind1111TagsForPublish } from "../utils.js";
+import { replyTagsForPublish, kind1111TagsForPublish, videoPosterUrl, imetaTagForMedia } from "../utils.js";
 import { GIPHY_KEY } from "../constants.js";
-import { uploadToBlossom } from "../utils/blossom.js";
+import { uploadFileWithMeta } from "../utils/upload.js";
 
 const isAddressableKind = k => k >= 30000 && k <= 39999;
 
@@ -84,44 +84,14 @@ export default function InlineCompose({
     setShowGif(false);
   };
 
-  const uploadFile = async file => {
-    if (blossomServers.length > 0) {
-      const url = await uploadToBlossom(file, blossomServers, myPubkey);
-      if (url) return url;
-    }
-    const uploadUrl = "https://nostr.build/api/v2/upload/files";
-    let authHeader = "";
-    if (myPubkey && window.nostr?.signEvent) {
-      const buf = await file.arrayBuffer();
-      const digest = await crypto.subtle.digest("SHA-256", buf);
-      const hash = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
-      const authEvent = await window.nostr.signEvent({
-        kind: 27235, pubkey: myPubkey,
-        created_at: Math.floor(Date.now() / 1000),
-        tags: [["u", uploadUrl], ["method", "POST"], ["payload", hash]],
-        content: "",
-      });
-      authHeader = `Nostr ${btoa(JSON.stringify(authEvent))}`;
-    }
-    const form = new FormData();
-    form.append("file", file);
-    const headers = authHeader ? { Authorization: authHeader } : {};
-    const res = await fetch(uploadUrl, { method: "POST", headers, body: form });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    const url = json?.nip94_event?.tags?.find(t => t[0] === "url")?.[1] ?? json?.data?.[0]?.url;
-    if (!url) throw new Error("No URL");
-    return url;
-  };
-
   const handleFileChange = async e => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     setUploading(true);
     for (const file of files) {
       try {
-        const url = await uploadFile(file);
-        setMedia(m => [...m, { url, type: file.type.startsWith("video/") ? "video" : "image" }]);
+        const uploaded = await uploadFileWithMeta(file, { blossomServers, myPubkey });
+        setMedia(m => [...m, { ...uploaded, type: file.type.startsWith("video/") ? "video" : "image" }]);
       } catch {}
     }
     setUploading(false);
@@ -138,6 +108,7 @@ export default function InlineCompose({
       const urls = media.map(m => m.url).join("\n");
       const fullContent = [text.trim(), urls].filter(Boolean).join("\n");
       for (const et of emojiTags) tags.push(et);
+      for (const m of media) { const t = imetaTagForMedia(m); if (t) tags.push(t); }
       const published = await publishEvent({ kind, content: fullContent, tags });
       if (published) {
         setText(""); setMedia([]); setEmojiTags([]);
@@ -174,7 +145,7 @@ export default function InlineCompose({
             {media.map((m, i) => (
               <div key={i} className="cal-inline-media-thumb">
                 {m.type === "video"
-                  ? <video src={m.url} muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ? <video src={m.url} poster={videoPosterUrl(m.url)} muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   : <img src={m.url} alt="" />}
                 <button type="button" className="cal-inline-media-remove" onClick={() => setMedia(prev => prev.filter((_, j) => j !== i))}>✕</button>
               </div>

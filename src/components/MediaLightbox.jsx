@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
+import { videoPosterUrl } from "../utils.js";
 
 const preloadedUrls = new Set();
 
@@ -95,6 +96,7 @@ export default function MediaLightbox({ items, index, onClose, onIndexChange }) 
           <video
             key={current.url}
             src={current.url}
+            poster={videoPosterUrl(current.url)}
             controls
             autoPlay
             playsInline

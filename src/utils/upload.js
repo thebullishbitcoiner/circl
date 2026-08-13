@@ -1,10 +1,22 @@
 import { uploadToBlossom } from "./blossom.js";
+import { videoPosterUrl } from "../utils.js";
 
-export async function uploadFile(file, { blossomServers = [], myPubkey } = {}) {
+/**
+ * Uploads a file via Blossom (if servers given), falling back to nostr.build,
+ * and returns the URL plus whatever poster/thumbnail metadata the host makes
+ * available (nostr.build's NIP-94 response carries `thumb`/`image` tags for
+ * videos; Blossom hosts don't, so we derive a poster URL via the deterministic
+ * `?poster` convention instead).
+ */
+export async function uploadFileWithMeta(file, { blossomServers = [], myPubkey } = {}) {
+  const isVideo = (file.type || "").startsWith("video/");
+
   // Try Blossom servers first
   if (blossomServers.length > 0) {
     const blossomUrl = await uploadToBlossom(file, blossomServers, myPubkey);
-    if (blossomUrl) return blossomUrl;
+    if (blossomUrl) {
+      return { url: blossomUrl, thumb: isVideo ? videoPosterUrl(blossomUrl) : null, mimeType: file.type || null };
+    }
   }
 
   // Fall back to nostr.build
@@ -32,9 +44,22 @@ export async function uploadFile(file, { blossomServers = [], myPubkey } = {}) {
     const errText = await res.text().catch(() => "");
     throw new Error(`HTTP ${res.status}: ${errText}`);
   }
-  const json = await res.json();
-  const url  = json?.nip94_event?.tags?.find(t => t[0] === "url")?.[1]
-            ?? json?.data?.[0]?.url;
+  const json      = await res.json();
+  const nip94Tags = json?.nip94_event?.tags;
+  const url       = nip94Tags?.find(t => t[0] === "url")?.[1] ?? json?.data?.[0]?.url;
   if (!url) throw new Error("No URL returned");
+  const thumb = nip94Tags?.find(t => t[0] === "thumb")?.[1] ?? (isVideo ? videoPosterUrl(url) : null);
+  return {
+    url,
+    thumb,
+    image:    nip94Tags?.find(t => t[0] === "image")?.[1] ?? thumb,
+    mimeType: nip94Tags?.find(t => t[0] === "m")?.[1] ?? file.type ?? null,
+    sha256:   nip94Tags?.find(t => t[0] === "x")?.[1] ?? null,
+    dim:      nip94Tags?.find(t => t[0] === "dim")?.[1] ?? null,
+  };
+}
+
+export async function uploadFile(file, opts) {
+  const { url } = await uploadFileWithMeta(file, opts);
   return url;
 }

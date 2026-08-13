@@ -5,14 +5,14 @@ import { useDraftsContext } from "../contexts/DraftsContext.jsx";
 import Overlay from "./Overlay.jsx";
 import { sheetPortal } from "../utils/sheetPortal.js";
 import Avatar from "./Avatar.jsx";
-import { displayName, avatarInitial, replyTagsForPublish, kind1111TagsForPublish, extractContentTags, nip19 } from "../utils.js";
+import { displayName, avatarInitial, replyTagsForPublish, kind1111TagsForPublish, extractContentTags, nip19, videoPosterUrl, imetaTagForMedia } from "../utils.js";
 import { DEFAULT_RELAYS } from "../constants.js";
 import { broadcastEvent, pool } from "../nostr.js";
 import EmojiPicker from "./EmojiPicker.jsx";
 import PollCompose from "./PollCompose.jsx";
 import GoalCompose from "./GoalCompose.jsx";
 import ThreadCompose, { makeThreadPost } from "./ThreadCompose.jsx";
-import { uploadFile } from "../utils/upload.js";
+import { uploadFileWithMeta } from "../utils/upload.js";
 import { VoiceRecorderBody } from "./VoiceRecorderSheet.jsx";
 import useRichTextEditor from "../hooks/useRichTextEditor.js";
 import useGifPicker from "../hooks/useGifPicker.js";
@@ -262,6 +262,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
         const existingPubkeys = new Set(tags.filter(pt => pt[0] === "p").map(pt => pt[1]));
         for (const t of extractContentTags(content, { existingPubkeys })) tags.push(t);
         for (const et of post.emojiTags) tags.push(et);
+        for (const m of post.media) { const t = imetaTagForMedia(m); if (t) tags.push(t); }
 
         const published = await publishEvent({ kind: 1, content, tags }, { trackStatus: true });
         if (!published) {
@@ -313,6 +314,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
       const existingPubkeys = new Set(tags.filter(t => t[0] === "p").map(t => t[1]));
       for (const t of extractContentTags(finalContent, { existingPubkeys, excludedMentions })) tags.push(t);
       for (const et of emojiTags) tags.push(et);
+      for (const m of media) { const t = imetaTagForMedia(m); if (t) tags.push(t); }
       if (replyTo && replyTo.pubkey !== myPubkey) broadcastEvent(replyTo);
       const published = await publishEvent({ kind: isNip22Reply ? 1111 : 1, content: finalContent, tags }, { trackStatus: true });
       if (published) { onPrepend?.(published); deleteDraft(thisDraftId); }
@@ -328,8 +330,8 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     const errors = [];
     for (const file of files) {
       try {
-        const url = await uploadFile(file, { blossomServers, myPubkey });
-        setMedia(m => [...m, { url, type: file.type.startsWith("video/") ? "video" : "image" }]);
+        const uploaded = await uploadFileWithMeta(file, { blossomServers, myPubkey });
+        setMedia(m => [...m, { ...uploaded, type: file.type.startsWith("video/") ? "video" : "image" }]);
       } catch (err) {
         errors.push(err.message);
       }
@@ -491,7 +493,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
               {media.map((m, i) => (
                 <div key={i} className="compose-preview">
                   {m.type === "video"
-                    ? <video src={m.url} muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ? <video src={m.url} poster={videoPosterUrl(m.url)} muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     : <img src={m.url} alt="" />}
                   <button className="compose-preview-remove" onClick={() => setMedia(ms => ms.filter((_, j) => j !== i))}>✕</button>
                 </div>

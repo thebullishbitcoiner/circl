@@ -1,4 +1,5 @@
 import { useEffect, useRef, useMemo, memo } from "react";
+import { videoPosterUrl } from "../utils.js";
 
 function StackedIcon() {
   return (
@@ -23,7 +24,7 @@ const ProfileMediaGrid = memo(function ProfileMediaGrid({ visible = true, items,
     >
       {type === "video" ? (
         <>
-          <video src={url} playsInline preload="metadata" muted />
+          <video src={url} poster={videoPosterUrl(url)} playsInline preload="metadata" muted />
           <span className="profile-media-play">
             <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28" aria-hidden="true">
               <polygon points="5,3 19,12 5,21" />
