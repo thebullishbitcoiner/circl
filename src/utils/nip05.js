@@ -16,6 +16,12 @@ export function parseNip05(nip05) {
   return { name: name || "_", domain };
 }
 
+/** Synchronous cache read, for seeding React state without an initial async gap. */
+export function getCachedNip05Names(domain) {
+  const cached = namesCache.get(domain);
+  return cached && Date.now() - cached.ts < CACHE_TTL ? cached.names : null;
+}
+
 /** Fetch (and cache) the full name -> pubkey map from a domain's .well-known/nostr.json. */
 export function fetchNip05Names(domain) {
   const cached = namesCache.get(domain);

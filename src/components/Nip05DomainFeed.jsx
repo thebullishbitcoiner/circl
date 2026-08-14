@@ -18,6 +18,16 @@ const PROFILES_FLUSH_INTERVAL_MS = 300; // throttle re-renders from useProfiles'
 
 const domainNotesCache = new Map(); // domain → { notes, ts }
 const DOMAIN_NOTES_CACHE_TTL = 5 * 60 * 1000;
+function getCachedDomainNotes(domain) {
+  const cached = domainNotesCache.get(domain);
+  return cached && Date.now() - cached.ts < DOMAIN_NOTES_CACHE_TTL ? cached.notes : null;
+}
+
+// Persists scroll position (and how many cards were expanded into view) across
+// unmount/remount — e.g. opening a note and coming back. Nip05DomainFeed isn't
+// kept mounted in the background like ProfilePage is, so without this the whole
+// panel remounts from scratch on every "back" and scroll resets to the top.
+const savedFeedState = new Map(); // domain → { scrollTop, visibleCount }
 
 const hasNonMentionETag = e => e.tags.some(t => t[0] === "e" && t[3] !== "mention");
 const isReplyEvent = e => e.kind === 1 && hasNonMentionETag(e) && !isQuoteRepost(e);
@@ -56,21 +66,55 @@ export default function Nip05DomainFeed({
   const mergedProfiles = useMemo(() => ({ ...fetchedProfiles, ...profilesProp }), [profilesProp, fetchedProfiles]);
   const profiles = useThrottledValue(mergedProfiles, PROFILES_FLUSH_INTERVAL_MS);
 
-  const [notes, setNotes] = useState([]);
-  const [notesLoading, setNotesLoading] = useState(true);
-  const [visibleCount, setVisibleCount] = useState(VISIBLE_STEP);
+  // Seed synchronously from cache (same reasoning as useNip05DomainMembers): a
+  // remount within the cache window should show the same feed on its first
+  // render, not flash back to a spinner while relay data reloads.
+  const [notes, setNotes] = useState(() => getCachedDomainNotes(domain) ?? []);
+  const [notesLoading, setNotesLoading] = useState(() => !getCachedDomainNotes(domain));
+  const [visibleCount, setVisibleCount] = useState(() => savedFeedState.get(domain)?.visibleCount ?? VISIBLE_STEP);
   const notesLenRef = useRef(0);
   notesLenRef.current = notes.length;
   const subRef = useRef(null);
+  const scrollRef = useRef(null);
 
   const handleScroll = e => {
     const el = e.currentTarget;
+    savedFeedState.set(domain, { ...savedFeedState.get(domain), scrollTop: el.scrollTop });
     if (el.scrollHeight - el.scrollTop - el.clientHeight > SCROLL_THRESHOLD_PX) return;
     setVisibleCount(n => Math.min(n + VISIBLE_STEP, notesLenRef.current));
   };
 
+  // Keep the saved window size in sync as it grows, so a remount restores enough
+  // cards to actually reach the saved scroll position.
   useEffect(() => {
-    setVisibleCount(VISIBLE_STEP);
+    savedFeedState.set(domain, { ...savedFeedState.get(domain), visibleCount });
+  }, [domain, visibleCount]);
+
+  // Restore scroll position after mount — e.g. opening a note and coming back.
+  // notes/visibleCount arrive through a multi-hop async chain (domain → pubkeys
+  // → cached/fetched notes), so a single-shot attempt right after mount can fire
+  // before there's enough content to actually reach the saved offset, and the
+  // browser silently clamps it. Retry as content grows instead, same idea as
+  // ThreadView's scroll-restore retry, until the container is tall enough or a
+  // few seconds pass.
+  const pendingScrollRef = useRef(savedFeedState.get(domain)?.scrollTop ?? null);
+  const scrollRestoredRef = useRef(false);
+
+  useEffect(() => {
+    if (pendingScrollRef.current == null || scrollRestoredRef.current) return;
+    const el = scrollRef.current;
+    if (!el || el.scrollHeight - el.clientHeight < pendingScrollRef.current) return;
+    el.scrollTop = pendingScrollRef.current;
+    scrollRestoredRef.current = true;
+  }, [notes, visibleCount]);
+
+  useEffect(() => {
+    if (pendingScrollRef.current == null) return;
+    const t = setTimeout(() => { scrollRestoredRef.current = true; }, 3000);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
     if (pubkeysLoading || pubkeys.length === 0) {
       if (!pubkeysLoading) setNotesLoading(false);
       return;
@@ -78,9 +122,9 @@ export default function Nip05DomainFeed({
     const authors = pubkeys.slice(0, MAX_AUTHORS);
     const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
 
-    const cached = domainNotesCache.get(domain);
-    if (cached && Date.now() - cached.ts < DOMAIN_NOTES_CACHE_TTL) {
-      setNotes(cached.notes);
+    const cached = getCachedDomainNotes(domain);
+    if (cached) {
+      setNotes(cached);
       setNotesLoading(false);
       return;
     }
@@ -128,7 +172,7 @@ export default function Nip05DomainFeed({
   const loading = pubkeysLoading || notesLoading;
 
   return (
-    <div className="slide-panel-scroll" onScroll={handleScroll}>
+    <div className="slide-panel-scroll" ref={scrollRef} onScroll={handleScroll}>
       <div className="panel-bar">
         <button type="button" className="back-btn" onClick={onBack}><Bk s={16} /></button>
         <span className="panel-bar-logo panel-bar-logo-domain">
