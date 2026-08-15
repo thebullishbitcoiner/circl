@@ -4,6 +4,7 @@ import { pool, eventStore, relayUrls$ } from "../nostr.js";
 
 const PIN_LIST_KIND = 10001;
 const CACHE_KEY = "circl_pins";
+const PINNABLE_KINDS = [1, 1068, 6969];
 
 export function readPinnedCache(pk) {
   try { return JSON.parse(localStorage.getItem(CACHE_KEY))?.[pk] ?? null; } catch { return null; }
@@ -104,7 +105,7 @@ export default function usePinnedNotes({ pubkey, signAndPublish } = {}) {
 
   const pinNote = useCallback(
     async event => {
-      if (event?.kind !== 1 || !event?.id) return;
+      if (!PINNABLE_KINDS.includes(event?.kind) || !event?.id) return;
       const prev = itemsRef.current;
       if (prev.includes(event.id)) return;
       const next = [...prev, event.id];
@@ -138,7 +139,7 @@ export default function usePinnedNotes({ pubkey, signAndPublish } = {}) {
 
   const isPinned = useCallback(
     event => {
-      if (event?.kind !== 1 || !event?.id) return false;
+      if (!PINNABLE_KINDS.includes(event?.kind) || !event?.id) return false;
       return items.includes(event.id);
     },
     [items]

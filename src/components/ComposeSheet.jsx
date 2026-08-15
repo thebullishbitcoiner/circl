@@ -203,6 +203,8 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
 
     if (pollMode && publishEvent) {
       const question = getContent().trim();
+      const urls = media.map(m => m.url).join("\n");
+      const content = [question, urls].filter(Boolean).join("\n");
       const filledOptions = pollOptions.filter(o => o.trim());
       const isZap = pollType === "zap";
       const tags = [];
@@ -217,8 +219,9 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
         tags.push(["polltype", pollChoice]);
         if (pollExpiry) tags.push(["endsAt", String(Math.floor(new Date(pollExpiry).getTime() / 1000))]);
       }
+      for (const m of media) { const t = imetaTagForMedia(m); if (t) tags.push(t); }
 
-      const published = await publishEvent({ kind: isZap ? 6969 : 1068, content: question, tags }, { trackStatus: true });
+      const published = await publishEvent({ kind: isZap ? 6969 : 1068, content, tags }, { trackStatus: true });
       if (published) onPrepend?.(published);
       deleteDraft(thisDraftId);
       onDismiss?.();

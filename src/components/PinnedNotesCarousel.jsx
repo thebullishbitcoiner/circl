@@ -33,6 +33,8 @@ function renderCardText(content, profiles) {
 export default function PinnedNotesCarousel({ events, profiles, onOpenThread }) {
   if (!events?.length) return null;
 
+  const sorted = [...events].sort((a, b) => b.created_at - a.created_at);
+
   return (
     <div className="pinned-carousel">
       <div className="pinned-carousel-header">
@@ -44,7 +46,7 @@ export default function PinnedNotesCarousel({ events, profiles, onOpenThread }) 
         onTouchStart={e => e.stopPropagation()}
         onTouchEnd={e => e.stopPropagation()}
       >
-        {events.map(event => (
+        {sorted.map(event => (
           <PinCard key={event.id} event={event} profiles={profiles} onOpenThread={onOpenThread} />
         ))}
       </div>

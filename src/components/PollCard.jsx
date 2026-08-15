@@ -43,6 +43,8 @@ function PollCard({
   const { onOpenPoll } = useNavigation();
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+  if (deleted) return null;
   const [localModal, setLocalModal] = useState(null);
   const [zapTargetOption, setZapTargetOption] = useState(null);
   const [showZapModal, setShowZapModal] = useState(false);
@@ -144,7 +146,13 @@ function PollCard({
             <span /><span /><span />
           </button>
           {cardMenuOpen && (
-            <NoteContextMenu event={event} onClose={() => setCardMenuOpen(false)} onViewJson={() => setJsonOpen(true)} />
+            <NoteContextMenu
+              event={event}
+              onClose={() => setCardMenuOpen(false)}
+              onViewJson={() => setJsonOpen(true)}
+              publishEvent={publishEvent}
+              onDeleted={() => setDeleted(true)}
+            />
           )}
         </div>
 

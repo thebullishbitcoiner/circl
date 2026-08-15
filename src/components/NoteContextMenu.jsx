@@ -89,7 +89,7 @@ export default function NoteContextMenu({ event, onClose, onViewJson, publishEve
           {threadMuted ? "Unmute Thread" : "Mute Thread"}
         </button>
       )}
-      {isOwnNote && event.kind === 1 && onTogglePin && (
+      {isOwnNote && [1, 1068, 6969].includes(event.kind) && onTogglePin && (
         <button type="button" className="note-card-menu-item" onClick={() => { onTogglePin(event); onClose(); }}>
           {isPinned?.(event) ? "Unpin from Profile" : "Pin to Profile"}
         </button>
