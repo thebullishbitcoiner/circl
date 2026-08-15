@@ -1251,7 +1251,12 @@ export default function ProfilePage({
         )}
       </div>
 
-      <div className="profile-stats" ref={tabBarRef}>
+      <div
+        className="profile-stats"
+        ref={tabBarRef}
+        onTouchStart={e => e.stopPropagation()}
+        onTouchEnd={e => e.stopPropagation()}
+      >
         <div className={`profile-stat ${tab === "notes" ? "active" : ""}`} onClick={() => switchTab("notes")}>
           <div className="profile-stat-label">Notes</div>
         </div>

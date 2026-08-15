@@ -763,7 +763,7 @@
   .profile-stat:last-child{border-right:none;}
   .profile-stat:hover,.profile-stat.active{background:var(--surface);}
   .profile-stat-val{font-family:'DM Sans',sans-serif;font-size:20px;font-weight:700;color:var(--text);line-height:1;}
-  .profile-stat-label{font-size:calc(var(--font-base) - 4px);color:var(--text-faint);margin-top:2px;text-transform:uppercase;letter-spacing:.5px;}
+  .profile-stat-label{font-size:calc(var(--font-base) - 4px);color:var(--text-faint);margin-top:2px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;}
 
   /* Profile media grid */
   .profile-media-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;}
