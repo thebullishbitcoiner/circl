@@ -63,7 +63,6 @@ function HighlightCard({
   const [jsonOpen, setJsonOpen] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const [sourceEvent, setSourceEvent] = useState(null);
-  if (deleted) return null;
 
   const { text, sourceTag, sourceRef, authorPubkey, comment } = parseHighlight(event);
   const isNoteSource = sourceEvent?.kind === 1 || (sourceTag === "e" && sourceEvent && sourceEvent.kind !== 30023);
@@ -90,6 +89,8 @@ function HighlightCard({
     }
     return () => { cancelled = true; };
   }, [sourceRef, sourceTag, resolveEventById]);
+
+  if (deleted) return null;
 
   return (
     <>

@@ -44,7 +44,6 @@ function PollCard({
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
   const [deleted, setDeleted] = useState(false);
-  if (deleted) return null;
   const [localModal, setLocalModal] = useState(null);
   const [zapTargetOption, setZapTargetOption] = useState(null);
   const [showZapModal, setShowZapModal] = useState(false);
@@ -53,6 +52,7 @@ function PollCard({
   const [viewResults, setViewResults] = useState(false);
 
   const { options, voteCounts, myVote, total, isExpired, expiry, loading, polltype, zapLimits, voteEvents, voterCount } = usePollData({ event, myPubkey });
+  if (deleted) return null;
   const isZapPoll = event.kind === 6969;
   const effectiveVote = localVote ?? myVote;
   const effectiveCounts = localVoteCounts ?? voteCounts;
