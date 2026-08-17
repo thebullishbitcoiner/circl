@@ -91,6 +91,7 @@ export default function CalendarCard({
 
           <NoteActions
             event={event}
+            additionalEventIds={event._olderIds ?? []}
             profiles={profiles}
             myPubkey={myPubkey}
             myProfile={myProfile}

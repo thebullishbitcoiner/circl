@@ -11,6 +11,7 @@ import {
   nip19,
   parseKind6EmbeddedEvent,
   zapperPubkeyFromKind9735,
+  collapseEventRevisions,
 } from "./utils.js";
 import useAuth from "./hooks/useAuth.js";
 import { nostrSubscribe, eventLoader, eventStore, pool, validRelays } from "./nostr.js";
@@ -599,7 +600,10 @@ export default function App() {
     if (nav === "zaps" && activeNav !== "zaps") refreshWallet();
   };
 
-  const displayEvs = (activeNav === "bookmarks" ? bookmarkFeedEvents : events).filter(e => !isDeleted(e));
+  const displayEvs = collapseEventRevisions(
+    (activeNav === "bookmarks" ? bookmarkFeedEvents : events).filter(e => !isDeleted(e)),
+    [31922, 31923]
+  );
   const isLoading = fl || el;
   const anyPanelOpen = settingsOpen || !!openStreamEvent || navStack.length > 0;
   const myProfile = profiles[pubkey];

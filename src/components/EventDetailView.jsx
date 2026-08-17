@@ -75,6 +75,14 @@ export default function EventDetailView({
   const cal = parseCalendarEvent(event);
   const { grouped, myRsvp } = useCalendarRSVPs({ event, pubkey });
   const resolvedMyRsvp = localMyRsvp ?? myRsvp;
+  const olderIds = event._olderIds ?? [];
+  const mergeLocal = (getter, id) => {
+    const primary = getter?.(id) ?? [];
+    if (!olderIds.length) return primary;
+    const seen = new Set(primary.map(x => x.id).filter(Boolean));
+    const extra = olderIds.flatMap(oldId => (getter?.(oldId) ?? []).filter(x => !x.id || !seen.has(x.id)));
+    return [...primary, ...extra];
+  };
 
   // Fetch profiles for RSVP attendees
   useEffect(() => {
@@ -93,7 +101,7 @@ export default function EventDetailView({
     const dTag = event.tags?.find(t => t[0] === "d")?.[1] ?? "";
     const addr = `${event.kind}:${event.pubkey}:${dTag}`;
     const sub = pool.subscription(relayUrls, [
-      { kinds: [1, 1111], "#e": [event.id] },
+      { kinds: [1, 1111], "#e": [event.id, ...olderIds] },
       { kinds: [1111], "#a": [addr] },
     ]).subscribe({
       next: ev => {
@@ -245,10 +253,11 @@ export default function EventDetailView({
 
           <FocusedStatsRow
             eventId={event.id}
+            additionalEventIds={olderIds}
             rCount={comments.length}
             allEvents={events}
-            zaps={getLocalZaps?.(event.id) ?? []}
-            reactions={getLocalReactions?.(event.id) ?? []}
+            zaps={mergeLocal(getLocalZaps, event.id)}
+            reactions={mergeLocal(getLocalReactions, event.id)}
             onOpenZaps={onOpenZaps}
             onOpenReactions={onOpenReactions}
             onOpenReposts={onOpenReposts}
@@ -257,6 +266,7 @@ export default function EventDetailView({
           <div className="reader-header-actions">
             <NoteActions
               event={event}
+              additionalEventIds={olderIds}
               profiles={profiles}
               myPubkey={pubkey}
               myProfile={myProfile}

@@ -114,6 +114,30 @@ export const parseArticle = ev => {
   };
 };
 
+// Addressable events (kind:pubkey:d) keep their d tag across edits but get a new
+// id each time they're republished. Collapses same-coordinate revisions down to
+// the newest one, tagging it with `_olderIds` so callers can still merge stats
+// (zaps/reactions/reposts/replies) accumulated under the earlier revisions' ids.
+export function collapseEventRevisions(events, kinds) {
+  const byCoord = new Map();
+  const rest = [];
+  for (const e of events) {
+    if (!kinds.includes(e.kind)) { rest.push(e); continue; }
+    const d = e.tags?.find(t => t[0] === "d")?.[1] ?? "";
+    const coord = `${e.kind}:${e.pubkey}:${d}`;
+    if (!byCoord.has(coord)) byCoord.set(coord, []);
+    byCoord.get(coord).push(e);
+  }
+  if (!byCoord.size) return rest;
+  const collapsed = [];
+  for (const versions of byCoord.values()) {
+    versions.sort((a, b) => b.created_at - a.created_at);
+    const [latest, ...older] = versions;
+    collapsed.push(older.length ? { ...latest, _olderIds: older.map(v => v.id) } : latest);
+  }
+  return [...rest, ...collapsed].sort((a, b) => b.created_at - a.created_at);
+}
+
 export function parseCalendarEvent(event) {
   const isDateBased = event.kind === 31922;
   const start = getCalendarEventStart(event);

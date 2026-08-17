@@ -1,12 +1,13 @@
 import { isQuoteRepost } from "../utils.js";
 
-export default function FocusedStatsRow({ eventId, rCount, allEvents, zaps, reactions, onOpenZaps, onOpenReactions, onOpenReposts }) {
+export default function FocusedStatsRow({ eventId, additionalEventIds = [], rCount, allEvents, zaps, reactions, onOpenZaps, onOpenReactions, onOpenReposts }) {
+  const targetIds = [eventId, ...additionalEventIds];
   const kind6Pubkeys = (allEvents || [])
-    .filter(e => e.kind === 6 && e.tags.some(t => t[0] === "e" && t[1] === eventId))
+    .filter(e => e.kind === 6 && e.tags.some(t => t[0] === "e" && targetIds.includes(t[1])))
     .map(e => e.pubkey);
 
   const quoteRepostEvs = (allEvents || []).filter(e =>
-    e.kind === 1 && e.id !== eventId && e.tags.some(t => t[0] === "q" && t[1] === eventId)
+    e.kind === 1 && !targetIds.includes(e.id) && e.tags.some(t => t[0] === "q" && targetIds.includes(t[1]))
   );
 
   const repostItems = [

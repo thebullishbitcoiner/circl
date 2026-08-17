@@ -8,7 +8,7 @@ import NoteActions from "./NoteActions.jsx";
 import ProfileText from "./ProfileText.jsx";
 import { Bk, CkC, AlC } from "./icons.jsx";
 import ProfileContextMenu from "./ProfileContextMenu.jsx";
-import { displayName, nip05OrNpub, relativeTime, shortNpub, truncNpub, avatarUrl, isQuoteRepost, isHexPubkey, replyCount, repostAndQuoteCount, normPubkey, directReplyParentId, parseKind6EmbeddedEvent, nip19, parseNoteMediaSegments, zapperPubkeyFromKind9735 } from "../utils.js";
+import { displayName, nip05OrNpub, relativeTime, shortNpub, truncNpub, avatarUrl, isQuoteRepost, isHexPubkey, replyCount, repostAndQuoteCount, normPubkey, directReplyParentId, parseKind6EmbeddedEvent, nip19, parseNoteMediaSegments, zapperPubkeyFromKind9735, collapseEventRevisions } from "../utils.js";
 import useProfiles from "../hooks/useProfiles.js";
 import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
@@ -853,9 +853,11 @@ export default function ProfilePage({
   );
 
   const topLevel = useMemo(
-    () => theirEvents
-      .filter(e => e.kind === 6 || e.kind === 9802 || e.kind === 9735 || isQuoteRepost(e) || (e.kind === 1 && !hasNonMentionETag(e)) || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311 || e.kind === 9041 || e.kind === 30023)
-      .sort((a, b) => b.created_at - a.created_at),
+    () => collapseEventRevisions(
+      theirEvents
+        .filter(e => e.kind === 6 || e.kind === 9802 || e.kind === 9735 || isQuoteRepost(e) || (e.kind === 1 && !hasNonMentionETag(e)) || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311 || e.kind === 9041 || e.kind === 30023),
+      [31922, 31923]
+    ),
     [theirEvents]
   );
 
