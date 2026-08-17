@@ -137,7 +137,7 @@ export default function ZapGoalPage({
       ) : (
         sortedZaps.map((z, i) => (
           <div key={z.id || i} className="list-row" onClick={() => onOpenProfile?.(z.zapper)}>
-            <div className={`list-row-av${hasUniqTop && i === 0 ? " top" : ""}`}>
+            <div className="list-row-av">
               <Avatar pk={z.zapper} profiles={profiles} size={36} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>

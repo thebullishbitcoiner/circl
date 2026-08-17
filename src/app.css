@@ -289,9 +289,6 @@
     0%{background-position:200% 200%,0 0;}
     100%{background-position:-100% -100%,0 0;}
   }
-  /* .r-av already draws its own accent outline; suppress it when the avatar
-     inside is Inner Circl ringed so the two don't stack into a double border. */
-  .r-av:has(.inner-circl-ring){outline:none;}
   .note-body{flex:1;min-width:0;}
   .note-body{position:relative;}
   .note-header{display:flex;align-items:center;gap:8px;margin-bottom:7px;position:relative;}
@@ -645,7 +642,7 @@
   .host-avatars{display:flex;align-items:center;}
   .host-av-wrap{border-radius:50%;box-shadow:0 0 0 2px var(--bg, var(--surface));cursor:pointer;flex-shrink:0;}
   .host-av-wrap+.host-av-wrap{margin-left:-10px;}
-  .r-av{width:34px;height:34px;border-radius:50%;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--primary);outline:2px solid var(--primary);outline-offset:2px;overflow:hidden;}
+  .r-av{width:34px;height:34px;border-radius:50%;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--primary);overflow:hidden;}
   .r-av img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
   .r-author-name{font-size:13px;font-weight:500;}
   .r-author-npub{font-size:9px;color:var(--text-faint);font-family:monospace;}
@@ -891,7 +888,6 @@
     flex-shrink:0;overflow:hidden;
   }
   .list-row-av img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
-  .list-row-av.top{outline:2px solid var(--primary);outline-offset:2px;}
   .list-row-name{font-size:13.5px;font-weight:500;color:var(--text);flex:1;min-width:0;}
   .list-row-meta{font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text-muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .list-row-right{font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;color:var(--primary);flex-shrink:0;}

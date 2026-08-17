@@ -69,7 +69,7 @@ export function ZapsScreen({ eventId, zaps, profiles: propProfiles, onBack, onOp
     <ListScreen title="Zaps" subtitle={`${fmtSats(total)} sats total`} onBack={onBack}>
       {sorted.map((z, i) => (
         <div key={i} className="list-row" onClick={() => onOpenProfile?.(z.zapper)}>
-          <div className={`list-row-av${hasUniqTop && i === 0 ? " top" : ""}`}>
+          <div className="list-row-av">
             {avatarUrl(z.zapper, profiles)
               ? <img src={avatarUrl(z.zapper, profiles)} alt="" onError={e => { e.target.style.display = "none"; }} />
               : avatarInitial(z.zapper, profiles)}
