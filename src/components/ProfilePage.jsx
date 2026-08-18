@@ -455,6 +455,7 @@ export default function ProfilePage({
   const topLevelLenRef = useRef(0);
   const repliesLenRef  = useRef(0);
   const articlesLenRef = useRef(0);
+  const pollsLenRef    = useRef(0);
   useEffect(() => { renderedTabRef.current = tab; }, [tab]);
 
   const handleProfileScroll = useCallback(e => {
@@ -466,6 +467,8 @@ export default function ProfilePage({
       setVisibleReplies(n => Math.min(n + 20, repliesLenRef.current));
     else if (renderedTabRef.current === "articles")
       setVisibleArticles(n => Math.min(n + 10, articlesLenRef.current));
+    else if (renderedTabRef.current === "polls")
+      setVisiblePolls(n => Math.min(n + 10, pollsLenRef.current));
   }, []);
 
   useEffect(() => {
@@ -922,6 +925,7 @@ export default function ProfilePage({
 
   useEffect(() => { topLevelLenRef.current  = topLevel.length;  }, [topLevel.length]);
   useEffect(() => { repliesLenRef.current   = replies.length;   }, [replies.length]);
+  useEffect(() => { pollsLenRef.current     = polls.length;     }, [polls.length]);
   useEffect(() => { articlesLenRef.current  = articles.length;  }, [articles.length]);
 
   useEffect(() => {
