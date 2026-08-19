@@ -1,10 +1,12 @@
 const fmtUrl = url => url.replace(/^wss?:\/\//, "").replace(/\/$/, "");
 
 export function publishStatusHeaderText(session) {
-  if (session.relays.some(r => r.status === "pending")) return "Publishing note…";
+  const isBroadcast = session.label === "broadcast";
+  if (session.relays.some(r => r.status === "pending")) return isBroadcast ? "Broadcasting note…" : "Publishing note…";
   const failed = session.relays.filter(r => r.status === "failed").length;
-  if (failed > 0) return `Published to ${session.relays.length - failed}/${session.relays.length} relays`;
-  return "Published";
+  const verb = isBroadcast ? "Broadcast" : "Published";
+  if (failed > 0) return `${verb} to ${session.relays.length - failed}/${session.relays.length} relays`;
+  return verb;
 }
 
 export function PublishStatusRows({ relays }) {

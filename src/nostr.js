@@ -105,19 +105,6 @@ eventStore.insert$.subscribe(event => {
   if (event.kind === 0) saveProfileToCache(event);
 });
 
-// ── Broadcast ───────────────────────────────────────────────────────────────
-// Re-publish an already-signed event to all currently connected relays
-// (which include the user's own outbox relays after login).
-
-export function broadcastEvent(event) {
-  if (!event?.id || !event?.sig) return Promise.resolve();
-  const relays = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
-  return Promise.race([
-    pool.publish(relays, event),
-    new Promise(resolve => setTimeout(resolve, 8000)),
-  ]).catch(() => null);
-}
-
 // ── Publish status tracking ─────────────────────────────────────────────────
 // Opt-in per-relay publish progress for the "publishing…" UI. Uses pool.event
 // (not pool.publish) so we get one PublishResponse per relay as it resolves,
@@ -133,7 +120,7 @@ const PUBLISH_STATUS_TIMEOUT_MS = 20_000;
 
 export const publishSession$ = new BehaviorSubject(null);
 
-export function publishWithStatus(relays, event) {
+export function publishWithStatus(relays, event, { label = "publish" } = {}) {
   const id = Math.random();
   // pool.relay() normalizes URLs before using them as the Relay's own `.url`
   // (see pool.js), so every PublishResponse.from comes back normalized. Match
@@ -143,6 +130,7 @@ export function publishWithStatus(relays, event) {
   publishSession$.next({
     id,
     event,
+    label,
     relays: normalized.map(url => ({ url, status: "pending", message: null })),
   });
 
@@ -167,6 +155,18 @@ export function publishWithStatus(relays, event) {
     complete: () => clearTimeout(timer),
     error: () => clearTimeout(timer),
   });
+}
+
+// ── Broadcast ───────────────────────────────────────────────────────────────
+// Re-publish an already-signed event to all currently connected relays
+// (which include the user's own outbox relays after login), surfacing
+// per-relay progress through the same publish-status popup used for
+// composing notes.
+
+export function broadcastEvent(event) {
+  if (!event?.id || !event?.sig) return;
+  const relays = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
+  publishWithStatus(relays, event, { label: "broadcast" });
 }
 
 // ── Reactive relay list ─────────────────────────────────────────────────────
