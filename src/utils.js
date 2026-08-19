@@ -56,6 +56,31 @@ export const truncNpub = pk => {
  */
 export const MENTION_BODY_SRC = "(?:npub1|nprofile1)[023456789acdefghjklmnpqrstuvwxyz]+";
 
+const BARE_NOSTR_ENTITY_RE = /(?:npub1|nprofile1|nevent1|note1|naddr1)[023456789acdefghjklmnpqrstuvwxyz]{20,}/gi;
+
+/**
+ * Canonicalize bare NIP-19 entities in note text so clients recognize them as
+ * Nostr references. Candidates must be valid, standalone identifiers rather
+ * than fragments of a hostname or path.
+ */
+export function addNostrUriPrefixes(content) {
+  if (typeof content !== "string") return content;
+  return content.replace(BARE_NOSTR_ENTITY_RE, (entity, offset, source) => {
+    const before = offset === 0 ? "" : source[offset - 1];
+    const after = source.slice(offset + entity.length);
+    if (!(before === "" || /[\s([<"'`]/.test(before))) return entity;
+    if (/^(?:\.[a-zA-Z0-9-]|\/)/.test(after)) return entity;
+    try {
+      const type = nip19.decode(entity)?.type;
+      return ["npub", "nprofile", "nevent", "note", "naddr"].includes(type)
+        ? `nostr:${entity}`
+        : entity;
+    } catch {
+      return entity;
+    }
+  });
+}
+
 /**
  * Decodes an npub/nprofile mention token — bare, "nostr:"-prefixed, and/or
  * "@"-prefixed all work — tolerating trailing non-bech32 characters absorbed

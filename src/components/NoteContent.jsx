@@ -6,7 +6,7 @@ import PollPreview from "./PollPreview.jsx";
 import CalendarInlineCard from "./CalendarInlineCard.jsx";
 import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
 import LightningCard from "./LightningCard.jsx";
-import { parseNoteMediaSegments, groupNoteMediaSegments, displayName, relativeTime, nip19, isHexPubkey, normPubkey, fmtSats, parseBolt11Msats, zapCommentFromKind9735, zapperPubkeyFromKind9735, firstLinkPreviewUrl, parseArticle, videoPosterUrl } from "../utils.js";
+import { addNostrUriPrefixes, parseNoteMediaSegments, groupNoteMediaSegments, displayName, relativeTime, nip19, isHexPubkey, normPubkey, fmtSats, parseBolt11Msats, zapCommentFromKind9735, zapperPubkeyFromKind9735, firstLinkPreviewUrl, parseArticle, videoPosterUrl } from "../utils.js";
 import LinkPreviewCard from "./LinkPreviewCard.jsx";
 import NoteAudioAttachment from "./NoteAudioAttachment.jsx";
 import PodcastPreviewChip from "./PodcastPreviewChip.jsx";
@@ -442,9 +442,10 @@ export default function NoteContent({
   style = {},
   collapsible = false,
 }) {
+  const normalizedContent = useMemo(() => addNostrUriPrefixes(content || ""), [content]);
   const segments = useMemo(
-    () => groupNoteMediaSegments(parseNoteMediaSegments(content || "")),
-    [content]
+    () => groupNoteMediaSegments(parseNoteMediaSegments(normalizedContent)),
+    [normalizedContent]
   );
   const normalizedSegments = useMemo(() => {
     const merged = [];
@@ -498,7 +499,7 @@ export default function NoteContent({
   const { autoplayVideos, loopVideos, bigFontShortNotes } = useContentSettings();
 
   // Fetch profiles for any nprofile/npub mentions so display names resolve
-  useEffect(() => { fetchMentionedProfiles(content); }, [content]);
+  useEffect(() => { fetchMentionedProfiles(normalizedContent); }, [normalizedContent]);
 
   const textLength = normalizedSegments
     .filter(s => s.type === "text")
@@ -511,8 +512,8 @@ export default function NoteContent({
   const isBigFont = bigFontShortNotes && textLength > 0 && textLength < BIG_FONT_THRESHOLD;
 
   useEffect(() => {
-    if (!allowEmbeds || !resolveEventById || typeof content !== "string" || !/nostr:(nevent1|note1)/i.test(content)) return;
-    const refs = [...content.matchAll(/nostr:(nevent1[023456789acdefghjklmnpqrstuvwxyz]+|note1[023456789acdefghjklmnpqrstuvwxyz]+)/ig)]
+    if (!allowEmbeds || !resolveEventById || !/nostr:(nevent1|note1)/i.test(normalizedContent)) return;
+    const refs = [...normalizedContent.matchAll(/nostr:(nevent1[023456789acdefghjklmnpqrstuvwxyz]+|note1[023456789acdefghjklmnpqrstuvwxyz]+)/ig)]
       .map(m => m[1]);
     if (!refs.length) return;
     let cancelled = false;
@@ -528,11 +529,11 @@ export default function NoteContent({
       }).catch(() => {});
     }
     return () => { cancelled = true; };
-  }, [content, allEvents, resolveEventById, resolvedRefs, allowEmbeds]);
+  }, [normalizedContent, allEvents, resolveEventById, resolvedRefs, allowEmbeds]);
 
   useEffect(() => {
-    if (!allowEmbeds || typeof content !== "string" || !/nostr:naddr1/i.test(content)) return;
-    const refs = [...content.matchAll(/nostr:(naddr1[023456789acdefghjklmnpqrstuvwxyz]+)/ig)].map(m => m[1]);
+    if (!allowEmbeds || !/nostr:naddr1/i.test(normalizedContent)) return;
+    const refs = [...normalizedContent.matchAll(/nostr:(naddr1[023456789acdefghjklmnpqrstuvwxyz]+)/ig)].map(m => m[1]);
     if (!refs.length) return;
     let cancelled = false;
     const connected = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
@@ -552,7 +553,7 @@ export default function NoteContent({
       });
     }
     return () => { cancelled = true; };
-  }, [content, resolvedNaddrRefs, allowEmbeds]);
+  }, [normalizedContent, resolvedNaddrRefs, allowEmbeds]);
 
   // Collect all nevent/note1/naddr1 refs from text segments — rendered at the bottom,
   // outside the collapse and after media, so they never block text or images.
@@ -682,7 +683,7 @@ export default function NoteContent({
       );
     })}
 
-    {allowEmbeds && (() => { const u = firstLinkPreviewUrl(content); return u ? <LinkPreviewCard key={u} url={u} /> : null; })()}
+    {allowEmbeds && (() => { const u = firstLinkPreviewUrl(normalizedContent); return u ? <LinkPreviewCard key={u} url={u} /> : null; })()}
 
     {lightbox && (
       <MediaLightbox
