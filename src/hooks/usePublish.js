@@ -1,16 +1,22 @@
 import { useCallback } from "react";
+import { addNostrUriPrefixes } from "../utils.js";
+
+const isNoteLikeKind = kind => kind === 1 || kind === 1111;
 
 export default function usePublish({ signAndPublish, pubkey }) {
   const publish = useCallback(async content => {
     if (!content.trim()) return null;
     try {
-      return await signAndPublish({ kind: 1, content: content.trim(), tags: [] });
+      return await signAndPublish({ kind: 1, content: addNostrUriPrefixes(content.trim()), tags: [] });
     } catch { return null; }
   }, [signAndPublish]);
 
   const publishEvent = useCallback(async (tmpl, opts) => {
     try {
-      return await signAndPublish(tmpl, opts);
+      const event = isNoteLikeKind(tmpl?.kind) && typeof tmpl.content === "string"
+        ? { ...tmpl, content: addNostrUriPrefixes(tmpl.content) }
+        : tmpl;
+      return await signAndPublish(event, opts);
     } catch { return null; }
   }, [signAndPublish]);
 
