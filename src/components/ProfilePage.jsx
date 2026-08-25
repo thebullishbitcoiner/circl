@@ -158,7 +158,7 @@ export default function ProfilePage({
   pubkey, myPubkey, profiles: profilesProp, follows, events, isOwn,
   onBack, onOpenProfile, onOpenNote, onOpenThread, onOpenHashtag, onOpenZaps, onOpenReactions, onOpenReposts,
   myProfile, onPublish, publishEvent, publishHighlight, onPrepend, onBookmark, isBookmarked,
-  getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
+  getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, getLocalReposts, getLocalReplies,
   onRequestModal, onDismissModal, backLabel = "Your Circle", resolveEventById, showBack = true,
   onOpenCircle, onFollow, onUnfollow, onOpenPollVotes, onOpenArticle, onOpenStream, onOpenNip05Domain,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
@@ -1242,6 +1242,8 @@ export default function ProfilePage({
                     addLocalZap={addLocalZap}
                     getLocalReactions={getLocalReactions}
                     setLocalReaction={setLocalReaction}
+                    getLocalReposts={getLocalReposts}
+                    getLocalReplies={getLocalReplies}
                     sendZap={sendZap}
                     defaultZapAmount={defaultZapAmount}
                     defaultZapMsg={defaultZapMsg}
@@ -1278,7 +1280,7 @@ export default function ProfilePage({
                     resolveEventById={resolveEventById}
                     replyingToPubkey={replyingToPk}
                     liked={false} bookmarked={isBookmarked?.(e) || false} likeCount={0}
-                    replyCount={replyCount(e.id, mergedEvents)} repostCount={repostAndQuoteCount(e.id, mergedEvents)}
+                    replyCount={replyCount(e.id, mergedEvents, getLocalReplies?.(e.id))} repostCount={repostAndQuoteCount(e.id, mergedEvents, getLocalReposts?.(e.id))}
                     myPubkey={myPubkey} myProfile={myProfile}
                     onLike={() => {}} onBookmark={onBookmark}
                     onOpenProfile={onOpenProfile} onOpenThread={onOpenThread}
@@ -1416,6 +1418,8 @@ export default function ProfilePage({
                   addLocalZap={addLocalZap}
                   getLocalReactions={getLocalReactions}
                   setLocalReaction={setLocalReaction}
+                  getLocalReposts={getLocalReposts}
+                  getLocalReplies={getLocalReplies}
                   sendZap={sendZap}
                   defaultZapAmount={defaultZapAmount}
                   defaultZapMsg={defaultZapMsg}
@@ -1459,6 +1463,8 @@ export default function ProfilePage({
                   addLocalZap={addLocalZap}
                   getLocalReactions={getLocalReactions}
                   setLocalReaction={setLocalReaction}
+                  getLocalReposts={getLocalReposts}
+                  getLocalReplies={getLocalReplies}
                   sendZap={sendZap}
                   defaultZapAmount={defaultZapAmount}
                   defaultZapMsg={defaultZapMsg}

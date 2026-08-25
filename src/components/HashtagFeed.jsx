@@ -12,7 +12,7 @@ const HASHTAG_CACHE_TTL = 5 * 60 * 1000;
 export default function HashtagFeed({
   hashtag, profiles, onBack, onOpenProfile, onOpenThread, onOpenHashtag,
   myPubkey, myProfile, onBookmark, isBookmarked,
-  getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
+  getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, getLocalReposts, getLocalReplies,
   publishEvent, onPrepend, onOpenZaps, onOpenReactions, onOpenReposts,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail, resolveEventById,
   customEmojis,
@@ -92,8 +92,8 @@ export default function HashtagFeed({
           liked={false}
           bookmarked={isBookmarked?.(ev) || false}
           likeCount={0}
-          replyCount={replyCount(ev.id, notes)}
-          repostCount={repostAndQuoteCount(ev.id, notes)}
+          replyCount={replyCount(ev.id, notes, getLocalReplies?.(ev.id))}
+          repostCount={repostAndQuoteCount(ev.id, notes, getLocalReposts?.(ev.id))}
           myPubkey={myPubkey}
           myProfile={myProfile}
           onLike={() => {}}

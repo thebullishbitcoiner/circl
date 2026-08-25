@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { parseBolt11Msats, isHexPubkey, zapperPubkeyFromKind9735 } from "../utils.js";
+import { parseBolt11Msats, isHexPubkey, zapperPubkeyFromKind9735, isQuoteRepost, directReplyParentId } from "../utils.js";
 import { pool, eventStore, relayUrls$ } from "../nostr.js";
 
 // metaSub below shares one 500-event budget across every note from every
@@ -14,7 +14,7 @@ const STATS_BACKFILL_CHUNK = 100;
 // 1111 (NIP-22 comments) is included so replyCount() sees replies to kind-1
 // posts that clients like Amethyst now publish as comments instead of kind 1
 // — App.jsx's root-post filter already excludes them from rendering as cards.
-const MAIN_FEED_KINDS = [1, 6, 9802, 30023, 1068, 6969, 31922, 31923, 30311, 9041, 1111];
+const MAIN_FEED_KINDS = [1, 6, 16, 9802, 30023, 1068, 6969, 31922, 31923, 30311, 9041, 1111];
 
 function compareFeedEventsDesc(a, b) {
   const ta = Number(a?.created_at) || 0;
@@ -29,7 +29,7 @@ function sortFeedEventsChronological(events) {
   return [...events].sort(compareFeedEventsDesc);
 }
 
-export default function useFeed({ follows, setLocalReaction, addLocalZap, addLocalRepost }) {
+export default function useFeed({ follows, setLocalReaction, addLocalZap, addLocalRepost, addLocalReply }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const seen = useRef(new Set());
@@ -135,7 +135,7 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap, addLoc
     // ledger, which repostAndQuoteCount() unions with `events` by id so nothing
     // already counted from the live stream is double-counted.
     const handleBackfillEvent = raw => {
-      const isRepost = raw.kind === 6;
+      const isRepost = raw.kind === 6 || raw.kind === 16;
       const isQuote = raw.kind === 1 && raw.tags?.some(t => t[0] === "q");
       if (isRepost || isQuote) {
         eventStore.add(raw);
@@ -145,14 +145,26 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap, addLoc
         if (targetId) addLocalRepost?.(targetId, { id: raw.id, pubkey: raw.pubkey, kind: raw.kind });
         return;
       }
+      // Replies from authors outside `follows` are never fetched by mainSub, so
+      // this is the only place cards can learn about them without a thread visit.
+      // Not merged into `events` (same reasoning as reposts above) — only feeds
+      // the local reply-count ledger.
+      if ((raw.kind === 1 || raw.kind === 1111 || raw.kind === 1244) && !isQuoteRepost(raw)) {
+        const targetId = directReplyParentId(raw);
+        if (targetId) {
+          eventStore.add(raw);
+          addLocalReply?.(targetId, { id: raw.id });
+          return;
+        }
+      }
       handleMetaEvent(raw);
     };
 
     // Stats backfill sweep — see STATS_BACKFILL_INTERVAL_MS comment above.
     // Runs dedicated "#e"/"#q" fetches (no shared limit) for whatever notes
-    // are currently loaded into the feed, so reaction/zap/repost/quote counts
-    // are already accurate by the time a card scrolls into view instead of
-    // only resolving when its thread is opened.
+    // are currently loaded into the feed, so reaction/zap/repost/quote/reply
+    // counts are already accurate by the time a card scrolls into view instead
+    // of only resolving when its thread is opened.
     const backfilled = new Set();
     const backfillSubs = [];
     const backfillTick = () => {
@@ -163,7 +175,7 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap, addLoc
         const chunk = ids.slice(i, i + STATS_BACKFILL_CHUNK);
         backfillSubs.push(
           pool.group(relayUrls$, false).request([
-            { kinds: [6, 7, 9735], "#e": chunk },
+            { kinds: [6, 16, 7, 9735, 1, 1111, 1244], "#e": chunk },
             { kinds: [1], "#q": chunk },
           ]).subscribe({ next: handleBackfillEvent })
         );

@@ -20,7 +20,7 @@ export default function RepostCard({
   resolveEventById,
   onOpenProfile, onOpenThread, onOpenHashtag, onOpenZaps, onOpenReactions, onOpenReposts,
   onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
-  getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
+  getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, getLocalReposts, getLocalReplies,
   onRequestModal, onDismissModal, delay,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail, onOpenPollVotes,
   customEmojis,
@@ -160,6 +160,7 @@ export default function RepostCard({
                 onBookmark={onBookmark} isBookmarked={isBookmarked}
                 getLocalZaps={getLocalZaps} addLocalZap={addLocalZap}
                 getLocalReactions={getLocalReactions} setLocalReaction={setLocalReaction}
+                getLocalReposts={getLocalReposts} getLocalReplies={getLocalReplies}
                 onRequestModal={onRequestModal} onDismissModal={onDismissModal}
                 sendZap={sendZap} defaultZapAmount={defaultZapAmount}
                 defaultZapMsg={defaultZapMsg} onZapFail={onZapFail}

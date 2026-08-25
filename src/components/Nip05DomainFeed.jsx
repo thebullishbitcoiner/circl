@@ -56,7 +56,7 @@ export default function Nip05DomainFeed({
   domain, profiles: profilesProp, onBack, onOpenProfile, onOpenThread, onOpenHashtag, onOpenMembers,
   onOpenArticle,
   myPubkey, myProfile, onBookmark, isBookmarked,
-  getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
+  getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, getLocalReposts, getLocalReplies,
   publishEvent, onPrepend, onOpenZaps, onOpenReactions, onOpenReposts,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail, resolveEventById,
   customEmojis,
@@ -246,6 +246,8 @@ export default function Nip05DomainFeed({
           addLocalZap={addLocalZap}
           getLocalReactions={getLocalReactions}
           setLocalReaction={setLocalReaction}
+          getLocalReposts={getLocalReposts}
+          getLocalReplies={getLocalReplies}
           sendZap={sendZap}
           defaultZapAmount={defaultZapAmount}
           defaultZapMsg={defaultZapMsg}

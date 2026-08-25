@@ -31,7 +31,7 @@ export default function FeedItem({
   getLike, onLike,
   isBookmarked, onBookmark,
   onPublish, publishEvent, onPrepend,
-  getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, getLocalReposts,
+  getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, getLocalReposts, getLocalReplies,
   onRequestModal, onDismissModal,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
   customEmojis,
@@ -98,7 +98,7 @@ export default function FeedItem({
     onOpenThread, onOpenZaps, onOpenReactions, onOpenReposts,
     onPublish, publishEvent, onPrepend,
     onBookmark, isBookmarked,
-    getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, getLocalReposts,
+    getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, getLocalReposts, getLocalReplies,
     onRequestModal, onDismissModal,
     sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
     customEmojis,
@@ -143,6 +143,8 @@ export default function FeedItem({
         addLocalZap={addLocalZap}
         getLocalReactions={getLocalReactions}
         setLocalReaction={setLocalReaction}
+        getLocalReposts={getLocalReposts}
+        getLocalReplies={getLocalReplies}
         onRequestModal={onRequestModal}
         onDismissModal={onDismissModal}
         sendZap={sendZap}
@@ -294,7 +296,7 @@ export default function FeedItem({
       liked={like.liked}
       bookmarked={isBookmarked?.(event) || false}
       likeCount={like.count}
-      replyCount={replyCount(event.id, events)}
+      replyCount={replyCount(event.id, events, getLocalReplies?.(event.id))}
       repostCount={repostAndQuoteCount(event.id, events, getLocalReposts?.(event.id))}
       myPubkey={myPubkey}
       myProfile={myProfile}

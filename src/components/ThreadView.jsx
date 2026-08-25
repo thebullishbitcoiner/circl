@@ -209,7 +209,7 @@ function ThreadNoteRow({
   onOpenZaps, onOpenReactions, onOpenReposts,
   myPubkey, myProfile, onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
   publishHighlight,
-  getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, onRequestModal, onDismissModal,
+  getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, getLocalReposts, addLocalRepost, getLocalReplies, addLocalReply, onRequestModal, onDismissModal,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
   resolveEventById, onOpenPollVotes,
   focusRef, hasConnector = false,
@@ -405,7 +405,7 @@ function ThreadNoteRow({
           </div>
           {focused && (
             <FocusedStatsRow eventId={event.id} rCount={rCount} allEvents={allEvents}
-              zaps={zaps} reactions={reactions}
+              zaps={zaps} reactions={reactions} localReposts={getLocalReposts?.(event.id)}
               onOpenZaps={onOpenZaps} onOpenReactions={onOpenReactions} onOpenReposts={onOpenReposts} />
           )}
           {(focused || isParent || isReply || isSelf) && (
@@ -418,6 +418,8 @@ function ThreadNoteRow({
               onBookmark={onBookmark} isBookmarked={isBookmarked}
               getLocalZaps={getLocalZaps} addLocalZap={addLocalZap}
               getLocalReactions={getLocalReactions} setLocalReaction={setLocalReaction}
+              getLocalReposts={getLocalReposts}
+              getLocalReplies={getLocalReplies}
               onRequestModal={onRequestModal} onDismissModal={onDismissModal}
               sendZap={sendZap} defaultZapAmount={defaultZapAmount}
               defaultZapMsg={defaultZapMsg} onZapFail={onZapFail}
@@ -450,7 +452,7 @@ export default function ThreadView({
   onOpenZaps, onOpenReactions, onOpenReposts,
   myPubkey, myProfile, onPublish, publishEvent, onPrepend, onBookmark, isBookmarked,
   publishHighlight,
-  getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, onRequestModal, onDismissModal,
+  getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, getLocalReposts, addLocalRepost, getLocalReplies, addLocalReply, onRequestModal, onDismissModal,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
   resolveEventById, onOpenPollVotes,
   customEmojis,
@@ -545,6 +547,12 @@ export default function ThreadView({
         known.set(ev.id, ev);
         eventStore.add(ev);
         setFetchedEvents(prev => [...prev, ev]);
+        // Also feed the shared reply-count ledger so feed/profile cards for this
+        // note (which never run this dedicated #e fetch) can reflect the real
+        // count instead of only whatever their own passive pool already had.
+        if (directReplyParentId(ev) === focusedEvent.id) {
+          addLocalReply?.(focusedEvent.id, { id: ev.id });
+        }
       },
     });
     subs.push(replySub);
@@ -579,6 +587,24 @@ export default function ThreadView({
       },
     });
     subs.push(reactionFetch);
+
+    // Backfill all reposts/quotes for the focused event — the feed's follows-only,
+    // 48h-windowed pool (and its periodic #e/#q sweep) may never see this note at
+    // all when it's opened directly (e.g. via a permalink), so repost counts would
+    // otherwise silently undercount until/unless the note also surfaces in the feed.
+    const repostFetch = pool.request(relayUrls, [
+      { kinds: [6, 16], "#e": [focusedEvent.id] },
+      { kinds: [1], "#q": [focusedEvent.id] },
+    ]).subscribe({
+      next: raw => {
+        const isRepost = raw.kind === 6 || raw.kind === 16;
+        const isQuote = raw.kind === 1 && raw.tags?.some(t => t[0] === "q");
+        if (!isRepost && !isQuote) return;
+        eventStore.add(raw);
+        addLocalRepost?.(focusedEvent.id, { id: raw.id, pubkey: raw.pubkey, kind: raw.kind });
+      },
+    });
+    subs.push(repostFetch);
 
     return () => subs.forEach(s => s.unsubscribe());
   }, [focusedEvent.id]); // eslint-disable-line
@@ -621,7 +647,7 @@ export default function ThreadView({
     myPubkey, myProfile, onPublish, publishEvent, onPrepend,
     publishHighlight,
     onBookmark, isBookmarked, getLocalZaps, addLocalZap,
-    getLocalReactions, setLocalReaction, onRequestModal, onDismissModal,
+    getLocalReactions, setLocalReaction, getLocalReposts, addLocalRepost, getLocalReplies, addLocalReply, onRequestModal, onDismissModal,
     sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
     resolveEventById, onOpenPollVotes,
     threadMenuId, setThreadMenuId, onShowThreadJson: setThreadJsonEvent,

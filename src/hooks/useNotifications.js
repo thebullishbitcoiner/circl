@@ -4,14 +4,14 @@ import { pool, eventStore, eventLoader } from "../nostr.js";
 import { DEFAULT_RELAYS } from "../constants.js";
 import useMailboxes from "./useMailboxes.js";
 
-const NOTIF_KINDS = [1, 6, 7, 9735, 30023, 1018, 1111, 1244];
+const NOTIF_KINDS = [1, 6, 16, 7, 9735, 30023, 1018, 1111, 1244];
 const SINCE_SEC = 60 * 60 * 24 * 7;
 // Reactions/reposts/poll-votes carry the *actor's* p-tags, which some clients
 // (e.g. Amethyst) populate by copying every p-tag off the target note rather
 // than just its author. Relying on "#p": [pk] alone therefore misfires for
 // anyone merely mentioned in a note that later gets a reaction. Resolve the
 // actual target event and only keep the notification if its author is pk.
-const TARGET_KINDS = new Set([6, 7, 1018]);
+const TARGET_KINDS = new Set([6, 16, 7, 1018]);
 
 // Resolves (and caches) the author pubkey of an event referenced by id,
 // checking the local store before falling back to a relay fetch.
@@ -61,7 +61,7 @@ export function getNotificationSummary(ev) {
     return { headline: `zapped you ${amt} ${unit}`, detail: "", kind: "zap" };
   }
   if (kind === 1018) return { headline: "voted in your poll", detail: "", kind: "poll-vote" };
-  if (kind === 6) return { headline: "Reposted your note", detail: "", kind: "repost" };
+  if (kind === 6 || kind === 16) return { headline: "Reposted your note", detail: "", kind: "repost" };
   if (kind === 30023) {
     const t = parseArticle(ev).title;
     return { headline: "Mentioned you in an article", detail: t && t !== "Untitled" ? t : "", kind: "article" };

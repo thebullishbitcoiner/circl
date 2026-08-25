@@ -111,6 +111,7 @@ export default function App() {
   const [zapsByEvent, setZapsByEvent] = useState({});
   const [reactionsByEvent, setReactionsByEvent] = useState({});
   const [repostsByEvent, setRepostsByEvent] = useState({});
+  const [repliesByEvent, setRepliesByEvent] = useState({});
 
   const getLocalZaps = useCallback(
     eventId => zapsByEvent[eventId] ?? [],
@@ -162,11 +163,24 @@ export default function App() {
     });
   }, []);
 
+  const getLocalReplies = useCallback(
+    eventId => repliesByEvent[eventId] ?? [],
+    [repliesByEvent]
+  );
+  const addLocalReply = useCallback((eventId, reply) => {
+    setRepliesByEvent(prev => {
+      const current = prev[eventId] ?? [];
+      if (reply.id && current.some(r => r.id === reply.id)) return prev;
+      return { ...prev, [eventId]: [...current, reply] };
+    });
+  }, []);
+
   const { events, loading: el, prependEvent, isDeleted } = useFeed({
     follows,
     setLocalReaction,
     addLocalZap,
     addLocalRepost,
+    addLocalReply,
   });
   const { items: notificationEvents, loading: notifLoading } = useNotifications({ pubkey });
   const [bookmarkRefreshKey, setBookmarkRefreshKey] = useState(0);
@@ -837,6 +851,7 @@ export default function App() {
                                 getLocalReactions={getLocalReactions}
                                 setLocalReaction={setLocalReaction}
                                 getLocalReposts={getLocalReposts}
+                                getLocalReplies={getLocalReplies}
                                 sendZap={sendZap}
                                 defaultZapAmount={zapSettings.amount}
                                 defaultZapMsg={zapSettings.msg}
@@ -1080,6 +1095,8 @@ export default function App() {
                         profiles={profiles}
                         follows={follows}
                         events={mergedFeedPool}
+                        getLocalReposts={getLocalReposts}
+                        getLocalReplies={getLocalReplies}
                         isOwn={profileEntry.payload === pubkey}
                         backLabel={backLabel}
                         showBack={idx > 0 || !profileEntry.isTabRoot}
@@ -1317,6 +1334,10 @@ export default function App() {
                         addLocalZap={addLocalZap}
                         getLocalReactions={getLocalReactions}
                         setLocalReaction={setLocalReaction}
+                        getLocalReposts={getLocalReposts}
+                        addLocalRepost={addLocalRepost}
+                        getLocalReplies={getLocalReplies}
+                        addLocalReply={addLocalReply}
                         onRequestModal={setPanelModal}
                         onDismissModal={() => setPanelModal(null)}
                         sendZap={sendZap}
@@ -1616,6 +1637,8 @@ export default function App() {
                         onOpenHashtag={handleOpenHashtag}
                         myPubkey={pubkey}
                         myProfile={myProfile}
+                        getLocalReposts={getLocalReposts}
+                        getLocalReplies={getLocalReplies}
                         onBookmark={handleBookmark}
                         isBookmarked={isBookmarked}
                         getLocalZaps={getLocalZaps}
@@ -1661,6 +1684,8 @@ export default function App() {
                         addLocalZap={addLocalZap}
                         getLocalReactions={getLocalReactions}
                         setLocalReaction={setLocalReaction}
+                        getLocalReposts={getLocalReposts}
+                        getLocalReplies={getLocalReplies}
                         publishEvent={publishEvent}
                         onPrepend={prependEvent}
                         onOpenZaps={handleOpenZaps}

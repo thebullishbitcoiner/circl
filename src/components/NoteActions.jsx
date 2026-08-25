@@ -15,7 +15,7 @@ export default function NoteActions({
   replyCount: replyCountProp, repostCount: repostCountProp,
   onOpenThread, onOpenZaps, onOpenReactions, onOpenReposts,
   onPublish, onBookmark, isBookmarked, publishEvent, onPrepend,
-  getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction,
+  getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, getLocalReposts, getLocalReplies,
   onRequestModal, onDismissModal,
   sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail,
   customEmojis,
@@ -27,8 +27,8 @@ export default function NoteActions({
     const extra = additionalEventIds.flatMap(id => (getLocalReactions?.(id) ?? []).filter(r => !r.id || !seen.has(r.id)));
     return [...primaryReactions, ...extra];
   })();
-  const rCount = (replyCountProp ?? computeReplyCount(event.id, allEvents))
-    + (additionalEventIds.length ? additionalEventIds.reduce((s, id) => s + computeReplyCount(id, allEvents), 0) : 0);
+  const rCount = (replyCountProp ?? computeReplyCount(event.id, allEvents, getLocalReplies?.(event.id)))
+    + (additionalEventIds.length ? additionalEventIds.reduce((s, id) => s + computeReplyCount(id, allEvents, getLocalReplies?.(id)), 0) : 0);
   const primaryZaps = getLocalZaps?.(event.id) ?? [];
   const localZaps = additionalEventIds.length === 0 ? primaryZaps : (() => {
     const seen = new Set(primaryZaps.map(z => z.id).filter(Boolean));
@@ -161,7 +161,7 @@ export default function NoteActions({
             onMouseDown={e => { e.stopPropagation(); const t = setTimeout(() => { haptic.longPress(); openModal(<ComposeSheet quotedEvent={event} profiles={profiles} myPubkey={myPubkey} myProfile={myProfile} events={allEvents} publishEvent={publishEvent} onPrepend={onPrepend} onDismiss={dismiss} customEmojis={customEmojis} />); }, 600); window.addEventListener("mouseup", () => clearTimeout(t), { once: true }); }}
             onTouchStart={e => { e.stopPropagation(); const t = setTimeout(() => { haptic.longPress(); openModal(<ComposeSheet quotedEvent={event} profiles={profiles} myPubkey={myPubkey} myProfile={myProfile} events={allEvents} publishEvent={publishEvent} onPrepend={onPrepend} onDismiss={dismiss} customEmojis={customEmojis} />); }, 600); window.addEventListener("touchend", () => clearTimeout(t), { once: true }); }}
           >
-            <Rpi />{((repostCountProp ?? computeRepostCount(event.id, allEvents)) + additionalEventIds.reduce((s, id) => s + computeRepostCount(id, allEvents), 0)) || ""}
+            <Rpi />{((repostCountProp ?? computeRepostCount(event.id, allEvents, getLocalReposts?.(event.id))) + additionalEventIds.reduce((s, id) => s + computeRepostCount(id, allEvents, getLocalReposts?.(id)), 0)) || ""}
           </button>
           <button className={`action-btn${isBookmarked?.(event) ? " saved" : ""}`}
             onClick={e => { e.stopPropagation(); onBookmark?.(event); }}>

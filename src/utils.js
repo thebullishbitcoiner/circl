@@ -218,13 +218,22 @@ export const directReplyParentId = event => {
   return null;
 };
 
-export const replyCount = (eventId, pool) =>
-  pool.filter(e =>
-    (e.kind === 1 || e.kind === 1111 || e.kind === 1244) &&
-    e.id !== eventId &&
-    !isQuoteRepost(e) &&
-    directReplyParentId(e) === eventId
-  ).length;
+// localReplies is an optional list of {id} backfilled out-of-band (e.g. from a
+// thread-view visit that discovered replies outside the feed pool) — merged in
+// by id so anything already found in `pool` isn't double-counted.
+export const replyCount = (eventId, pool, localReplies = []) => {
+  const ids = new Set();
+  for (const e of pool) {
+    if (
+      (e.kind === 1 || e.kind === 1111 || e.kind === 1244) &&
+      e.id !== eventId &&
+      !isQuoteRepost(e) &&
+      directReplyParentId(e) === eventId
+    ) ids.add(e.id);
+  }
+  for (const r of localReplies) if (r?.id) ids.add(r.id);
+  return ids.size;
+};
 
 // localReposts is an optional list of {id} backfilled out-of-band (e.g. from
 // reposts/quotes by authors outside the feed pool) — merged in by event id so
@@ -232,7 +241,7 @@ export const replyCount = (eventId, pool) =>
 export const repostAndQuoteCount = (eventId, pool, localReposts = []) => {
   const ids = new Set();
   for (const e of pool) {
-    if (e.kind === 6 && e.tags.some(t => t[0] === "e" && t[1] === eventId)) ids.add(e.id);
+    if ((e.kind === 6 || e.kind === 16) && e.tags.some(t => t[0] === "e" && t[1] === eventId)) ids.add(e.id);
     else if (e.kind === 1 && e.id !== eventId && e.tags.some(t => t[0] === "q" && t[1] === eventId)) ids.add(e.id);
   }
   for (const r of localReposts) if (r?.id) ids.add(r.id);

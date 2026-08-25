@@ -32,7 +32,7 @@ function groupItems(items) {
   for (const ev of items) {
     const eTags = ev.tags?.filter(t => t[0] === "e") ?? [];
     const targetId = eTags[eTags.length - 1]?.[1];
-    if ((ev.kind === 7 || ev.kind === 6 || ev.kind === 1018) && targetId) {
+    if ((ev.kind === 7 || ev.kind === 6 || ev.kind === 16 || ev.kind === 1018) && targetId) {
       const key = `${ev.kind}:${targetId}`;
       if (seen.has(key)) {
         result[seen.get(key)].actors.push(ev);
