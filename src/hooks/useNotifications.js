@@ -4,7 +4,7 @@ import { pool, eventStore, eventLoader } from "../nostr.js";
 import { DEFAULT_RELAYS } from "../constants.js";
 import useMailboxes from "./useMailboxes.js";
 
-const NOTIF_KINDS = [1, 6, 7, 9735, 30023, 1018];
+const NOTIF_KINDS = [1, 6, 7, 9735, 30023, 1018, 1111, 1244];
 const SINCE_SEC = 60 * 60 * 24 * 7;
 // Reactions/reposts/poll-votes carry the *actor's* p-tags, which some clients
 // (e.g. Amethyst) populate by copying every p-tag off the target note rather
@@ -72,6 +72,8 @@ export function getNotificationSummary(ev) {
     if (inThread) return { headline: "Replied in a thread you're in", detail: "", kind: "reply" };
     return { headline: "Mentioned you", detail: "", kind: "mention" };
   }
+  if (kind === 1111) return { headline: "Replied in a comment thread you're in", detail: "", kind: "reply" };
+  if (kind === 1244) return { headline: "Replied in a voice thread you're in", detail: "", kind: "reply" };
   return { headline: "Activity", detail: "", kind: "other" };
 }
 

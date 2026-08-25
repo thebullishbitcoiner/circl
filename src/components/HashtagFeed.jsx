@@ -21,6 +21,11 @@ export default function HashtagFeed({
   const [loading, setLoading] = useState(true);
   const subRef = useRef(null);
 
+  // `notes` holds both kind 1 and kind 1111 (NIP-22 comment) matches so
+  // replyCount()/repostAndQuoteCount() can see comment-style replies that
+  // also carry this hashtag — but only kind-1 notes render as cards here.
+  const visibleNotes = notes.filter(e => e.kind === 1);
+
   useEffect(() => {
     if (!hashtag) return;
     const key = hashtag.toLowerCase();
@@ -37,7 +42,7 @@ export default function HashtagFeed({
     setLoading(true);
 
     // Use group(relays, false) so offline/not-yet-connected outbox relays are included
-    const sub = pool.group(relayUrls, false).request([{ kinds: [1], "#t": [key], limit: 100 }]).subscribe({
+    const sub = pool.group(relayUrls, false).request([{ kinds: [1, 1111], "#t": [key], limit: 100 }]).subscribe({
       next: ev => {
         eventStore.add(ev);
         setNotes(prev => {
@@ -63,20 +68,20 @@ export default function HashtagFeed({
         <span className="panel-bar-logo">#{hashtag}</span>
       </div>
 
-      {loading && notes.length === 0 && (
+      {loading && visibleNotes.length === 0 && (
         <div style={{ display: "flex", justifyContent: "center", padding: 40 }}>
           <div style={{ width: 22, height: 22, border: "2px solid var(--border)", borderTopColor: "var(--primary)", borderRadius: "50%", animation: "spin .7s linear infinite" }} />
         </div>
       )}
 
-      {!loading && notes.length === 0 && (
+      {!loading && visibleNotes.length === 0 && (
         <div className="empty-state" style={{ paddingTop: 48 }}>
           <div className="empty-state-title">No notes found</div>
           <div className="empty-state-sub">#{hashtag}</div>
         </div>
       )}
 
-      {notes.map((ev, i) => (
+      {visibleNotes.map((ev, i) => (
         <MutedNoteGate key={ev.id} event={ev} profiles={profiles} onOpenProfile={onOpenProfile}>
         <NoteCard
           key={ev.id}

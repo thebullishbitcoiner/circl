@@ -11,7 +11,10 @@ import { pool, eventStore, relayUrls$ } from "../nostr.js";
 const STATS_BACKFILL_INTERVAL_MS = 5_000;
 const STATS_BACKFILL_CHUNK = 100;
 
-const MAIN_FEED_KINDS = [1, 6, 9802, 30023, 1068, 6969, 31922, 31923, 30311, 9041];
+// 1111 (NIP-22 comments) is included so replyCount() sees replies to kind-1
+// posts that clients like Amethyst now publish as comments instead of kind 1
+// — App.jsx's root-post filter already excludes them from rendering as cards.
+const MAIN_FEED_KINDS = [1, 6, 9802, 30023, 1068, 6969, 31922, 31923, 30311, 9041, 1111];
 
 function compareFeedEventsDesc(a, b) {
   const ta = Number(a?.created_at) || 0;

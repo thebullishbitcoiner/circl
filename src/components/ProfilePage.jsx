@@ -48,7 +48,9 @@ import { readPinnedCache, writePinnedCache } from "../hooks/usePinnedNotes.js";
 const mediaCache = new Map(); // pubkey → { items, until, exhausted }
 
 const hasNonMentionETag = e => e.tags.some(t => t[0] === "e" && t[3] !== "mention");
-const isReplyEvent = e => e.kind === 1 && hasNonMentionETag(e) && !isQuoteRepost(e);
+// Kind 1111 (NIP-22 comment) events are always replies/comments — there's no
+// "root" 1111 the way a kind-1 note can stand alone.
+const isReplyEvent = e => (e.kind === 1 && hasNonMentionETag(e) && !isQuoteRepost(e)) || e.kind === 1111;
 
 function NpubCopy({ pubkey }) {
   const [copied, setCopied] = useState(false);
@@ -490,7 +492,7 @@ export default function ProfilePage({
     // Phase 1 — notes first (default tab); clears loading state when done.
     // Circle count fetch is deferred until after notes complete so the relay
     // prioritises the notes query and the tab populates without waiting for follows.
-    const notesSub = pool.request(relayUrls, [{ kinds: [1], authors: [pubkey], limit: 200 }]).subscribe({
+    const notesSub = pool.request(relayUrls, [{ kinds: [1, 1111], authors: [pubkey], limit: 200 }]).subscribe({
       next: raw => { eventStore.add(raw); byId.set(raw.id, raw); },
       complete: () => {
         flush();
@@ -849,7 +851,7 @@ export default function ProfilePage({
   const theirEvents = useMemo(
     () => mergedEvents.filter(e =>
       e.pubkey === pubkey &&
-      (e.kind === 1 || e.kind === 6 || e.kind === 9802 || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311 || e.kind === 9041 || e.kind === 9735 || e.kind === 30023) &&
+      (e.kind === 1 || e.kind === 1111 || e.kind === 6 || e.kind === 9802 || e.kind === 1068 || e.kind === 6969 || e.kind === 31922 || e.kind === 31923 || e.kind === 30311 || e.kind === 9041 || e.kind === 9735 || e.kind === 30023) &&
       !deletedIds.has(e.id)
     ),
     [mergedEvents, pubkey, deletedIds]

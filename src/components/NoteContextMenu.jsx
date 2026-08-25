@@ -45,8 +45,12 @@ export default function NoteContextMenu({ event, onClose, onViewJson, publishEve
   };
 
   // NIP-51 mute lists store the thread *root* id — resolve it from the NIP-10
-  // root marker so muting from any reply silences the whole thread.
-  const threadRootId = event.tags?.find(t => t[0] === "e" && t[3] === "root")?.[1] ?? event.id;
+  // root marker (kind 1) or the NIP-22 uppercase "E" tag (kind 1111/1244) so
+  // muting from any reply silences the whole thread.
+  const threadRootId =
+    event.tags?.find(t => t[0] === "e" && t[3] === "root")?.[1] ??
+    event.tags?.find(t => t[0] === "E")?.[1] ??
+    event.id;
   const threadMuted = mutedThreads?.includes(threadRootId);
   const canMuteThread = [1, 1111, 1244].includes(event.kind) && !!(onMuteThread || onUnmuteThread);
 

@@ -222,8 +222,12 @@ export default function NotificationsFeed({ items, profiles: propProfiles, onOpe
           }
           preview = zappedEv ? <NotePreview ev={zappedEv} profiles={profiles} /> : null;
         } else {
-          if (ev.kind === 1) {
-            const rootId = ev.tags?.find(t => t[0] === "e" && t[3] === "root")?.[1];
+          if (ev.kind === 1 || ev.kind === 1111 || ev.kind === 1244) {
+            // Kind-1 replies mark root via a lowercase "e" tag ("root" marker);
+            // NIP-22 comments (1111/1244) mark it via the uppercase "E" tag.
+            const rootId = ev.kind === 1
+              ? ev.tags?.find(t => t[0] === "e" && t[3] === "root")?.[1]
+              : ev.tags?.find(t => t[0] === "E")?.[1];
             const rootEv = rootId ? (evById.get(rootId) ?? eventStore.getTimeline([{ ids: [rootId] }])?.[0]) : null;
             if (rootEv?.kind === 6969) {
               headline = "Replied to your zap poll";

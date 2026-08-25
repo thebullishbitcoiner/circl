@@ -796,7 +796,11 @@ export default function App() {
                               ev.kind === 31922 ||
                               ev.kind === 31923 ||
                               ev.kind === 9041 ||
-                              !ev.tags.some(t => t[0] === "e" && t[3] !== "mention")
+                              // Kind 1111 (NIP-22 comment) is only fetched so replyCount()
+                              // can see it — it's never a root post, even when it lacks a
+                              // lowercase "e" tag (e.g. a top-level comment on an article,
+                              // which points at its parent via an "a" tag instead).
+                              (ev.kind !== 1111 && !ev.tags.some(t => t[0] === "e" && t[3] !== "mention"))
                             );
                         const visible = filtered.slice(0, visibleCount);
                         return (
