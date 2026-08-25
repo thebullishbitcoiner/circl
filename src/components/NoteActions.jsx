@@ -85,7 +85,7 @@ export default function NoteActions({
     const coords = zapAnimCoords.current;
     if (coords) openModal(<ZapAnimation cx={coords.cx} cy={coords.cy} onDone={dismiss} />);
     setTimeout(() => { addZap({ amount, msg }); doSendZap({ amount, msg }); }, 680);
-    if (event.pubkey !== myPubkey) broadcastEvent(event);
+    if (event.pubkey !== myPubkey) broadcastEvent(event, { silent: true });
   };
 
   const handleZapInstant = useCallback(() => {
@@ -95,7 +95,7 @@ export default function NoteActions({
       : null;
     if (coords) openModal(<ZapAnimation cx={coords.cx} cy={coords.cy} onDone={dismiss} />);
     setTimeout(() => { addZap({ amount: defaultZapAmount, msg: defaultZapMsg }); doSendZap({ amount: defaultZapAmount, msg: defaultZapMsg }); }, 680);
-    if (event.pubkey !== myPubkey) broadcastEvent(event);
+    if (event.pubkey !== myPubkey) broadcastEvent(event, { silent: true });
   }, [localZaps, defaultZapAmount, defaultZapMsg, doSendZap, event, myPubkey]);
 
   const publishReaction = useCallback((content, emojiTag) => {
@@ -110,7 +110,7 @@ export default function NoteActions({
     setReaction(emoji);
     if (setLocalReaction) setLocalReaction(event.id, myPubkey, emoji);
     publishReaction(emoji);
-    if (event.pubkey !== myPubkey) broadcastEvent(event);
+    if (event.pubkey !== myPubkey) broadcastEvent(event, { silent: true });
   }, [reaction, publishReaction, event, myPubkey]);
 
   const handleReactPick = useCallback(picked => {
@@ -121,7 +121,7 @@ export default function NoteActions({
     setReaction(displayEmoji);
     if (setLocalReaction) setLocalReaction(event.id, myPubkey, displayEmoji, emojiTag ? { tags: [emojiTag] } : {});
     publishReaction(displayEmoji, emojiTag);
-    if (event.pubkey !== myPubkey) broadcastEvent(event);
+    if (event.pubkey !== myPubkey) broadcastEvent(event, { silent: true });
   }, [publishReaction, event, myPubkey]);
 
   return (

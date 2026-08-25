@@ -318,7 +318,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
       for (const t of extractContentTags(finalContent, { existingPubkeys, excludedMentions })) tags.push(t);
       for (const et of emojiTags) tags.push(et);
       for (const m of media) { const t = imetaTagForMedia(m); if (t) tags.push(t); }
-      if (replyTo && replyTo.pubkey !== myPubkey) broadcastEvent(replyTo);
+      if (replyTo && replyTo.pubkey !== myPubkey) broadcastEvent(replyTo, { silent: true });
       const published = await publishEvent({ kind: isNip22Reply ? 1111 : 1, content: finalContent, tags }, { trackStatus: true });
       if (published) { onPrepend?.(published); deleteDraft(thisDraftId); }
     } else {

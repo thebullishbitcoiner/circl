@@ -159,13 +159,23 @@ export function publishWithStatus(relays, event, { label = "publish" } = {}) {
 
 // ── Broadcast ───────────────────────────────────────────────────────────────
 // Re-publish an already-signed event to all currently connected relays
-// (which include the user's own outbox relays after login), surfacing
-// per-relay progress through the same publish-status popup used for
-// composing notes.
+// (which include the user's own outbox relays after login).
+//
+// User-initiated broadcasts (the "Broadcast" menu item) surface per-relay
+// progress through the publish-status popup. Broadcasts that piggyback on
+// another action (rebroadcasting a note you just liked/zapped/replied to)
+// pass silent:true so they don't hijack that popup for a side effect.
 
-export function broadcastEvent(event) {
+export function broadcastEvent(event, { silent = false } = {}) {
   if (!event?.id || !event?.sig) return;
   const relays = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
+  if (silent) {
+    Promise.race([
+      pool.publish(relays, event),
+      new Promise(resolve => setTimeout(resolve, 8000)),
+    ]).catch(() => null);
+    return;
+  }
   publishWithStatus(relays, event, { label: "broadcast" });
 }
 
