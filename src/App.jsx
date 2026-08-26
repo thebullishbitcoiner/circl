@@ -204,9 +204,17 @@ export default function App() {
 
   const mergedFeedPool = useMemo(() => [...mergedFeedMap.values()], [mergedFeedMap]);
 
+  // Kept in a ref (rather than a useCallback dependency) so resolveEventById's
+  // identity stays stable across renders — the home feed updates mergedFeedMap
+  // continuously, and callers (e.g. quoted-note embeds) key effects off this
+  // function's identity, so a churning identity was cancelling in-flight
+  // embed fetches before the relay could respond.
+  const mergedFeedMapRef = useRef(mergedFeedMap);
+  useEffect(() => { mergedFeedMapRef.current = mergedFeedMap; }, [mergedFeedMap]);
+
   const resolveEventById = useCallback(async (eventId, relayHints = []) => {
     if (!eventId) return null;
-    const existing = mergedFeedMap.get(eventId);
+    const existing = mergedFeedMapRef.current.get(eventId);
     if (existing) return existing;
     // Fast path: event already known to the store from any prior fetch
     const stored = eventStore.getTimeline([{ ids: [eventId], limit: 1 }])?.[0];
@@ -231,7 +239,7 @@ export default function App() {
       });
       setTimeout(() => { if (!done) { done = true; sub.unsubscribe(); resolve(null); } }, 8000);
     });
-  }, [mergedFeedMap]);
+  }, []);
 
   const allPks = useMemo(() => {
     const seen = new Set();

@@ -253,19 +253,49 @@ function EmbeddedEvent({ event, profiles, onOpenProfile }) {
   );
 }
 
+function CopyableBech32({ label, value }) {
+  const [copied, setCopied] = useState(false);
+  const truncated = `${value.slice(0, 11)}…${value.slice(-11)}`;
+
+  const handleCopy = e => {
+    e.stopPropagation();
+    navigator.clipboard?.writeText(value).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <span>{label}: {truncated}</span>
+      <button
+        type="button"
+        onClick={handleCopy}
+        aria-label={`Copy ${label}`}
+        style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 3px", color: copied ? "var(--primary)" : "var(--text-faint)", transition: "color .2s", display: "flex", alignItems: "center", flexShrink: 0 }}
+      >
+        {copied
+          ? <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><polyline points="20 6 9 17 4 12" /></svg>
+          : <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+        }
+      </button>
+    </div>
+  );
+}
+
 function EmbeddedEventRef({ nevent }) {
   const data = decodeNevent(nevent);
   if (!data?.id) return null;
-  const shortId = `${data.id.slice(0, 12)}…${data.id.slice(-8)}`;
-  const author = data.author ? `${data.author.slice(0, 10)}…${data.author.slice(-8)}` : null;
+  let noteId = null, npub = null;
+  try { noteId = nip19.noteEncode(data.id); } catch {}
+  try { npub = data.author ? nip19.npubEncode(data.author) : null; } catch {}
   return (
     <div className="note-embed note-embed-ref" role="presentation">
       <div className="note-embed-head">
         <span className="note-embed-name">Referenced note</span>
       </div>
       <div className="note-embed-text">
-        <div>id: {shortId}</div>
-        {author && <div>author: {author}</div>}
+        {noteId && <CopyableBech32 label="note" value={noteId} />}
+        {npub && <CopyableBech32 label="author" value={npub} />}
       </div>
     </div>
   );
@@ -510,25 +540,30 @@ export default function NoteContent({
   const isCollapsed = shouldCollapse && !expanded;
   const isBigFont = bigFontShortNotes && textLength > 0 && textLength < BIG_FONT_THRESHOLD;
 
+  // Intentionally excludes `allEvents`/`resolvedRefs` from deps — both change on
+  // every unrelated feed update (allEvents is the live home-feed pool), and
+  // including them was tearing this effect down and rebuilding it before an
+  // in-flight resolveEventById() fetch could ever land, so quoted notes never
+  // resolved on a busy feed. `resolveEventById` itself already checks its own
+  // caches, so re-fetching an already-known id here just resolves instantly.
   useEffect(() => {
     if (!allowEmbeds || !resolveEventById || typeof content !== "string" || !/nostr:(nevent1|note1)/i.test(content)) return;
     const refs = [...content.matchAll(/nostr:(nevent1[023456789acdefghjklmnpqrstuvwxyz]+|note1[023456789acdefghjklmnpqrstuvwxyz]+)/ig)]
       .map(m => m[1]);
     if (!refs.length) return;
     let cancelled = false;
-    const known = new Set((allEvents || []).map(e => e.id));
     for (const nevent of refs) {
       const decoded = decodeNevent(nevent);
       const id = decoded?.id;
       const hints = decoded?.relays || [];
-      if (!id || known.has(id) || resolvedRefs[id]) continue;
+      if (!id) continue;
       Promise.resolve(resolveEventById(id, hints)).then(ev => {
         if (cancelled || !ev?.id) return;
         setResolvedRefs(prev => (prev[ev.id] ? prev : { ...prev, [ev.id]: ev }));
       }).catch(() => {});
     }
     return () => { cancelled = true; };
-  }, [content, allEvents, resolveEventById, resolvedRefs, allowEmbeds]);
+  }, [content, resolveEventById, allowEmbeds]);
 
   useEffect(() => {
     if (!allowEmbeds || typeof content !== "string" || !/nostr:naddr1/i.test(content)) return;
