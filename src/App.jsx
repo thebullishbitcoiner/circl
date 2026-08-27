@@ -32,6 +32,8 @@ import useIsMobile from "./hooks/useIsMobile.js";
 import useDarkMode from "./hooks/useDarkMode.js";
 import useTextSize from "./hooks/useTextSize.js";
 import useContentSettings from "./hooks/useContentSettings.js";
+import useFeedFilterSettings from "./hooks/useFeedFilterSettings.js";
+import { ALL_FEED_GROUP_IDS } from "./feedFilters.js";
 import useWallet from "./hooks/useWallet.js";
 import useZap from "./hooks/useZap.js";
 import useZapSettings from "./hooks/useZapSettings.js";
@@ -54,6 +56,7 @@ import HighlightCard from "./components/HighlightCard.jsx";
 import CalendarCard from "./components/CalendarCard.jsx";
 import EventDetailView from "./components/EventDetailView.jsx";
 import FeedItem from "./components/FeedItem.jsx";
+import FeedFilterModal from "./components/FeedFilterModal.jsx";
 import StreamCard from "./components/StreamCard.jsx";
 import StreamDetailView from "./components/StreamDetailView.jsx";
 import ComposeSheet from "./components/ComposeSheet.jsx";
@@ -82,7 +85,7 @@ import SwipePanel from "./components/SwipePanel.jsx";
 import ZapGoalPage from "./components/ZapGoalPage.jsx";
 import Avatar from "./components/Avatar.jsx";
 import NoteContent from "./components/NoteContent.jsx";
-import { SbHome, SbBell, SbBook, SbZap, SbSearch, SbWallet, NavHome, NavBell, NavBook, NavZap, NavSearch, NavWallet, Bk, SunI, MoonI, SettingsI, LogoutI } from "./components/icons.jsx";
+import { SbHome, SbBell, SbBook, SbZap, SbSearch, SbWallet, NavHome, NavBell, NavBook, NavZap, NavSearch, NavWallet, Bk, SunI, MoonI, SettingsI, LogoutI, FilterI } from "./components/icons.jsx";
 import { AudioProvider, useAudio } from "./contexts/AudioContext.jsx";
 import AudioPlayer from "./components/AudioPlayer.jsx";
 import AudioPlayerCard from "./components/AudioPlayerCard.jsx";
@@ -106,6 +109,8 @@ export default function App() {
   const { pubkey, status, error, login, logout, signAndPublish, privateRelayUrls } = useAuth();
   const isInnerCircl = useIsInnerCircl(pubkey);
   const { follows, loading: fl, follow: followPk, unfollow: unfollowPk, refresh: refreshFollows } = useFollows({ pubkey, signAndPublish });
+  const feedFilterSettings = useFeedFilterSettings();
+  const feedKindSet = useMemo(() => new Set(feedFilterSettings.feedKinds), [feedFilterSettings.feedKinds]);
 
   const [likes, setLikes] = useState({});
   const [zapsByEvent, setZapsByEvent] = useState({});
@@ -177,6 +182,7 @@ export default function App() {
 
   const { events, loading: el, prependEvent, isDeleted } = useFeed({
     follows,
+    feedKinds: feedFilterSettings.feedKinds,
     setLocalReaction,
     addLocalZap,
     addLocalRepost,
@@ -405,6 +411,7 @@ export default function App() {
     textSize, setTextSize,
     contentSettings,
     zapSettings, saveZapSettings,
+    feedFilterSettings,
   });
   const { balance: walletBalance, transactions: walletTxs, flow24h: walletFlow24h, hasMore: walletHasMore, loadMore: walletLoadMore, loadingMore: walletLoadingMore, loading: walletLoading, error: walletError, refresh: refreshWallet } = useWalletData(wallet);
   const [floatingCompose, setFloatingCompose] = useState(false);
@@ -415,6 +422,7 @@ export default function App() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [panelModal, setPanelModal] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [feedFilterOpen, setFeedFilterOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(20);
   const feedScrollRef = useRef(null);
 
@@ -794,6 +802,17 @@ export default function App() {
                     }}>{bookmarkFeedEvents.length}</span>
                   )}
                 </div>
+                {activeNav === "home" && (
+                  <button
+                    type="button"
+                    className={`feed-header-action${feedFilterSettings.kindGroups.length < ALL_FEED_GROUP_IDS.length ? " active" : ""}`}
+                    onClick={() => setFeedFilterOpen(true)}
+                    title="Feed filter"
+                    aria-label="Feed filter"
+                  >
+                    <FilterI s={18} />
+                  </button>
+                )}
               </div>
               <div className="feed-scroll" ref={feedScrollRef} onScroll={handleFeedScroll}
                 style={activeNav === "search" ? { display: "none" } : undefined}>
@@ -812,17 +831,22 @@ export default function App() {
                         const filtered = activeNav === "bookmarks"
                           ? displayEvs
                           : displayEvs.filter(ev =>
-                              ev.kind === 30023 ||
-                              ev.kind === 6 ||
-                              ev.kind === 9802 ||
-                              ev.kind === 31922 ||
-                              ev.kind === 31923 ||
-                              ev.kind === 9041 ||
-                              // Kind 1111 (NIP-22 comment) is only fetched so replyCount()
-                              // can see it — it's never a root post, even when it lacks a
-                              // lowercase "e" tag (e.g. a top-level comment on an article,
-                              // which points at its parent via an "a" tag instead).
-                              (ev.kind !== 1111 && !ev.tags.some(t => t[0] === "e" && t[3] !== "mention"))
+                              // Home-feed kind filter (FeedFilterModal). Stat-only
+                              // kinds (1 replies, 1111) are fetched regardless but
+                              // excluded here when their group is off.
+                              feedKindSet.has(ev.kind) && (
+                                ev.kind === 30023 ||
+                                ev.kind === 6 ||
+                                ev.kind === 9802 ||
+                                ev.kind === 31922 ||
+                                ev.kind === 31923 ||
+                                ev.kind === 9041 ||
+                                // Kind 1111 (NIP-22 comment) is only fetched so replyCount()
+                                // can see it — it's never a root post, even when it lacks a
+                                // lowercase "e" tag (e.g. a top-level comment on an article,
+                                // which points at its parent via an "a" tag instead).
+                                (ev.kind !== 1111 && !ev.tags.some(t => t[0] === "e" && t[3] !== "mention"))
+                              )
                             );
                         const visible = filtered.slice(0, visibleCount);
                         return (
@@ -1866,6 +1890,14 @@ export default function App() {
       </div>
 
       {panelModal && panelModal}
+
+      {feedFilterOpen && (
+        <FeedFilterModal
+          kindGroups={feedFilterSettings.kindGroups}
+          setKindGroups={feedFilterSettings.setKindGroups}
+          onClose={() => setFeedFilterOpen(false)}
+        />
+      )}
 
       {moreOpen && (
         <div className="overlay" onClick={() => setMoreOpen(false)}>

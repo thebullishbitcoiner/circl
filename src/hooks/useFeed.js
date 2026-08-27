@@ -29,7 +29,13 @@ function sortFeedEventsChronological(events) {
   return [...events].sort(compareFeedEventsDesc);
 }
 
-export default function useFeed({ follows, setLocalReaction, addLocalZap, addLocalRepost, addLocalReply }) {
+export default function useFeed({ follows, feedKinds, setLocalReaction, addLocalZap, addLocalRepost, addLocalReply }) {
+  // User-selected display kinds (from useFeedFilterSettings), falling back to the
+  // full known set. 1 and 1111 are always fetched so replyCount() stays accurate
+  // even when "Notes" is filtered out of the rendered feed.
+  const enabledKinds = (feedKinds && feedKinds.length) ? feedKinds : MAIN_FEED_KINDS;
+  const subKinds = [...new Set([...enabledKinds, 1, 1111])];
+  const subKindsKey = subKinds.join(",");
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const seen = useRef(new Set());
@@ -63,7 +69,8 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap, addLoc
       );
     }
 
-    const mainSub = pool.group(relayUrls$, false).subscription([{ kinds: MAIN_FEED_KINDS, authors, since, limit: 300 }]).subscribe({
+    const activeKinds = subKindsKey.split(",").map(Number);
+    const mainSub = pool.group(relayUrls$, false).subscription([{ kinds: activeKinds, authors, since, limit: 300 }]).subscribe({
       next: raw => {
         if (!MAIN_FEED_KINDS.includes(raw.kind)) return;
         eventStore.add(raw);
@@ -194,7 +201,7 @@ export default function useFeed({ follows, setLocalReaction, addLocalZap, addLoc
       metaSub.unsubscribe();
       deleteSub.unsubscribe();
     };
-  }, [(follows || []).filter(isHexPubkey).join(",")]);
+  }, [(follows || []).filter(isHexPubkey).join(","), subKindsKey]);
 
   const prependEvent = useCallback(e => {
     if (!e || !MAIN_FEED_KINDS.includes(e.kind) || seen.current.has(e.id)) return;
