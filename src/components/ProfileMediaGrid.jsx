@@ -45,10 +45,13 @@ const ProfileMediaGrid = memo(function ProfileMediaGrid({ visible = true, items,
   // Recreate the observer when visibility changes so isFirstFire resets correctly.
   // This prevents the sentinel's immediate-fire from triggering a load when switching
   // back to this tab with items already in state.
+  // hasItems is a dep because the sentinel isn't in the DOM until the first batch
+  // renders — without it the observer is never attached on the initial visit.
+  const hasItems = items.length > 0;
   useEffect(() => {
     if (!visible) return;
     const el = sentinelRef.current;
-    if (!el || exhausted) return;
+    if (!el || exhausted || !hasItems) return;
     let isFirstFire = true;
     const obs = new IntersectionObserver(
       entries => {
@@ -63,7 +66,7 @@ const ProfileMediaGrid = memo(function ProfileMediaGrid({ visible = true, items,
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [visible, exhausted, onLoadMore]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [visible, exhausted, hasItems, onLoadMore]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Nothing to preserve yet — safe to stay unmounted until first visit
   if (!visible && items.length === 0 && !loading) return null;
