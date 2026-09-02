@@ -246,6 +246,7 @@ export default function ProfilePage({
   const [emojiSetsLoading, setEmojiSetsLoading] = useState(false);
   const [visibleEmojiSets, setVisibleEmojiSets] = useState(10);
   const [emojiSetCompose,  setEmojiSetCompose]  = useState(null); // null | "new" | <event>
+  const [emojiSetMenuId,   setEmojiSetMenuId]   = useState(null);
   const emojiSetsFetchedRef = useRef(false);
 
   const handleBadgeAccept = async (awardEvent) => {
@@ -375,6 +376,7 @@ export default function ProfilePage({
     setEmojiSetsLoading(false);
     setVisibleEmojiSets(10);
     setEmojiSetCompose(null);
+    setEmojiSetMenuId(null);
     emojiSetsFetchedRef.current = false;
   }, [pubkey]);
 
@@ -1606,7 +1608,7 @@ export default function ProfilePage({
             : emojiSets.length === 0
               ? <div className="empty-state"><div className="empty-state-title">No emoji sets yet</div><div className="empty-state-sub">{isOwn ? "Create a set to share your custom emoji" : "Published emoji sets will appear here"}</div></div>
               : emojiSets.slice(0, visibleEmojiSets).map(ev => (
-                  <div key={ev.id} style={{ padding: "8px 12px 0" }}>
+                  <div key={ev.id} style={{ padding: "8px 12px 8px", position: "relative" }}>
                     <EmojiSetCard
                       event={ev}
                       profiles={profiles}
@@ -1615,12 +1617,25 @@ export default function ProfilePage({
                       hideHead
                     />
                     {isOwn && (
-                      <div style={{ display: "flex", gap: 14, padding: "4px 4px 0", fontFamily: "'DM Sans',sans-serif", fontSize: 12 }}>
-                        <button type="button" onClick={() => setEmojiSetCompose(ev)}
-                          style={{ background: "none", border: "none", color: "var(--primary)", cursor: "pointer", padding: 0 }}>Edit</button>
-                        <button type="button" onClick={() => handleDeleteEmojiSet(ev)}
-                          style={{ background: "none", border: "none", color: "#E05C8A", cursor: "pointer", padding: 0 }}>Delete</button>
-                      </div>
+                      <>
+                        <button type="button" className="note-card-menu-btn"
+                          style={{ position: "absolute", top: 22, right: 26, zIndex: 2 }}
+                          aria-label="Set options"
+                          onClick={e => { e.stopPropagation(); setEmojiSetMenuId(id => (id === ev.id ? null : ev.id)); }}>
+                          <span /><span /><span />
+                        </button>
+                        {emojiSetMenuId === ev.id && (
+                          <>
+                            <div style={{ position: "fixed", inset: 0, zIndex: 19 }} onClick={() => setEmojiSetMenuId(null)} />
+                            <div className="note-card-menu" style={{ top: 40, right: 24 }}>
+                              <button type="button" className="note-card-menu-item"
+                                onClick={() => { setEmojiSetMenuId(null); setEmojiSetCompose(ev); }}>Edit</button>
+                              <button type="button" className="note-card-menu-item note-card-menu-item--danger"
+                                onClick={() => { setEmojiSetMenuId(null); handleDeleteEmojiSet(ev); }}>Delete</button>
+                            </div>
+                          </>
+                        )}
+                      </>
                     )}
                   </div>
                 ))
