@@ -448,6 +448,7 @@ export default function App() {
     contentSettings,
     zapSettings, saveZapSettings,
     feedFilterSettings,
+    spamFilter,
   });
   const { balance: walletBalance, transactions: walletTxs, flow24h: walletFlow24h, hasMore: walletHasMore, loadMore: walletLoadMore, loadingMore: walletLoadingMore, loading: walletLoading, error: walletError, refresh: refreshWallet } = useWalletData(wallet);
   const [floatingCompose, setFloatingCompose] = useState(false);

@@ -12,7 +12,7 @@ const SETTINGS_D_TAG = "circl-settings";
 const SETTLE_CUTOFF_MS = 8000;
 const PUBLISH_DEBOUNCE_MS = 800;
 
-function buildSnapshot({ dark, textSize, contentSettings, zapSettings, feedFilterSettings }) {
+function buildSnapshot({ dark, textSize, contentSettings, zapSettings, feedFilterSettings, spamFilter }) {
   return {
     dark,
     textSize,
@@ -24,11 +24,19 @@ function buildSnapshot({ dark, textSize, contentSettings, zapSettings, feedFilte
     zapMsg: zapSettings.msg,
     zapPresets: zapSettings.presets,
     feedKindGroups: feedFilterSettings.kindGroups,
+    wotEnabled: spamFilter?.wotEnabled,
+    wotDunbar: spamFilter?.wotDunbar,
+    wotMainAccount: spamFilter?.wotMainAccount ?? null,
   };
 }
 
-function applySnapshot(settings, { setDark, setTextSize, contentSettings, saveZapSettings, feedFilterSettings }) {
+function applySnapshot(settings, { setDark, setTextSize, contentSettings, saveZapSettings, feedFilterSettings, spamFilter }) {
   if (Array.isArray(settings.feedKindGroups)) feedFilterSettings.setKindGroups(settings.feedKindGroups);
+  if (spamFilter) {
+    if (typeof settings.wotEnabled === "boolean") spamFilter.setWotEnabled(settings.wotEnabled);
+    if (typeof settings.wotDunbar === "number") spamFilter.setWotDunbar(settings.wotDunbar);
+    if ("wotMainAccount" in settings) spamFilter.setWotMainAccount(settings.wotMainAccount);
+  }
   if (typeof settings.dark === "boolean") setDark(settings.dark);
   if (typeof settings.textSize === "string") setTextSize(settings.textSize);
   if (typeof settings.bigFontShortNotes === "boolean") contentSettings.setBigFontShortNotes(settings.bigFontShortNotes);
@@ -57,6 +65,7 @@ export default function useAppSettingsSync({
   contentSettings,
   zapSettings, saveZapSettings,
   feedFilterSettings,
+  spamFilter,
 }) {
   const [settled, setSettled] = useState(false);
   // Snapshot (as published or as just loaded from relays) known to already
@@ -92,7 +101,7 @@ export default function useAppSettingsSync({
       // applySnapshot is about to write into the local hooks' state — using a
       // partial/stale base here would make the very next render look diverged
       // and trigger a spurious immediate re-publish.
-      const remoteSnapshot = { ...buildSnapshot({ dark, textSize, contentSettings, zapSettings, feedFilterSettings }), ...parsed };
+      const remoteSnapshot = { ...buildSnapshot({ dark, textSize, contentSettings, zapSettings, feedFilterSettings, spamFilter }), ...parsed };
       const localDark = readStoredDarkPreference();
       const keepLocalDark = typeof parsed.dark === "boolean"
         && isLocalDarkPreferenceNewer(localDark.updatedAt, raw.created_at);
@@ -100,7 +109,7 @@ export default function useAppSettingsSync({
         ? { ...remoteSnapshot, dark: localDark.dark }
         : remoteSnapshot;
 
-      applySnapshot(appliedSnapshot, { setDark, setTextSize, contentSettings, saveZapSettings, feedFilterSettings });
+      applySnapshot(appliedSnapshot, { setDark, setTextSize, contentSettings, saveZapSettings, feedFilterSettings, spamFilter });
       // Keep the relay snapshot as the comparison target when a newer local
       // theme wins, so the publish effect sends that preference upstream.
       syncedSnapshotRef.current = JSON.stringify(remoteSnapshot);
@@ -126,7 +135,7 @@ export default function useAppSettingsSync({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pubkey]);
 
-  const snapshot = buildSnapshot({ dark, textSize, contentSettings, zapSettings, feedFilterSettings });
+  const snapshot = buildSnapshot({ dark, textSize, contentSettings, zapSettings, feedFilterSettings, spamFilter });
   const snapshotKey = JSON.stringify(snapshot);
 
   useEffect(() => {
