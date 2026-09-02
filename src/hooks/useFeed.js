@@ -170,7 +170,7 @@ export default function useFeed({ follows, feedKinds, setLocalReaction, addLocal
         const targetId = directReplyParentId(raw) ?? idForCoord(directReplyParentCoord(raw));
         if (targetId) {
           eventStore.add(raw);
-          addLocalReply?.(targetId, { id: raw.id });
+          addLocalReply?.(targetId, { id: raw.id, pubkey: raw.pubkey });
           return;
         }
       }

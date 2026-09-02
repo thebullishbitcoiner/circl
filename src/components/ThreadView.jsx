@@ -451,6 +451,7 @@ function ThreadNoteRow({
               sendZap={sendZap} defaultZapAmount={defaultZapAmount}
               defaultZapMsg={defaultZapMsg} onZapFail={onZapFail}
               customEmojis={customEmojis}
+              hideFilteredHint
             />
           )}
     </div>
@@ -584,7 +585,7 @@ export default function ThreadView({
         // count instead of only whatever their own passive pool already had.
         if (directReplyParentId(ev) === focusedEvent.id
           || (focusedCoord && directReplyParentCoord(ev) === focusedCoord)) {
-          addLocalReply?.(focusedEvent.id, { id: ev.id });
+          addLocalReply?.(focusedEvent.id, { id: ev.id, pubkey: ev.pubkey });
         }
       },
     });
@@ -798,7 +799,7 @@ export default function ThreadView({
             onClick={() => setLowTrustOpen(v => !v)}
           >
             <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><polyline points="9 18 15 12 9 6" /></svg>
-            {visibleReplies.length > 0 ? "Show more replies" : "Replies outside your web of trust"}
+            WoT filtered
             <span className="thread-muted-toggle-count">{lowTrustReplies.length}</span>
           </button>
           {lowTrustOpen && lowTrustReplies.map(e => (

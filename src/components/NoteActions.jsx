@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Zi, Hi, Ri, Rpi, Bi } from "./icons.jsx";
 import { haptic, fmtSatsVal, replyCount as computeReplyCount, repostAndQuoteCount as computeRepostCount, addressableCoordinate } from "../utils.js";
+import { useNavigation } from "../context/NavigationContext.jsx";
 import { broadcastEvent } from "../nostr.js";
 import ZapBadges from "./ZapBadges.jsx";
 import ZapModal from "./ZapModal.jsx";
@@ -21,11 +22,31 @@ export default function NoteActions({
   customEmojis,
   additionalEventIds = [],
   addressableCoord,
+  hideFilteredHint = false,
 }) {
   // "kind:pubkey:d" coordinate for addressable events (30023/30030/30311/…) so
   // reactions, zaps and reposts attach to the replaceable event, not just one
   // version's id. Auto-detected from the event; kind-1 notes resolve to null.
   const coord = addressableCoord ?? addressableCoordinate(event);
+
+  const { isTrusted, wotActive } = useNavigation();
+  // Replies to this note from pubkeys outside your web of trust (collapsed in the
+  // thread view). Derived from the reply-count ledger, which carries the author.
+  const filteredReplyCount = (() => {
+    if (hideFilteredHint || !wotActive || !isTrusted) return 0;
+    const seen = new Set();
+    let n = 0;
+    for (const id of [event.id, ...additionalEventIds]) {
+      for (const r of getLocalReplies?.(id) ?? []) {
+        if (!r?.pubkey || (r.id && seen.has(r.id))) continue;
+        if (r.id) seen.add(r.id);
+        if (r.pubkey === myPubkey || r.pubkey === event.pubkey) continue;
+        if (!isTrusted(r.pubkey)) n++;
+      }
+    }
+    return n;
+  })();
+
   const primaryReactions = getLocalReactions?.(event.id) ?? [];
   const reactions = additionalEventIds.length === 0 ? primaryReactions : (() => {
     const seen = new Set(primaryReactions.map(r => r.id).filter(Boolean));
@@ -174,6 +195,16 @@ export default function NoteActions({
             <Bi f={!!isBookmarked?.(event)} />
           </button>
         </div>
+        {filteredReplyCount > 0 && (
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); onOpenThread?.(event); }}
+            style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, background: "none", border: "none", padding: 0, cursor: "pointer", color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", fontSize: 11.5 }}
+          >
+            <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+            {filteredReplyCount} {filteredReplyCount === 1 ? "reply" : "replies"} filtered
+          </button>
+        )}
       </div>
       {showZapModal && createPortal(<ZapModal event={event} profiles={profiles} defaultAmount={defaultZapAmount} defaultMsg={defaultZapMsg} onZap={handleZapFromModal} onDismiss={() => setShowZapModal(false)} />, document.body)}
       {localModal && createPortal(localModal, document.body)}
