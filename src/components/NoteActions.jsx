@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Zi, Hi, Ri, Rpi, Bi } from "./icons.jsx";
-import { haptic, fmtSatsVal, replyCount as computeReplyCount, repostAndQuoteCount as computeRepostCount, addressableCoordinate } from "../utils.js";
+import { haptic, fmtSatsVal, replyCountBreakdown, repostAndQuoteCount as computeRepostCount, addressableCoordinate } from "../utils.js";
 import { useNavigation } from "../context/NavigationContext.jsx";
 import { broadcastEvent } from "../nostr.js";
 import ZapBadges from "./ZapBadges.jsx";
@@ -13,7 +13,7 @@ import RepostSheet from "./RepostSheet.jsx";
 
 export default function NoteActions({
   event, profiles, myPubkey, myProfile, events: allEvents,
-  replyCount: replyCountProp, repostCount: repostCountProp,
+  repostCount: repostCountProp,
   onOpenThread, onOpenZaps, onOpenReactions, onOpenReposts,
   onPublish, onBookmark, isBookmarked, publishEvent, onPrepend,
   getLocalZaps, addLocalZap, getLocalReactions, setLocalReaction, getLocalReposts, getLocalReplies,
@@ -29,23 +29,17 @@ export default function NoteActions({
   // version's id. Auto-detected from the event; kind-1 notes resolve to null.
   const coord = addressableCoord ?? addressableCoordinate(event);
 
-  const { isTrusted, wotActive } = useNavigation();
-  // Replies to this note from pubkeys outside your web of trust (collapsed in the
-  // thread view). Derived from the reply-count ledger, which carries the author.
-  const filteredReplyCount = (() => {
-    if (hideFilteredHint || !wotActive || !isTrusted) return 0;
-    const seen = new Set();
-    let n = 0;
-    for (const id of [event.id, ...additionalEventIds]) {
-      for (const r of getLocalReplies?.(id) ?? []) {
-        if (!r?.pubkey || (r.id && seen.has(r.id))) continue;
-        if (r.id) seen.add(r.id);
-        if (r.pubkey === myPubkey || r.pubkey === event.pubkey) continue;
-        if (!isTrusted(r.pubkey)) n++;
-      }
-    }
-    return n;
-  })();
+  const { isTrusted, wotActive, isMuted } = useNavigation();
+  // A reply is hidden if its author is muted or (when WoT is active) outside your
+  // trust graph. You and the note's author always pass.
+  const replyHidden = pk =>
+    !!isMuted?.(pk) ||
+    (wotActive && !!isTrusted && !isTrusted(pk) && pk !== myPubkey && pk !== event.pubkey);
+  const replyStats = [event.id, ...additionalEventIds].reduce((acc, id) => {
+    const b = replyCountBreakdown(id, allEvents, getLocalReplies?.(id), replyHidden);
+    return { total: acc.total + b.total, hidden: acc.hidden + b.hidden, visible: acc.visible + b.visible };
+  }, { total: 0, hidden: 0, visible: 0 });
+  const filteredReplyCount = hideFilteredHint ? 0 : replyStats.hidden;
 
   const primaryReactions = getLocalReactions?.(event.id) ?? [];
   const reactions = additionalEventIds.length === 0 ? primaryReactions : (() => {
@@ -53,8 +47,7 @@ export default function NoteActions({
     const extra = additionalEventIds.flatMap(id => (getLocalReactions?.(id) ?? []).filter(r => !r.id || !seen.has(r.id)));
     return [...primaryReactions, ...extra];
   })();
-  const rCount = (replyCountProp ?? computeReplyCount(event.id, allEvents, getLocalReplies?.(event.id)))
-    + (additionalEventIds.length ? additionalEventIds.reduce((s, id) => s + computeReplyCount(id, allEvents, getLocalReplies?.(id)), 0) : 0);
+  const rCount = replyStats.visible;
   const primaryZaps = getLocalZaps?.(event.id) ?? [];
   const localZaps = additionalEventIds.length === 0 ? primaryZaps : (() => {
     const seen = new Set(primaryZaps.map(z => z.id).filter(Boolean));

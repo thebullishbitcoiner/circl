@@ -7,7 +7,7 @@ import FocusedStatsRow from "./FocusedStatsRow.jsx";
 import HighlightPopover from "./HighlightPopover.jsx";
 import HighlightSheet from "./HighlightSheet.jsx";
 import { Bk } from "./icons.jsx";
-import { displayName, nip05OrNpub, relativeTime, isQuoteRepost, replyCount, buildParentChain, buildSelfReplyChain, directReplyParentId, directReplyParentCoord, addressableCoordinate, parseBolt11Msats, zapperPubkeyFromKind9735, zapCommentFromKind9735 } from "../utils.js";
+import { displayName, nip05OrNpub, relativeTime, isQuoteRepost, replyCountBreakdown, buildParentChain, buildSelfReplyChain, directReplyParentId, directReplyParentCoord, addressableCoordinate, parseBolt11Msats, zapperPubkeyFromKind9735, zapCommentFromKind9735 } from "../utils.js";
 import useProfiles from "../hooks/useProfiles.js";
 import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
@@ -219,9 +219,12 @@ function ThreadNoteRow({
   customEmojis,
   emojiSetBookmarks = [], onAddEmojiSet, onRemoveEmojiSet,
 }) {
-  const { onOpenGoal, onOpenPoll, onOpenCalendarEvent, onOpenEmojiSet } = useNavigation();
+  const { onOpenGoal, onOpenPoll, onOpenCalendarEvent, onOpenEmojiSet, isTrusted, wotActive, isMuted } = useNavigation();
   const [savingSet, setSavingSet] = useState(false);
-  const rCount    = replyCount(event.id, allEvents);
+  const rCount = replyCountBreakdown(event.id, allEvents, getLocalReplies?.(event.id), pk =>
+    !!isMuted?.(pk) ||
+    (wotActive && !!isTrusted && !isTrusted(pk) && pk !== myPubkey && pk !== event.pubkey)
+  ).visible;
   const [highlightDraft, setHighlightDraft] = useState(null);
   const contentRef = useRef(null);
   const focused   = variant === "focused";

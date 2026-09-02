@@ -242,6 +242,25 @@ export const replyCount = (eventId, pool, localReplies = []) => {
   return ids.size;
 };
 
+// Like replyCount, but also reports how many of those replies are from authors
+// `isHidden(pubkey)` filters out (web of trust / mutes). Replies whose author is
+// unknown (older ledger entries without a pubkey) count as visible.
+export const replyCountBreakdown = (eventId, pool, localReplies = [], isHidden) => {
+  const byId = new Map(); // reply id -> author pubkey | null
+  for (const e of pool) {
+    if (
+      (e.kind === 1 || e.kind === 1111 || e.kind === 1244) &&
+      e.id !== eventId &&
+      !isQuoteRepost(e) &&
+      directReplyParentId(e) === eventId
+    ) byId.set(e.id, e.pubkey);
+  }
+  for (const r of localReplies) if (r?.id && !byId.has(r.id)) byId.set(r.id, r.pubkey ?? null);
+  let hidden = 0;
+  if (isHidden) for (const pk of byId.values()) if (pk && isHidden(pk)) hidden++;
+  return { total: byId.size, hidden, visible: byId.size - hidden };
+};
+
 // localReposts is an optional list of {id} backfilled out-of-band (e.g. from
 // reposts/quotes by authors outside the feed pool) — merged in by event id so
 // anything already found in `pool` isn't double-counted.
