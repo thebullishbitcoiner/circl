@@ -17,6 +17,7 @@ import { DEFAULT_RELAYS } from "../constants.js";
 import PollInline from "./PollInline.jsx";
 import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
 import CalendarInlineCard from "./CalendarInlineCard.jsx";
+import { EmojiSetCard } from "./EmojiSetView.jsx";
 
 // Remembers which row (parent/reply/self-reply) was clicked to open a sub-thread, keyed by
 // the root note's id, so navigating back can scroll that same row back into view. Keyed by
@@ -216,7 +217,7 @@ function ThreadNoteRow({
   threadMenuId, setThreadMenuId, onShowThreadJson,
   customEmojis,
 }) {
-  const { onOpenGoal, onOpenPoll, onOpenCalendarEvent } = useNavigation();
+  const { onOpenGoal, onOpenPoll, onOpenCalendarEvent, onOpenEmojiSet } = useNavigation();
   const rCount    = replyCount(event.id, allEvents);
   const [highlightDraft, setHighlightDraft] = useState(null);
   const contentRef = useRef(null);
@@ -285,6 +286,18 @@ function ThreadNoteRow({
           {(() => {
             if (event.kind === 1222 || event.kind === 1244) {
               return <ThreadVoicePlayer event={event} />;
+            }
+            if (event.kind === 30030) {
+              return (
+                <EmojiSetCard
+                  event={event}
+                  profiles={profiles}
+                  onOpenProfile={onOpenProfile}
+                  onOpen={ev => (onOpenEmojiSet ?? onOpenThread)?.(ev)}
+                  hideHead
+                  full={focused}
+                />
+              );
             }
             const isGoal    = event.kind === 9041;
             const isPoll    = event.kind === 1068 || event.kind === 6969;

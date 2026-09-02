@@ -4,6 +4,7 @@ import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteActions from "./NoteActions.jsx";
 import CalendarInlineCard from "./CalendarInlineCard.jsx";
+import { EmojiSetCard } from "./EmojiSetView.jsx";
 import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
 import { displayName, nip05OrNpub, relativeTime } from "../utils.js";
 import NoteContextMenu from "./NoteContextMenu.jsx";
@@ -27,7 +28,7 @@ function NoteCard({
   onOpenPollVotes,
   customEmojis,
 }) {
-  const { onOpenGoal, onOpenPoll, onOpenCalendarEvent } = useNavigation();
+  const { onOpenGoal, onOpenPoll, onOpenCalendarEvent, onOpenEmojiSet } = useNavigation();
   const [cardMenuOpen, setCardMenuOpen] = useState(false);
   const [jsonOpen, setJsonOpen] = useState(false);
   const [deleted, setDeleted] = useState(false);
@@ -125,6 +126,15 @@ function NoteCard({
                 onHighlight={draft => setHighlightDraft(draft)}
               />
             )}
+            {event.kind === 30030 ? (
+              <EmojiSetCard
+                event={event}
+                profiles={profiles}
+                onOpenProfile={onOpenProfile}
+                onOpen={ev => (onOpenEmojiSet ?? onOpenThread)?.(ev)}
+                hideHead
+              />
+            ) : (
             <NoteContent
               content={quotedSpecialEvent ? event.content.replace(/nostr:(?:note1|nevent1|naddr1)\S*/gi, "").trim() : event.content}
               tags={event.tags}
@@ -137,6 +147,7 @@ function NoteCard({
               allowEmbeds={!quotedSpecialEvent}
               collapsible
             />
+            )}
             </div>
             {quotedPollEvent && (() => {
               const isZapPoll = quotedPollEvent.kind === 6969;

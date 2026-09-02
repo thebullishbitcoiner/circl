@@ -12,6 +12,7 @@ import LongformInlineCard from "./LongformInlineCard.jsx";
 import StreamInlineCard from "./StreamInlineCard.jsx";
 import PodcastZapInlineCard from "./PodcastZapInlineCard.jsx";
 import HighlightInlineCard from "./HighlightInlineCard.jsx";
+import { EmojiSetCard } from "./EmojiSetView.jsx";
 import { pool, eventStore } from "../nostr.js";
 import { DEFAULT_RELAYS } from "../constants.js";
 
@@ -25,7 +26,7 @@ export default function RepostCard({
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail, onOpenPollVotes,
   customEmojis,
 }) {
-  const { onOpenCalendarEvent, onOpenPoll, onOpenGoal, onOpenArticle, onOpenStream } = useNavigation();
+  const { onOpenCalendarEvent, onOpenPoll, onOpenGoal, onOpenArticle, onOpenStream, onOpenEmojiSet } = useNavigation();
   const originalId   = event.tags.find(t => t[0] === "e")?.[1];
   const originalATag = event.tags.find(t => t[0] === "a")?.[1];
   const fromContent  = (() => { try { return JSON.parse(event.content); } catch { return null; } })();
@@ -67,6 +68,7 @@ export default function RepostCard({
         if (original.kind === 31922 || original.kind === 31923) { onOpenCalendarEvent?.(original); return; }
         if (original.kind === 30023) { onOpenArticle?.(original); return; }
         if (original.kind === 30311) { onOpenStream?.(original); return; }
+        if (original.kind === 30030) { (onOpenEmojiSet ?? onOpenThread)?.(original); return; }
         onOpenThread?.(original);
       }}>
       <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--text-faint)", marginBottom: 8, paddingLeft: 2 }}>
@@ -122,6 +124,8 @@ export default function RepostCard({
               ? <PodcastZapInlineCard event={original} profiles={profiles} onOpenProfile={onOpenProfile} onOpenStream={onOpenStream} />
               : original.kind === 9802
               ? <HighlightInlineCard event={original} profiles={profiles} onOpenThread={onOpenThread} onOpenArticle={onOpenArticle} resolveEventById={resolveEventById} />
+              : original.kind === 30030
+              ? <EmojiSetCard event={original} profiles={profiles} onOpenProfile={onOpenProfile} onOpen={ev => (onOpenEmojiSet ?? onOpenThread)?.(ev)} hideHead />
               : <NoteContent
                   content={original.content}
                   tags={original.tags}

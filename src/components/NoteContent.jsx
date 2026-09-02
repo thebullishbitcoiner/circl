@@ -14,7 +14,7 @@ import { pool, eventStore } from "../nostr.js";
 import { DEFAULT_RELAYS } from "../constants.js";
 import { useNavigation } from "../context/NavigationContext.jsx";
 import useContentSettings from "../hooks/useContentSettings.js";
-import { emojiSetInfo } from "./EmojiSetView.jsx";
+import { EmojiSetCard } from "./EmojiSetView.jsx";
 
 function ZapEmbed({ event, profiles, onOpenProfile }) {
   const [liveEvent, setLiveEvent]     = useState(null);
@@ -158,39 +158,13 @@ function EmbeddedEvent({ event, profiles, onOpenProfile }) {
   if (!event) return null;
 
   if (event.kind === 30030) {
-    const { title, emojis } = emojiSetInfo(event);
-    const shown = emojis.slice(0, 8);
-    const extra = emojis.length - shown.length;
     return (
-      <div
-        className="note-embed"
-        onClick={e => { e.stopPropagation(); (onOpenEmojiSet ?? onOpenThread)?.(event); }}
-        role="presentation"
-      >
-        <div className="note-embed-head">
-          <div onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }} role="presentation">
-            <Avatar pk={event.pubkey} profiles={profiles} size={20} />
-          </div>
-          <span className="note-embed-name" onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }} role="presentation">
-            {displayName(event.pubkey, profiles)}
-          </span>
-          <span className="poll-badge" style={{ marginLeft: "auto" }}>Emoji set</span>
-        </div>
-        <div className="note-embed-text" style={{ fontWeight: 600, marginBottom: emojis.length ? 6 : 0 }}>{title}</div>
-        {emojis.length > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            {shown.map(em => (
-              <img key={em.name} src={em.url} alt={em.name} title={`:${em.name}:`} loading="lazy" decoding="async" referrerPolicy="no-referrer"
-                style={{ width: 24, height: 24, objectFit: "contain", flexShrink: 0 }} />
-            ))}
-            {extra > 0 && (
-              <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 11, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
-                +{extra} more
-              </span>
-            )}
-          </div>
-        )}
-      </div>
+      <EmojiSetCard
+        event={event}
+        profiles={profiles}
+        onOpenProfile={onOpenProfile}
+        onOpen={ev => (onOpenEmojiSet ?? onOpenThread)?.(ev)}
+      />
     );
   }
   const isPoll = event.kind === 1068 || event.kind === 6969;
