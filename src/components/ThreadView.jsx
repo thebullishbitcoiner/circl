@@ -18,6 +18,7 @@ import PollInline from "./PollInline.jsx";
 import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
 import CalendarInlineCard from "./CalendarInlineCard.jsx";
 import { EmojiSetCard } from "./EmojiSet.jsx";
+import { recordFiltered } from "../spamFilterMetrics.js";
 
 // Remembers which row (parent/reply/self-reply) was clicked to open a sub-thread, keyed by
 // the root note's id, so navigating back can scroll that same row back into view. Keyed by
@@ -484,7 +485,7 @@ export default function ThreadView({
   customEmojis,
   emojiSetBookmarks = [], onAddEmojiSet, onRemoveEmojiSet,
 }) {
-  const { isMuted, isContentMuted } = useNavigation();
+  const { isMuted, isContentMuted, isTrusted, wotActive } = useNavigation();
   const containerRef = useRef(null);
   const focusRef     = useRef(null);
   const authorPk     = focusedEvent.pubkey;
@@ -495,6 +496,7 @@ export default function ThreadView({
   const [threadJsonEvent, setThreadJsonEvent] = useState(null);
   const [fetchedEvents, setFetchedEvents] = useState(() => threadEventCache.get(focusedEvent.id) ?? []);
   const [mutedRepliesOpen, setMutedRepliesOpen] = useState(false);
+  const [lowTrustOpen, setLowTrustOpen] = useState(false);
 
   // Consume (once) the "return to this row" request left by the sub-thread we came
   // back from. Cached replies (see threadEventCache above) mean the target row is
@@ -665,8 +667,20 @@ export default function ThreadView({
     if (contentReason && contentReason !== "thread") return true;
     return !!isMuted?.(e.pubkey);
   };
-  const visibleReplies = otherReplies.filter(e => !isReplyMuted(e));
+  const unmutedReplies = otherReplies.filter(e => !isReplyMuted(e));
   const mutedReplies   = otherReplies.filter(isReplyMuted);
+
+  // Web-of-Trust partition: replies from outside your trust graph are collapsed
+  // behind a "Show more" toggle. The thread author and you always pass.
+  const replyInWoT = e =>
+    !wotActive || e.pubkey === authorPk || e.pubkey === myPubkey || !!isTrusted?.(e.pubkey);
+  const visibleReplies  = unmutedReplies.filter(replyInWoT);
+  const lowTrustReplies = unmutedReplies.filter(e => !replyInWoT(e));
+
+  const lowTrustIds = lowTrustReplies.map(e => e.id).join(",");
+  useEffect(() => {
+    for (const e of lowTrustReplies) recordFiltered(e.id);
+  }, [lowTrustIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRowOpenThread = clickedEvent => {
     lastOpenedChildId.set(focusedEvent.id, clickedEvent.id);
@@ -764,8 +778,30 @@ export default function ThreadView({
 
       {visibleReplies.length > 0 && (
         <>
-          <div className="thread-replies-label">{visibleReplies.length} {visibleReplies.length === 1 ? "reply" : "replies"}</div>
+          <div className="thread-replies-label">
+            {visibleReplies.length} {visibleReplies.length === 1 ? "reply" : "replies"}
+            {lowTrustReplies.length > 0 && (
+              <span style={{ color: "var(--text-faint)", fontWeight: 400 }}> · {lowTrustReplies.length} filtered</span>
+            )}
+          </div>
           {visibleReplies.map(e => (
+            <ThreadNoteRow key={e.id} event={e} variant="reply" hasConnector={false} {...rowProps} />
+          ))}
+        </>
+      )}
+
+      {lowTrustReplies.length > 0 && (
+        <>
+          <button
+            type="button"
+            className={`thread-muted-toggle${lowTrustOpen ? " open" : ""}`}
+            onClick={() => setLowTrustOpen(v => !v)}
+          >
+            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><polyline points="9 18 15 12 9 6" /></svg>
+            {visibleReplies.length > 0 ? "Show more replies" : "Replies outside your web of trust"}
+            <span className="thread-muted-toggle-count">{lowTrustReplies.length}</span>
+          </button>
+          {lowTrustOpen && lowTrustReplies.map(e => (
             <ThreadNoteRow key={e.id} event={e} variant="reply" hasConnector={false} {...rowProps} />
           ))}
         </>

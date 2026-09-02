@@ -9,6 +9,7 @@ import CustomEmojiSettingsPage from "./CustomEmojiSettingsPage.jsx";
 import useContentSettings from "../hooks/useContentSettings.js";
 import ZapModal from "./ZapModal.jsx";
 import { displayName, hasNip44 } from "../utils.js";
+import { filteredLastHour } from "../spamFilterMetrics.js";
 import { pool } from "../nostr.js";
 import { DEV_LUD16, DEV_PUBKEY, DEFAULT_RELAYS } from "../constants.js";
 
@@ -1161,6 +1162,82 @@ function StorageSubPage({ onBack, pubkey }) {
   );
 }
 
+function SpamFilterSubPage({ onBack, spamFilter, wotCount, wotUpdatedAt, wotUpdating, onRefreshWot }) {
+  const [filteredHour, setFilteredHour] = useState(() => filteredLastHour());
+  useEffect(() => {
+    const t = setInterval(() => setFilteredHour(filteredLastHour()), 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  const dunbarOpts = [[250, "250"], [500, "500"], [1000, "1000"], [2000, "2000"], [0, "∞"]];
+  const enabled = spamFilter.wotEnabled;
+
+  return (
+    <SubPage title="Spam filtering" onBack={onBack}>
+      <div className="settings-row" onClick={() => spamFilter.setWotEnabled(!enabled)}>
+        <div>
+          <div className="settings-row-label">Web of Trust filter</div>
+          <div className="settings-row-sub">Filter replies and notifications to people you follow and people they follow</div>
+        </div>
+        <label className="toggle" onClick={e => e.stopPropagation()}>
+          <input type="checkbox" checked={enabled} onChange={() => spamFilter.setWotEnabled(!enabled)} />
+          <div className="toggle-track" />
+          <div className="toggle-thumb" />
+        </label>
+      </div>
+
+      {enabled && (
+        <div className="settings-row" style={{ alignItems: "flex-start", flexDirection: "column", gap: 8 }}>
+          <div>
+            <div className="settings-row-label">Nostr Dunbar Number</div>
+            <div className="settings-row-sub">Follow lists larger than this are treated as low quality and left out of your Web of Trust</div>
+          </div>
+          <div style={{ display: "flex", gap: 4, background: "var(--surface)", borderRadius: 8, padding: 3 }}>
+            {dunbarOpts.map(([val, label]) => (
+              <button key={val} onClick={e => { e.stopPropagation(); spamFilter.setWotDunbar(val); }}
+                style={{
+                  padding: "4px 12px", borderRadius: 6, border: "none", cursor: "pointer",
+                  background: spamFilter.wotDunbar === val ? "var(--bg)" : "transparent",
+                  color: spamFilter.wotDunbar === val ? "var(--text)" : "var(--text-faint)",
+                  fontFamily: "'DM Sans',sans-serif", fontSize: 12,
+                  fontWeight: spamFilter.wotDunbar === val ? 600 : 400,
+                  boxShadow: spamFilter.wotDunbar === val ? "0 1px 3px rgba(0,0,0,.1)" : "none",
+                  transition: "all .15s",
+                }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="settings-row" style={{ alignItems: "center" }}>
+        <div>
+          <div className="settings-row-label" style={{ fontWeight: 400, color: "var(--text-muted)", fontSize: 13 }}>
+            Last updated: {wotUpdatedAt ? new Date(wotUpdatedAt).toLocaleString() : "Never"}
+          </div>
+        </div>
+        {wotUpdating
+          ? <div style={{ width: 16, height: 16, border: "2px solid var(--border)", borderTopColor: "var(--primary)", borderRadius: "50%", animation: "spin .7s linear infinite" }} />
+          : <button type="button" onClick={e => { e.stopPropagation(); onRefreshWot?.(); }}
+              style={{ background: "none", border: "none", color: "var(--primary)", cursor: "pointer", fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 500 }}>
+              Update
+            </button>
+        }
+      </div>
+
+      <div style={{ padding: "10px 16px", fontSize: 12, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif", borderTop: "1px solid var(--border)" }}>
+        Currently allowed by the filter: {enabled && wotCount >= 1000 ? `${wotCount.toLocaleString()} contacts` : "Everyone"}
+      </div>
+      {enabled && wotCount >= 1000 && filteredHour > 0 && (
+        <div style={{ padding: "0 16px 12px", fontSize: 12, color: "var(--text-faint)", fontFamily: "'DM Sans',sans-serif" }}>
+          Filtered in the last hour: {filteredHour} {filteredHour === 1 ? "item" : "items"}
+        </div>
+      )}
+    </SubPage>
+  );
+}
+
 // ── Main settings page ────────────────────────────────────────────────────────
 
 export default function SettingsPage({
@@ -1168,6 +1245,7 @@ export default function SettingsPage({
   zapSettings = { amount: 21, msg: "" }, onSaveZapSettings,
   textSize = "medium", onTextSizeChange,
   signAndPublish,
+  spamFilter, wotCount = 0, wotUpdatedAt = null, wotUpdating = false, onRefreshWot,
   customEmojis, sets = [], addEmoji, removeEmoji, addSet, removeSet, customEmojiLoading,
   blossomServers = [], saveBlossomServers,
   profiles, sendZap, onZapFail,
@@ -1210,6 +1288,18 @@ export default function SettingsPage({
   }
   if (subPage === "blossom") {
     return <BlossomSubPage onBack={() => setSubPage(null)} servers={blossomServers} saveServers={saveBlossomServers} />;
+  }
+  if (subPage === "spam" && spamFilter) {
+    return (
+      <SpamFilterSubPage
+        onBack={() => setSubPage(null)}
+        spamFilter={spamFilter}
+        wotCount={wotCount}
+        wotUpdatedAt={wotUpdatedAt}
+        wotUpdating={wotUpdating}
+        onRefreshWot={onRefreshWot}
+      />
+    );
   }
   if (subPage === "storage") {
     return <StorageSubPage onBack={() => setSubPage(null)} pubkey={pubkey} />;
@@ -1258,6 +1348,18 @@ export default function SettingsPage({
         </div>
         <div style={{ color: "var(--text-muted)", fontSize: 18 }}>›</div>
       </div>
+
+      {spamFilter && (
+        <div className="settings-row" onClick={() => setSubPage("spam")}>
+          <div>
+            <div className="settings-row-label">Spam filtering</div>
+            <div className="settings-row-sub">
+              {spamFilter.wotEnabled ? "Web of Trust filter on" : "Web of Trust filter off"}
+            </div>
+          </div>
+          <div style={{ color: "var(--text-muted)", fontSize: 18 }}>›</div>
+        </div>
+      )}
 
       <div className="settings-row" onClick={() => setSubPage("relays")}>
         <div>

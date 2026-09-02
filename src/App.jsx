@@ -19,6 +19,9 @@ import { DEFAULT_RELAYS } from "./constants.js";
 import useFollows from "./hooks/useFollows.js";
 import useFeed from "./hooks/useFeed.js";
 import useNotifications from "./hooks/useNotifications.js";
+import useSpamFilterSettings from "./hooks/useSpamFilterSettings.js";
+import useWebOfTrust from "./hooks/useWebOfTrust.js";
+import { recordFiltered } from "./spamFilterMetrics.js";
 import useProfiles from "./hooks/useProfiles.js";
 import useBookmarks from "./hooks/useBookmarks.js";
 import usePinnedNotes from "./hooks/usePinnedNotes.js";
@@ -109,6 +112,14 @@ export default function App() {
   const { pubkey, status, error, login, logout, signAndPublish, privateRelayUrls } = useAuth();
   const isInnerCircl = useIsInnerCircl(pubkey);
   const { follows, loading: fl, follow: followPk, unfollow: unfollowPk, refresh: refreshFollows } = useFollows({ pubkey, signAndPublish });
+  const spamFilter = useSpamFilterSettings();
+  const wot = useWebOfTrust({
+    myPubkey: pubkey,
+    follows,
+    enabled: spamFilter.wotEnabled,
+    dunbar: spamFilter.wotDunbar,
+    mainAccount: spamFilter.wotMainAccount,
+  });
   const feedFilterSettings = useFeedFilterSettings();
   const feedKindSet = useMemo(() => new Set(feedFilterSettings.feedKinds), [feedFilterSettings.feedKinds]);
 
@@ -626,8 +637,16 @@ export default function App() {
   };
 
   const visibleNotifications = useMemo(
-    () => notificationEvents.filter(e => !isMuted(e.pubkey) && !isContentMuted(e)),
-    [notificationEvents, isMuted, isContentMuted]
+    () => notificationEvents.filter(e => {
+      if (isMuted(e.pubkey) || isContentMuted(e)) return false;
+      // Zaps always shown (payment is signal); everything else must be in WoT.
+      if (wot.wotActive && e.kind !== 9735 && !wot.isTrusted(e.pubkey)) {
+        recordFiltered(e.id);
+        return false;
+      }
+      return true;
+    }),
+    [notificationEvents, isMuted, isContentMuted, wot.wotActive, wot.isTrusted]
   );
 
   const hasUnread = (visibleNotifications[0]?.created_at ?? 0) > lastNotifSeenAt;
@@ -718,6 +737,8 @@ export default function App() {
       mutes,
       onTogglePin: handleTogglePin,
       isPinned,
+      isTrusted: wot.isTrusted,
+      wotActive: wot.wotActive,
     }}>
     <>
       <div className="app-shell">
@@ -1825,6 +1846,11 @@ export default function App() {
                   textSize={textSize}
                   onTextSizeChange={setTextSize}
                   signAndPublish={signAndPublish}
+                  spamFilter={spamFilter}
+                  wotCount={wot.count}
+                  wotUpdatedAt={wot.updatedAt}
+                  wotUpdating={wot.updating}
+                  onRefreshWot={wot.refresh}
                   customEmojis={customEmojis}
                   sets={customEmojiSets}
                   addEmoji={addEmoji}
