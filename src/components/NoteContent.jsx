@@ -14,7 +14,7 @@ import { pool, eventStore } from "../nostr.js";
 import { DEFAULT_RELAYS } from "../constants.js";
 import { useNavigation } from "../context/NavigationContext.jsx";
 import useContentSettings from "../hooks/useContentSettings.js";
-import { EmojiSetCard } from "./EmojiSetView.jsx";
+import { EmojiSetCard } from "./EmojiSet.jsx";
 
 function ZapEmbed({ event, profiles, onOpenProfile }) {
   const [liveEvent, setLiveEvent]     = useState(null);

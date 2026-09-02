@@ -4,7 +4,7 @@ import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import NoteActions from "./NoteActions.jsx";
 import CalendarInlineCard from "./CalendarInlineCard.jsx";
-import { EmojiSetCard } from "./EmojiSetView.jsx";
+import { EmojiSetCard } from "./EmojiSet.jsx";
 import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
 import { displayName, nip05OrNpub, relativeTime } from "../utils.js";
 import NoteContextMenu from "./NoteContextMenu.jsx";

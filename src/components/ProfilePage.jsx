@@ -36,7 +36,7 @@ import ListingDetail from "./ListingDetail.jsx";
 import VoiceMessageRow from "./VoiceMessageRow.jsx";
 import CreateListingSheet from "./CreateListingSheet.jsx";
 import CreateBadgeSheet from "./CreateBadgeSheet.jsx";
-import { EmojiSetCard } from "./EmojiSetView.jsx";
+import { EmojiSetCard } from "./EmojiSet.jsx";
 import EmojiSetComposeSheet from "./EmojiSetComposeSheet.jsx";
 import BadgeCard from "./BadgeCard.jsx";
 import BadgeDetail from "./BadgeDetail.jsx";

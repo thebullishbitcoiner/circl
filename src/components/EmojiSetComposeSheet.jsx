@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { sheetPortal } from "../utils/sheetPortal.js";
 import Overlay from "./Overlay.jsx";
-import { emojiSetInfo } from "./EmojiSetView.jsx";
+import { emojiSetInfo } from "./EmojiSet.jsx";
 
 const SHORTCODE_RE = /^[a-zA-Z0-9_-]+$/;
 

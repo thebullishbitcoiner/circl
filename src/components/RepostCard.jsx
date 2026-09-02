@@ -12,7 +12,7 @@ import LongformInlineCard from "./LongformInlineCard.jsx";
 import StreamInlineCard from "./StreamInlineCard.jsx";
 import PodcastZapInlineCard from "./PodcastZapInlineCard.jsx";
 import HighlightInlineCard from "./HighlightInlineCard.jsx";
-import { EmojiSetCard } from "./EmojiSetView.jsx";
+import { EmojiSetCard } from "./EmojiSet.jsx";
 import { pool, eventStore } from "../nostr.js";
 import { DEFAULT_RELAYS } from "../constants.js";
 

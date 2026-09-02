@@ -17,7 +17,7 @@ import { DEFAULT_RELAYS } from "../constants.js";
 import PollInline from "./PollInline.jsx";
 import ZapGoalProgressBlock from "./ZapGoalProgressBlock.jsx";
 import CalendarInlineCard from "./CalendarInlineCard.jsx";
-import { EmojiSetCard } from "./EmojiSetView.jsx";
+import { EmojiSetCard } from "./EmojiSet.jsx";
 
 // Remembers which row (parent/reply/self-reply) was clicked to open a sub-thread, keyed by
 // the root note's id, so navigating back can scroll that same row back into view. Keyed by
@@ -216,8 +216,10 @@ function ThreadNoteRow({
   focusRef, hasConnector = false,
   threadMenuId, setThreadMenuId, onShowThreadJson,
   customEmojis,
+  emojiSetBookmarks = [], onAddEmojiSet, onRemoveEmojiSet,
 }) {
   const { onOpenGoal, onOpenPoll, onOpenCalendarEvent, onOpenEmojiSet } = useNavigation();
+  const [savingSet, setSavingSet] = useState(false);
   const rCount    = replyCount(event.id, allEvents);
   const [highlightDraft, setHighlightDraft] = useState(null);
   const contentRef = useRef(null);
@@ -288,6 +290,9 @@ function ThreadNoteRow({
               return <ThreadVoicePlayer event={event} />;
             }
             if (event.kind === 30030) {
+              const setAddr = `30030:${event.pubkey}:${event.tags.find(t => t[0] === "d")?.[1] ?? ""}`;
+              const saved = emojiSetBookmarks.some(s => s.aTag === setAddr);
+              const canBookmark = focused && event.pubkey !== myPubkey && (onAddEmojiSet || onRemoveEmojiSet);
               return (
                 <EmojiSetCard
                   event={event}
@@ -296,6 +301,14 @@ function ThreadNoteRow({
                   onOpen={ev => (onOpenEmojiSet ?? onOpenThread)?.(ev)}
                   hideHead
                   full={focused}
+                  bookmark={canBookmark ? {
+                    saved, saving: savingSet,
+                    onToggle: async () => {
+                      setSavingSet(true);
+                      try { if (saved) await onRemoveEmojiSet?.(setAddr); else await onAddEmojiSet?.(event); }
+                      finally { setSavingSet(false); }
+                    },
+                  } : null}
                 />
               );
             }
@@ -469,6 +482,7 @@ export default function ThreadView({
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail,
   resolveEventById, onOpenPollVotes,
   customEmojis,
+  emojiSetBookmarks = [], onAddEmojiSet, onRemoveEmojiSet,
 }) {
   const { isMuted, isContentMuted } = useNavigation();
   const containerRef = useRef(null);
@@ -671,6 +685,7 @@ export default function ThreadView({
     resolveEventById, onOpenPollVotes,
     threadMenuId, setThreadMenuId, onShowThreadJson: setThreadJsonEvent,
     customEmojis,
+    emojiSetBookmarks, onAddEmojiSet, onRemoveEmojiSet,
   };
 
   useEffect(() => {

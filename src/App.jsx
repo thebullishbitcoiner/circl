@@ -52,7 +52,6 @@ import PollInline from "./components/PollInline.jsx";
 import NoteActions from "./components/NoteActions.jsx";
 import NavigationContext from "./context/NavigationContext.jsx";
 import ArticleReader from "./components/ArticleReader.jsx";
-import EmojiSetView from "./components/EmojiSetView.jsx";
 import HighlightCard from "./components/HighlightCard.jsx";
 import CalendarCard from "./components/CalendarCard.jsx";
 import EventDetailView from "./components/EventDetailView.jsx";
@@ -363,7 +362,31 @@ export default function App() {
     pushNav({ type: "circle", payload: { pubkey: cpk, follows: cFollows } });
   const handleOpenNote = event => pushNav({ type: "note", payload: event });
   const handleOpenArticle = event => pushNav({ type: "article", payload: event });
-  const handleOpenEmojiSet = event => { setSettingsOpen(false); pushNav({ type: "emoji-set", payload: event }); };
+  // Emoji sets (kind 30030) open in the thread view — the focused row renders the
+  // full set and its comments/reactions/zaps below. A set passed without an id
+  // (e.g. rebuilt from a settings bookmark) is resolved by its coordinate first.
+  const handleOpenEmojiSet = async event => {
+    setSettingsOpen(false);
+    let ev = event;
+    if (!ev?.id && ev?.pubkey) {
+      const d = ev.tags?.find(t => t[0] === "d")?.[1] ?? "";
+      const filter = { kinds: [30030], authors: [ev.pubkey], "#d": [d], limit: 1 };
+      const cached = eventStore.getTimeline([filter])?.[0];
+      if (cached) ev = cached;
+      else {
+        const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
+        ev = await new Promise(resolve => {
+          let done = false;
+          const sub = pool.request(relayUrls, [filter]).subscribe({
+            next: raw => { if (!done) { done = true; eventStore.add(raw); resolve(raw); } },
+            complete: () => { if (!done) { done = true; resolve(null); } },
+          });
+          setTimeout(() => { if (!done) { done = true; sub.unsubscribe(); resolve(null); } }, 6000);
+        }) || event;
+      }
+    }
+    pushNav({ type: "thread", payload: ev });
+  };
   const handleOpenThread  = event => pushNav({ type: "thread",  payload: event });
   const handleOpenGoal            = event => pushNav({ type: "goal",     payload: event });
   const handleOpenCalendarEvent   = event => pushNav({ type: "calendar", payload: event });
@@ -1343,54 +1366,6 @@ export default function App() {
                     );
                   }
 
-                  if (top.type === "emoji-set") {
-                    const p = top.payload;
-                    return (
-                      <EmojiSetView
-                        key={p.id ?? p.tags?.find(t => t[0] === "d")?.[1] ?? "emoji-set"}
-                        event={p}
-                        profiles={profiles}
-                        onBack={handleBack}
-                        onOpenProfile={handleOpenProfile}
-                        mySets={customEmojiSets}
-                        onAddSet={addEmojiSet}
-                        onRemoveSet={removeEmojiSet}
-                        myPubkey={pubkey}
-                        myProfile={myProfile}
-                        events={mergedFeedPool}
-                        publishEvent={publishEvent}
-                        onPrepend={prependEvent}
-                        onPublish={prependEvent}
-                        getLocalZaps={getLocalZaps}
-                        addLocalZap={addLocalZap}
-                        getLocalReactions={getLocalReactions}
-                        setLocalReaction={setLocalReaction}
-                        getLocalReposts={getLocalReposts}
-                        addLocalRepost={addLocalRepost}
-                        getLocalReplies={getLocalReplies}
-                        addLocalReply={addLocalReply}
-                        onRequestModal={setPanelModal}
-                        onDismissModal={() => setPanelModal(null)}
-                        onOpenThread={handleOpenThread}
-                        onOpenZaps={handleOpenZaps}
-                        onOpenReactions={handleOpenReactions}
-                        onOpenReposts={handleOpenReposts}
-                        sendZap={sendZap}
-                        defaultZapAmount={zapSettings.amount}
-                        defaultZapMsg={zapSettings.msg}
-                        onZapFail={reason => showToast(
-                          reason === "no_lud16"  ? "⚡ No lightning address" :
-                          reason === "no_wallet" ? "⚡ No wallet connected" :
-                          `⚡ Zap failed: ${reason}`
-                        )}
-                        onBookmark={handleBookmark}
-                        isBookmarked={isBookmarked}
-                        customEmojis={allCustomEmojis}
-                        showToast={showToast}
-                      />
-                    );
-                  }
-
                   if (top.type === "thread") {
                     return (
                       <ThreadView
@@ -1433,6 +1408,9 @@ export default function App() {
                         )}                        resolveEventById={resolveEventById}
                         onOpenPollVotes={handleOpenPollVotes}
                         customEmojis={allCustomEmojis}
+                        emojiSetBookmarks={customEmojiSets}
+                        onAddEmojiSet={addEmojiSet}
+                        onRemoveEmojiSet={removeEmojiSet}
                       />
                     );
                   }
