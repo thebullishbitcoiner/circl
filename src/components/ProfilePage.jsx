@@ -36,6 +36,8 @@ import ListingDetail from "./ListingDetail.jsx";
 import VoiceMessageRow from "./VoiceMessageRow.jsx";
 import CreateListingSheet from "./CreateListingSheet.jsx";
 import CreateBadgeSheet from "./CreateBadgeSheet.jsx";
+import { EmojiSetCard } from "./EmojiSetView.jsx";
+import EmojiSetComposeSheet from "./EmojiSetComposeSheet.jsx";
 import BadgeCard from "./BadgeCard.jsx";
 import BadgeDetail from "./BadgeDetail.jsx";
 import BadgeDefDetail from "./BadgeDefDetail.jsx";
@@ -169,7 +171,7 @@ export default function ProfilePage({
   onOpenProfileSearch,
   blossomServers = [],
 }) {
-  const { isMuted } = useNavigation();
+  const { isMuted, onOpenEmojiSet } = useNavigation();
   const isProfileMuted = isMuted?.(pubkey);
   const [mutedRevealed, setMutedRevealed] = useState(false);
 
@@ -239,6 +241,12 @@ export default function ProfilePage({
   const [voiceLoadingMore,     setVoiceLoadingMore]     = useState(false);
   const voiceFetchedRef  = useRef(false);
   const voiceUntilRef    = useRef(null);
+
+  const [emojiSetEvents,   setEmojiSetEvents]   = useState([]);
+  const [emojiSetsLoading, setEmojiSetsLoading] = useState(false);
+  const [visibleEmojiSets, setVisibleEmojiSets] = useState(10);
+  const [emojiSetCompose,  setEmojiSetCompose]  = useState(null); // null | "new" | <event>
+  const emojiSetsFetchedRef = useRef(false);
 
   const handleBadgeAccept = async (awardEvent) => {
     const aTag = awardEvent.tags?.find(t => t[0] === "a")?.[1];
@@ -363,6 +371,11 @@ export default function ProfilePage({
     setSelectedBadgeDef(null);
     setCreatedBadgesOpen(true);
     setNotAcceptedOpen(false);
+    setEmojiSetEvents([]);
+    setEmojiSetsLoading(false);
+    setVisibleEmojiSets(10);
+    setEmojiSetCompose(null);
+    emojiSetsFetchedRef.current = false;
   }, [pubkey]);
 
   useEffect(() => {
@@ -458,6 +471,7 @@ export default function ProfilePage({
   const repliesLenRef  = useRef(0);
   const articlesLenRef = useRef(0);
   const pollsLenRef    = useRef(0);
+  const emojiSetsLenRef = useRef(0);
   useEffect(() => { renderedTabRef.current = tab; }, [tab]);
 
   const handleProfileScroll = useCallback(e => {
@@ -471,6 +485,8 @@ export default function ProfilePage({
       setVisibleArticles(n => Math.min(n + 10, articlesLenRef.current));
     else if (renderedTabRef.current === "polls")
       setVisiblePolls(n => Math.min(n + 10, pollsLenRef.current));
+    else if (renderedTabRef.current === "emojisets")
+      setVisibleEmojiSets(n => Math.min(n + 10, emojiSetsLenRef.current));
   }, []);
 
   useEffect(() => {
@@ -735,6 +751,45 @@ export default function ProfilePage({
     return () => { cancelled = true; };
   }, [pubkey, tab]);
 
+  // Emoji sets (NIP-51 kind 30030): lazy-load when the tab is first opened.
+  useEffect(() => {
+    if (!pubkey || tab !== "emojisets" || emojiSetsFetchedRef.current) return;
+    emojiSetsFetchedRef.current = true;
+    let cancelled = false;
+    const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
+    setEmojiSetsLoading(true);
+    const accum = [];
+    pool.request(relayUrls, [{ kinds: [30030], authors: [pubkey], limit: 200 }]).subscribe({
+      next: raw => {
+        if (cancelled) return;
+        try { eventStore.add(raw); } catch {}
+        if (!accum.some(e => e.id === raw.id)) accum.push(raw);
+      },
+      complete: () => { if (!cancelled) { setEmojiSetEvents(accum); setEmojiSetsLoading(false); } },
+      error:    () => { if (!cancelled) setEmojiSetsLoading(false); },
+    });
+    return () => { cancelled = true; };
+  }, [pubkey, tab]);
+
+  const handleEmojiSetSaved = useCallback(ev => {
+    setEmojiSetEvents(prev => {
+      const d = ev.tags.find(t => t[0] === "d")?.[1] ?? "";
+      const rest = prev.filter(e => (e.tags.find(t => t[0] === "d")?.[1] ?? "") !== d);
+      return [ev, ...rest];
+    });
+    setEmojiSetCompose(null);
+  }, []);
+
+  const handleDeleteEmojiSet = useCallback(async ev => {
+    const d = ev.tags.find(t => t[0] === "d")?.[1] ?? "";
+    const addr = `30030:${ev.pubkey}:${d}`;
+    try {
+      await publishEvent?.({ kind: 5, content: "", tags: [["a", addr], ["e", ev.id], ["k", "30030"]] });
+      setDeletedIds(prev => new Set([...prev, ev.id]));
+      setDeletedAddrs(prev => new Set([...prev, addr]));
+    } catch { /* leave the row; relay rejected the deletion */ }
+  }, [publishEvent]);
+
   const loadMoreVoice = () => {
     if (voiceLoadingMore || !voiceHasMore || !voiceUntilRef.current || !pubkey) return;
     setVoiceLoadingMore(true);
@@ -906,6 +961,18 @@ export default function ProfilePage({
     [mergedEvents, pubkey, deletedIds]
   );
 
+  const emojiSets = useMemo(() => {
+    const byD = new Map();
+    for (const e of emojiSetEvents) {
+      if (deletedIds.has(e.id)) continue;
+      const d = e.tags.find(t => t[0] === "d")?.[1] ?? "";
+      if (deletedAddrs.has(`30030:${e.pubkey}:${d}`)) continue;
+      const cur = byD.get(d);
+      if (!cur || e.created_at > cur.created_at) byD.set(d, e);
+    }
+    return [...byD.values()].sort((a, b) => b.created_at - a.created_at);
+  }, [emojiSetEvents, deletedIds, deletedAddrs]);
+
   const polls = useMemo(
     () => mergedEvents
       .filter(e => e.pubkey === pubkey && (e.kind === 1068 || e.kind === 6969) && !deletedIds.has(e.id))
@@ -929,6 +996,7 @@ export default function ProfilePage({
   useEffect(() => { repliesLenRef.current   = replies.length;   }, [replies.length]);
   useEffect(() => { pollsLenRef.current     = polls.length;     }, [polls.length]);
   useEffect(() => { articlesLenRef.current  = articles.length;  }, [articles.length]);
+  useEffect(() => { emojiSetsLenRef.current = emojiSets.length; }, [emojiSets.length]);
 
   useEffect(() => {
     if (!resolveEventById) return;
@@ -1189,6 +1257,9 @@ export default function ProfilePage({
         </div>
         <div className={`profile-stat ${tab === "voice" ? "active" : ""}`} onClick={() => switchTab("voice")}>
           <div className="profile-stat-label">Voice</div>
+        </div>
+        <div className={`profile-stat ${tab === "emojisets" ? "active" : ""}`} onClick={() => switchTab("emojisets")}>
+          <div className="profile-stat-label">Emoji Sets</div>
         </div>
       </div>
 
@@ -1517,6 +1588,46 @@ export default function ProfilePage({
               </>
       )}
 
+      {/* Emoji Sets tab */}
+      {tab === "emojisets" && (
+        <>
+          {isOwn && (
+            <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 12px 0" }}>
+              <button type="button" className="profile-follow-btn"
+                style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, flexShrink: 0 }}
+                onClick={() => setEmojiSetCompose("new")}>
+                <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                New set
+              </button>
+            </div>
+          )}
+          {emojiSetsLoading && emojiSets.length === 0
+            ? [0, 1, 2].map(i => <SkelCard key={i} />)
+            : emojiSets.length === 0
+              ? <div className="empty-state"><div className="empty-state-title">No emoji sets yet</div><div className="empty-state-sub">{isOwn ? "Create a set to share your custom emoji" : "Published emoji sets will appear here"}</div></div>
+              : emojiSets.slice(0, visibleEmojiSets).map(ev => (
+                  <div key={ev.id} style={{ padding: "8px 12px 0" }}>
+                    <EmojiSetCard
+                      event={ev}
+                      profiles={profiles}
+                      onOpenProfile={onOpenProfile}
+                      onOpen={e => onOpenEmojiSet?.(e)}
+                      hideHead
+                    />
+                    {isOwn && (
+                      <div style={{ display: "flex", gap: 14, padding: "4px 4px 0", fontFamily: "'DM Sans',sans-serif", fontSize: 12 }}>
+                        <button type="button" onClick={() => setEmojiSetCompose(ev)}
+                          style={{ background: "none", border: "none", color: "var(--primary)", cursor: "pointer", padding: 0 }}>Edit</button>
+                        <button type="button" onClick={() => handleDeleteEmojiSet(ev)}
+                          style={{ background: "none", border: "none", color: "#E05C8A", cursor: "pointer", padding: 0 }}>Delete</button>
+                      </div>
+                    )}
+                  </div>
+                ))
+          }
+        </>
+      )}
+
       {/* Listings tab */}
       {tab === "listings" && (
         <>
@@ -1781,6 +1892,16 @@ export default function ProfilePage({
         onLoadMore={fetchMediaBatch}
         onOpenThread={onOpenThread}
       />
+
+      {emojiSetCompose && (
+        <EmojiSetComposeSheet
+          publishEvent={publishEvent}
+          existingSet={emojiSetCompose === "new" ? null : emojiSetCompose}
+          myEmoji={isOwn ? customEmojis : []}
+          onSaved={handleEmojiSetSaved}
+          onDismiss={() => setEmojiSetCompose(null)}
+        />
+      )}
 
       {profileNotesJsonEvent && <NoteJsonModal event={profileNotesJsonEvent} onClose={() => setProfileNotesJsonEvent(null)} />}
       {showProfileMetadata && p._raw && <NoteJsonModal event={p._raw} title="Profile Metadata" onClose={() => setShowProfileMetadata(false)} />}
