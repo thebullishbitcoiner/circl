@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { parseBolt11Msats, isHexPubkey, zapperPubkeyFromKind9735, isQuoteRepost, directReplyParentId } from "../utils.js";
+import { parseBolt11Msats, isHexPubkey, zapperPubkeyFromKind9735, zapCommentFromKind9735, isQuoteRepost, directReplyParentId, directReplyParentCoord } from "../utils.js";
 import { pool, eventStore, relayUrls$ } from "../nostr.js";
 
 // metaSub below shares one 500-event budget across every note from every
@@ -141,13 +141,23 @@ export default function useFeed({ follows, feedKinds, setLocalReaction, addLocal
     // unrelated top-level card in the feed. It only feeds the local repost
     // ledger, which repostAndQuoteCount() unions with `events` by id so nothing
     // already counted from the live stream is double-counted.
+    // Resolve an addressable "kind:pubkey:d" coordinate to a feed event's version id.
+    const idForCoord = coord => {
+      if (!coord) return null;
+      for (const e of eventsRef.current) {
+        if (e.kind >= 30000 && e.kind < 40000
+          && `${e.kind}:${e.pubkey}:${e.tags?.find(t => t[0] === "d")?.[1] ?? ""}` === coord) return e.id;
+      }
+      return null;
+    };
+
     const handleBackfillEvent = raw => {
       const isRepost = raw.kind === 6 || raw.kind === 16;
       const isQuote = raw.kind === 1 && raw.tags?.some(t => t[0] === "q");
       if (isRepost || isQuote) {
         eventStore.add(raw);
         const targetId = isRepost
-          ? raw.tags.find(t => t[0] === "e")?.[1]
+          ? (raw.tags.find(t => t[0] === "e")?.[1] ?? idForCoord(raw.tags.find(t => t[0] === "a")?.[1]))
           : raw.tags.find(t => t[0] === "q")?.[1];
         if (targetId) addLocalRepost?.(targetId, { id: raw.id, pubkey: raw.pubkey, kind: raw.kind });
         return;
@@ -157,10 +167,24 @@ export default function useFeed({ follows, feedKinds, setLocalReaction, addLocal
       // Not merged into `events` (same reasoning as reposts above) — only feeds
       // the local reply-count ledger.
       if ((raw.kind === 1 || raw.kind === 1111 || raw.kind === 1244) && !isQuoteRepost(raw)) {
-        const targetId = directReplyParentId(raw);
+        const targetId = directReplyParentId(raw) ?? idForCoord(directReplyParentCoord(raw));
         if (targetId) {
           eventStore.add(raw);
           addLocalReply?.(targetId, { id: raw.id });
+          return;
+        }
+      }
+      // Reactions / zaps that only carry an "a" coordinate (no "e").
+      if ((raw.kind === 7 || raw.kind === 9735) && !raw.tags.some(t => t[0] === "e")) {
+        const targetId = idForCoord(raw.tags.find(t => t[0] === "a")?.[1]);
+        if (targetId) {
+          eventStore.add(raw);
+          if (raw.kind === 7 && raw.content) {
+            setLocalReaction?.(targetId, raw.pubkey, raw.content === "+" ? "💜" : raw.content, { id: raw.id, tags: raw.tags });
+          } else if (raw.kind === 9735) {
+            const bolt11 = raw.tags.find(t => t[0] === "bolt11")?.[1];
+            if (bolt11) addLocalZap?.(targetId, { id: raw.id, zapper: zapperPubkeyFromKind9735(raw) ?? raw.pubkey, amount: parseBolt11Msats(bolt11), comment: zapCommentFromKind9735(raw) ?? "" });
+          }
           return;
         }
       }
@@ -184,6 +208,21 @@ export default function useFeed({ follows, feedKinds, setLocalReaction, addLocal
           pool.group(relayUrls$, false).request([
             { kinds: [6, 16, 7, 9735, 1, 1111, 1244], "#e": chunk },
             { kinds: [1], "#q": chunk },
+          ]).subscribe({ next: handleBackfillEvent })
+        );
+      }
+      // Addressable feed items (emoji sets, …) get interactions tagged by their
+      // "kind:pubkey:d" coordinate rather than the version id.
+      const coords = eventsRef.current
+        .filter(e => e.kind >= 30000 && e.kind < 40000)
+        .map(e => `${e.kind}:${e.pubkey}:${e.tags?.find(t => t[0] === "d")?.[1] ?? ""}`)
+        .filter(c => !backfilled.has(c));
+      for (const c of coords) backfilled.add(c);
+      for (let i = 0; i < coords.length; i += STATS_BACKFILL_CHUNK) {
+        const chunk = coords.slice(i, i + STATS_BACKFILL_CHUNK);
+        backfillSubs.push(
+          pool.group(relayUrls$, false).request([
+            { kinds: [16, 7, 9735, 1111, 1244], "#a": chunk },
           ]).subscribe({ next: handleBackfillEvent })
         );
       }

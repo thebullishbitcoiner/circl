@@ -7,7 +7,7 @@ import FocusedStatsRow from "./FocusedStatsRow.jsx";
 import HighlightPopover from "./HighlightPopover.jsx";
 import HighlightSheet from "./HighlightSheet.jsx";
 import { Bk } from "./icons.jsx";
-import { displayName, nip05OrNpub, relativeTime, isQuoteRepost, replyCount, buildParentChain, buildSelfReplyChain, directReplyParentId, parseBolt11Msats, zapperPubkeyFromKind9735, zapCommentFromKind9735 } from "../utils.js";
+import { displayName, nip05OrNpub, relativeTime, isQuoteRepost, replyCount, buildParentChain, buildSelfReplyChain, directReplyParentId, directReplyParentCoord, addressableCoordinate, parseBolt11Msats, zapperPubkeyFromKind9735, zapCommentFromKind9735 } from "../utils.js";
 import useProfiles from "../hooks/useProfiles.js";
 import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
@@ -474,6 +474,9 @@ export default function ThreadView({
   const containerRef = useRef(null);
   const focusRef     = useRef(null);
   const authorPk     = focusedEvent.pubkey;
+  // "kind:pubkey:d" for an addressable focused event (e.g. an emoji set) — its
+  // interactions from other clients are keyed by this coordinate, not the id.
+  const focusedCoord = addressableCoordinate(focusedEvent);
   const [threadMenuId, setThreadMenuId]     = useState(null);
   const [threadJsonEvent, setThreadJsonEvent] = useState(null);
   const [fetchedEvents, setFetchedEvents] = useState(() => threadEventCache.get(focusedEvent.id) ?? []);
@@ -549,12 +552,12 @@ export default function ThreadView({
     };
     fetchAncestors(focusedEvent, 5);
 
-    // Subscribe to replies (kind 1) and NIP-22 comments (kind 1111)
-    const replySub = pool.subscription(relayUrls, [{
-      kinds: [1, 1111, 1244],
-      "#e": [focusedEvent.id],
-      since: focusedEvent.created_at,
-    }]).subscribe({
+    // Subscribe to replies (kind 1) and NIP-22 comments (kind 1111/1244), matched
+    // by the focused event id and — for addressable events — its "a" coordinate.
+    const replySub = pool.subscription(relayUrls, [
+      { kinds: [1, 1111, 1244], "#e": [focusedEvent.id], since: focusedEvent.created_at },
+      ...(focusedCoord ? [{ kinds: [1111, 1244], "#a": [focusedCoord] }] : []),
+    ]).subscribe({
       next: ev => {
         if (known.has(ev.id)) return;
         known.set(ev.id, ev);
@@ -563,7 +566,8 @@ export default function ThreadView({
         // Also feed the shared reply-count ledger so feed/profile cards for this
         // note (which never run this dedicated #e fetch) can reflect the real
         // count instead of only whatever their own passive pool already had.
-        if (directReplyParentId(ev) === focusedEvent.id) {
+        if (directReplyParentId(ev) === focusedEvent.id
+          || (focusedCoord && directReplyParentCoord(ev) === focusedCoord)) {
           addLocalReply?.(focusedEvent.id, { id: ev.id });
         }
       },
@@ -572,10 +576,10 @@ export default function ThreadView({
 
     // Backfill all zaps for the focused event — the feed's broad metaSub can miss
     // these (no #e filter, 48h window, 500-event limit)
-    const zapFetch = pool.request(relayUrls, [{
-      kinds: [9735],
-      "#e": [focusedEvent.id],
-    }]).subscribe({
+    const zapFetch = pool.request(relayUrls, [
+      { kinds: [9735], "#e": [focusedEvent.id] },
+      ...(focusedCoord ? [{ kinds: [9735], "#a": [focusedCoord] }] : []),
+    ]).subscribe({
       next: raw => {
         const bolt11 = raw.tags.find(t => t[0] === "bolt11")?.[1];
         if (!bolt11) return;
@@ -590,10 +594,10 @@ export default function ThreadView({
 
     // Backfill all reactions for the focused event — feed metaSub uses #p filter
     // which misses reactions from users who aren't in the follows list
-    const reactionFetch = pool.request(relayUrls, [{
-      kinds: [7],
-      "#e": [focusedEvent.id],
-    }]).subscribe({
+    const reactionFetch = pool.request(relayUrls, [
+      { kinds: [7], "#e": [focusedEvent.id] },
+      ...(focusedCoord ? [{ kinds: [7], "#a": [focusedCoord] }] : []),
+    ]).subscribe({
       next: raw => {
         if (raw.kind !== 7 || !raw.content) return;
         setLocalReaction?.(focusedEvent.id, raw.pubkey, raw.content === "+" ? "💜" : raw.content, { id: raw.id, tags: raw.tags });
@@ -608,6 +612,7 @@ export default function ThreadView({
     const repostFetch = pool.request(relayUrls, [
       { kinds: [6, 16], "#e": [focusedEvent.id] },
       { kinds: [1], "#q": [focusedEvent.id] },
+      ...(focusedCoord ? [{ kinds: [16], "#a": [focusedCoord] }] : []),
     ]).subscribe({
       next: raw => {
         const isRepost = raw.kind === 6 || raw.kind === 16;
@@ -637,7 +642,8 @@ export default function ThreadView({
 
   const otherReplies = allEvents.filter(e => {
     if ((e.kind !== 1 && e.kind !== 1111 && e.kind !== 1244) || chainIds.has(e.id) || isQuoteRepost(e)) return false;
-    return directReplyParentId(e) === focusedEvent.id;
+    return directReplyParentId(e) === focusedEvent.id
+      || (focusedCoord && directReplyParentCoord(e) === focusedCoord);
   }).sort((a, b) => a.created_at - b.created_at);
 
   const isReplyMuted = e => {

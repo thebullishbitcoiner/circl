@@ -218,6 +218,13 @@ export const directReplyParentId = event => {
   return null;
 };
 
+/** For a NIP-22 comment on an addressable event, the parent coordinate (lowercase "a"). */
+export const directReplyParentCoord = event => {
+  if (!event?.tags?.length) return null;
+  const a = event.tags.find(t => t[0] === "a" && t[3] !== "mention" && t[1]);
+  return a?.[1] ?? null;
+};
+
 // localReplies is an optional list of {id} backfilled out-of-band (e.g. from a
 // thread-view visit that discovered replies outside the feed pool) — merged in
 // by id so anything already found in `pool` isn't double-counted.
