@@ -363,7 +363,7 @@ export default function App() {
     pushNav({ type: "circle", payload: { pubkey: cpk, follows: cFollows } });
   const handleOpenNote = event => pushNav({ type: "note", payload: event });
   const handleOpenArticle = event => pushNav({ type: "article", payload: event });
-  const handleOpenEmojiSet = event => pushNav({ type: "emoji-set", payload: event });
+  const handleOpenEmojiSet = event => { setSettingsOpen(false); pushNav({ type: "emoji-set", payload: event }); };
   const handleOpenThread  = event => pushNav({ type: "thread",  payload: event });
   const handleOpenGoal            = event => pushNav({ type: "goal",     payload: event });
   const handleOpenCalendarEvent   = event => pushNav({ type: "calendar", payload: event });
@@ -1344,15 +1344,49 @@ export default function App() {
                   }
 
                   if (top.type === "emoji-set") {
+                    const p = top.payload;
                     return (
                       <EmojiSetView
-                        key={top.payload.id}
-                        event={top.payload}
+                        key={p.id ?? p.tags?.find(t => t[0] === "d")?.[1] ?? "emoji-set"}
+                        event={p}
                         profiles={profiles}
                         onBack={handleBack}
                         onOpenProfile={handleOpenProfile}
                         mySets={customEmojiSets}
                         onAddSet={addEmojiSet}
+                        onRemoveSet={removeEmojiSet}
+                        myPubkey={pubkey}
+                        myProfile={myProfile}
+                        events={mergedFeedPool}
+                        publishEvent={publishEvent}
+                        onPrepend={prependEvent}
+                        onPublish={prependEvent}
+                        getLocalZaps={getLocalZaps}
+                        addLocalZap={addLocalZap}
+                        getLocalReactions={getLocalReactions}
+                        setLocalReaction={setLocalReaction}
+                        getLocalReposts={getLocalReposts}
+                        addLocalRepost={addLocalRepost}
+                        getLocalReplies={getLocalReplies}
+                        addLocalReply={addLocalReply}
+                        onRequestModal={setPanelModal}
+                        onDismissModal={() => setPanelModal(null)}
+                        onOpenThread={handleOpenThread}
+                        onOpenZaps={handleOpenZaps}
+                        onOpenReactions={handleOpenReactions}
+                        onOpenReposts={handleOpenReposts}
+                        sendZap={sendZap}
+                        defaultZapAmount={zapSettings.amount}
+                        defaultZapMsg={zapSettings.msg}
+                        onZapFail={reason => showToast(
+                          reason === "no_lud16"  ? "⚡ No lightning address" :
+                          reason === "no_wallet" ? "⚡ No wallet connected" :
+                          `⚡ Zap failed: ${reason}`
+                        )}
+                        onBookmark={handleBookmark}
+                        isBookmarked={isBookmarked}
+                        customEmojis={allCustomEmojis}
+                        showToast={showToast}
                       />
                     );
                   }

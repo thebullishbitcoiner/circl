@@ -1,13 +1,30 @@
 import { useState } from "react";
 import EmojiSetDiscoveryPage from "./EmojiSetDiscoveryPage.jsx";
+import { useNavigation } from "../context/NavigationContext.jsx";
 
 const SHORTCODE_RE = /^[a-zA-Z0-9_-]+$/;
+
+// Rebuild a kind-30030-shaped event from a stored bookmark so it can open in the
+// shared set view (which resolves the authoritative version by coordinate).
+function setEventFromBookmark({ aTag, title, emojis }) {
+  const [, pubkey, dTag = ""] = aTag.split(":");
+  return {
+    kind: 30030,
+    pubkey,
+    tags: [
+      ["d", dTag],
+      ["title", title || dTag],
+      ...emojis.map(e => ["emoji", e.name, e.url]),
+    ],
+  };
+}
 
 export default function CustomEmojiSettingsPage({
   emojis = [], sets = [],
   addEmoji, removeEmoji, addSet, removeSet,
   loading, onBack,
 }) {
+  const { onOpenEmojiSet } = useNavigation();
   const [subPage, setSubPage] = useState(null); // "discover"
   const [name,    setName]    = useState("");
   const [url,     setUrl]     = useState("");
@@ -106,9 +123,12 @@ export default function CustomEmojiSettingsPage({
       {sets.length > 0 && (
         <>
           <div className="settings-section-title">Bookmarked Sets</div>
-          {sets.map(({ aTag, title, emojis: setEmojis }) => (
+          {sets.map((set) => {
+            const { aTag, title, emojis: setEmojis } = set;
+            return (
             <div key={aTag} className="list-row"
-              style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px" }}>
+              onClick={() => onOpenEmojiSet?.(setEventFromBookmark(set))}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", cursor: "pointer" }}>
               {/* preview */}
               <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
                 {setEmojis.slice(0, 4).map(e => (
@@ -124,11 +144,12 @@ export default function CustomEmojiSettingsPage({
                 className="profile-follow-btn"
                 disabled={saving === `set:${aTag}`}
                 style={{ flexShrink: 0, background: "none", border: "1px solid var(--border)", color: "var(--text-muted)" }}
-                onClick={() => handleRemoveSet(aTag)}>
+                onClick={e => { e.stopPropagation(); handleRemoveSet(aTag); }}>
                 {saving === `set:${aTag}` ? "…" : "Remove"}
               </button>
             </div>
-          ))}
+            );
+          })}
         </>
       )}
 

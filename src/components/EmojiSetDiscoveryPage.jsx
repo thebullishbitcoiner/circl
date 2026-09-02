@@ -2,11 +2,13 @@ import { useState, useEffect, useMemo } from "react";
 import { pool, eventStore } from "../nostr.js";
 import { DEFAULT_RELAYS } from "../constants.js";
 import { displayName } from "../utils.js";
+import { useNavigation } from "../context/NavigationContext.jsx";
 import useProfiles from "../hooks/useProfiles.js";
 
 const EMOJI_SET_KIND = 30030;
 
 export default function EmojiSetDiscoveryPage({ onBack, bookmarkedATags = [], addSet, addEmoji }) {
+  const { onOpenEmojiSet } = useNavigation();
   const [sets,    setSets]    = useState([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(null);
@@ -128,7 +130,7 @@ export default function EmojiSetDiscoveryPage({ onBack, bookmarkedATags = [], ad
             {/* set row */}
             <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 16px" }}>
               {/* info + preview */}
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => onOpenEmojiSet?.(ev)}>
                 <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   <span style={{ fontWeight: 600, color: "var(--text)", display: "inline-block", maxWidth: "55%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", verticalAlign: "bottom" }}>{title}</span>
                   <span style={{ color: "var(--text-muted)", fontWeight: 400 }}> · by {displayName(ev.pubkey, profiles)}</span>
