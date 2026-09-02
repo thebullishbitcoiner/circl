@@ -52,6 +52,7 @@ import PollInline from "./components/PollInline.jsx";
 import NoteActions from "./components/NoteActions.jsx";
 import NavigationContext from "./context/NavigationContext.jsx";
 import ArticleReader from "./components/ArticleReader.jsx";
+import EmojiSetView from "./components/EmojiSetView.jsx";
 import HighlightCard from "./components/HighlightCard.jsx";
 import CalendarCard from "./components/CalendarCard.jsx";
 import EventDetailView from "./components/EventDetailView.jsx";
@@ -362,6 +363,7 @@ export default function App() {
     pushNav({ type: "circle", payload: { pubkey: cpk, follows: cFollows } });
   const handleOpenNote = event => pushNav({ type: "note", payload: event });
   const handleOpenArticle = event => pushNav({ type: "article", payload: event });
+  const handleOpenEmojiSet = event => pushNav({ type: "emoji-set", payload: event });
   const handleOpenThread  = event => pushNav({ type: "thread",  payload: event });
   const handleOpenGoal            = event => pushNav({ type: "goal",     payload: event });
   const handleOpenCalendarEvent   = event => pushNav({ type: "calendar", payload: event });
@@ -676,6 +678,7 @@ export default function App() {
       onOpenCalendarEvent: handleOpenCalendarEvent,
       onOpenStream: setOpenStreamEvent,
       onOpenArticle: handleOpenArticle,
+      onOpenEmojiSet: handleOpenEmojiSet,
       onOpenHashtag: handleOpenHashtag,
       onOpenZaps: handleOpenZaps,
       onOpenReactions: handleOpenReactions,
@@ -1336,6 +1339,20 @@ export default function App() {
                           `⚡ Zap failed: ${reason}`
                         )}
                         customEmojis={allCustomEmojis}
+                      />
+                    );
+                  }
+
+                  if (top.type === "emoji-set") {
+                    return (
+                      <EmojiSetView
+                        key={top.payload.id}
+                        event={top.payload}
+                        profiles={profiles}
+                        onBack={handleBack}
+                        onOpenProfile={handleOpenProfile}
+                        mySets={customEmojiSets}
+                        onAddSet={addEmojiSet}
                       />
                     );
                   }
