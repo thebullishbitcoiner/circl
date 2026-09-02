@@ -118,7 +118,7 @@ export default function FeedItem({
     );
   }
 
-  if (event.kind === 6) {
+  if (event.kind === 6 || event.kind === 16) {
     return (
       <RepostCard
         key={event.id}

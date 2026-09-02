@@ -3,16 +3,31 @@ import Overlay from "./Overlay.jsx";
 import { Rpi } from "./icons.jsx";
 import ComposeSheet from "./ComposeSheet.jsx";
 import { sheetPortal } from "../utils/sheetPortal.js";
+import { addressableCoordinate } from "../utils.js";
 
 export default function RepostSheet({ event, profiles, onQuoteRepost, onDismiss, publishEvent, onPrepend }) {
   const handleRepost = async () => {
     onDismiss?.();
-    const kind6 = {
-      kind: 6,
-      content: JSON.stringify(event),
-      tags: [["e", event.id, "", "mention"], ["p", event.pubkey]],
-    };
-    const published = await publishEvent?.(kind6);
+    // NIP-18: kind 6 is for kind-1 notes only; everything else is a kind-16
+    // generic repost carrying a "k" tag (and an "a" coordinate when addressable).
+    const coord = addressableCoordinate(event);
+    const repost = event.kind === 1
+      ? {
+          kind: 6,
+          content: JSON.stringify(event),
+          tags: [["e", event.id, "", "mention"], ["p", event.pubkey]],
+        }
+      : {
+          kind: 16,
+          content: JSON.stringify(event),
+          tags: [
+            ["e", event.id, "", "mention"],
+            ...(coord ? [["a", coord]] : []),
+            ["p", event.pubkey],
+            ["k", String(event.kind)],
+          ],
+        };
+    const published = await publishEvent?.(repost);
     if (published) onPrepend?.(published);
   };
 

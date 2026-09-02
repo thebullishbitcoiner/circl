@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Zi, Hi, Ri, Rpi, Bi } from "./icons.jsx";
-import { haptic, fmtSatsVal, replyCount as computeReplyCount, repostAndQuoteCount as computeRepostCount } from "../utils.js";
+import { haptic, fmtSatsVal, replyCount as computeReplyCount, repostAndQuoteCount as computeRepostCount, addressableCoordinate } from "../utils.js";
 import { broadcastEvent } from "../nostr.js";
 import ZapBadges from "./ZapBadges.jsx";
 import ZapModal from "./ZapModal.jsx";
@@ -20,7 +20,12 @@ export default function NoteActions({
   sendZap, defaultZapAmount = 21, defaultZapMsg = "", onZapFail,
   customEmojis,
   additionalEventIds = [],
+  addressableCoord,
 }) {
+  // "kind:pubkey:d" coordinate for addressable events (30023/30030/30311/…) so
+  // reactions, zaps and reposts attach to the replaceable event, not just one
+  // version's id. Auto-detected from the event; kind-1 notes resolve to null.
+  const coord = addressableCoord ?? addressableCoordinate(event);
   const primaryReactions = getLocalReactions?.(event.id) ?? [];
   const reactions = additionalEventIds.length === 0 ? primaryReactions : (() => {
     const seen = new Set(primaryReactions.map(r => r.id).filter(Boolean));
@@ -72,9 +77,9 @@ export default function NoteActions({
   const doSendZap = useCallback(async ({ amount, msg }) => {
     if (!sendZap) { onZapFail?.("no_wallet"); return; }
     if (!recipientLnAddr) { onZapFail?.("no_lud16"); return; }
-    const result = await sendZap({ amountSats: amount, recipientLnAddr, recipientPubkey: event.pubkey, eventId: event.id, eventKind: event.kind, msg });
+    const result = await sendZap({ amountSats: amount, recipientLnAddr, recipientPubkey: event.pubkey, eventId: event.id, eventKind: event.kind, aTag: coord, msg });
     if (!result.ok) onZapFail?.(result.reason);
-  }, [sendZap, recipientLnAddr, event.pubkey, event.id, event.kind, onZapFail]);
+  }, [sendZap, recipientLnAddr, event.pubkey, event.id, event.kind, coord, onZapFail]);
 
   const handleZapFromModal = ({ amount, msg }) => {
     setShowZapModal(false);
@@ -100,9 +105,10 @@ export default function NoteActions({
 
   const publishReaction = useCallback((content, emojiTag) => {
     const tags = [["e", event.id], ["p", event.pubkey]];
+    if (coord) { tags.push(["a", coord]); tags.push(["k", String(event.kind)]); }
     if (emojiTag) tags.push(emojiTag);
     publishEvent?.({ kind: 7, content, tags });
-  }, [publishEvent, event.id, event.pubkey]);
+  }, [publishEvent, event.id, event.pubkey, event.kind, coord]);
 
   const handleReact = useCallback((emoji = "💜") => {
     if (reaction) return;

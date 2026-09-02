@@ -5,7 +5,7 @@ import { useDraftsContext } from "../contexts/DraftsContext.jsx";
 import Overlay from "./Overlay.jsx";
 import { sheetPortal } from "../utils/sheetPortal.js";
 import Avatar from "./Avatar.jsx";
-import { displayName, avatarInitial, replyTagsForPublish, kind1111TagsForPublish, extractContentTags, nip19, videoPosterUrl, imetaTagForMedia } from "../utils.js";
+import { displayName, avatarInitial, replyTagsForPublish, kind1111TagsForPublish, extractContentTags, nip19, videoPosterUrl, imetaTagForMedia, isAddressableKind } from "../utils.js";
 import { DEFAULT_RELAYS } from "../constants.js";
 import { broadcastEvent, pool } from "../nostr.js";
 import EmojiPicker from "./EmojiPicker.jsx";
@@ -130,7 +130,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     }
   }, [draft, circles]);
 
-  const isNip22Reply  = replyTo?.kind === 1068 || replyTo?.kind === 6969 || replyTo?.kind === 1111 || replyTo?.kind === 30023;
+  const isNip22Reply  = replyTo?.kind === 1068 || replyTo?.kind === 6969 || replyTo?.kind === 1111 || isAddressableKind(replyTo?.kind);
   const isVoiceReply  = replyTo?.kind === 1222 || replyTo?.kind === 1244;
   const mentionedPubkeys = (replyTo && !isNip22Reply)
     ? [...new Set(replyTagsForPublish(replyTo, events).filter(t => t[0] === "p").map(t => t[1]))]
@@ -411,7 +411,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
                 {isVoiceReply
                   ? <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12.5, color: "var(--text-faint)", margin: "2px 0 0", lineHeight: 1.4 }}>🎙 Voice message</p>
                   : <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12.5, color: "var(--text-muted)", margin: "2px 0 0", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", wordBreak: "break-word", overflowWrap: "anywhere" }}>
-                      {replyTo.content}
+                      {replyTo.content || (replyTo.kind === 30030 ? `😀 ${replyTo.tags?.find(t => t[0] === "title")?.[1] || replyTo.tags?.find(t => t[0] === "d")?.[1] || "emoji set"}` : "")}
                     </p>
                 }
               </div>

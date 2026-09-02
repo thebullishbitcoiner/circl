@@ -51,9 +51,11 @@ export default function useZap(wallet) {
         try {
           let zapRequestTemplate;
           if (aTag) {
-            // Addressable event (e.g. kind 30311): use "a" tag, not "e" tag
+            // Addressable event (e.g. kind 30311, 30030): "a" coordinate tag, plus
+            // the "e" tag for the specific version when we have its id (NIP-57).
             zapRequestTemplate = makeZapRequest({ pubkey: recipientPubkey, amount: msats, comment: msg, relays: allRelays });
             zapRequestTemplate.tags.push(["a", aTag]);
+            if (eventId) zapRequestTemplate.tags.push(["e", eventId]);
           } else if (eventId) {
             zapRequestTemplate = makeZapRequest({ event: { id: eventId, pubkey: recipientPubkey, kind: eventKind, tags: [], content: "", created_at: 0, sig: "" }, amount: msats, comment: msg, relays: allRelays });
           } else {

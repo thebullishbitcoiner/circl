@@ -266,7 +266,14 @@ export const threadRootId = (replyTo, pool = []) => {
   return replyTo.id;
 };
 
-const isAddressableKind = k => k >= 30000 && k <= 39999;
+export const isAddressableKind = k => k >= 30000 && k <= 39999;
+
+/** Event coordinate ("kind:pubkey:d") for an addressable event, or null. */
+export const addressableCoordinate = ev => {
+  if (!ev || !isAddressableKind(ev.kind)) return null;
+  const d = ev.tags?.find(t => t[0] === "d")?.[1] ?? "";
+  return `${ev.kind}:${ev.pubkey}:${d}`;
+};
 
 /** NIP-22 tags for publishing a kind 1111 comment on a poll, article, or another kind 1111. */
 export const kind1111TagsForPublish = (replyTo, pool = []) => {
