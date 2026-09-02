@@ -95,7 +95,7 @@ export function EmojiSetCard({ event, profiles, onOpenProfile, onOpen, hideHead 
       </div>
       <div className="note-embed-text" style={{ fontWeight: 600, marginBottom: emojis.length ? 6 : 0 }}>{title}</div>
       {emojis.length > 0 && (full ? (
-        <EmojiGrid emojis={emojis} maxHeight={240} />
+        <EmojiGrid emojis={emojis} minCol={44} maxHeight={150} />
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
           {shown.map(em => (
