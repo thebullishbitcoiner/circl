@@ -447,7 +447,7 @@ export default function App() {
       handleOpenArticle(ev);
       return;
     }
-    if (ev.kind === 1) {
+    if (ev.kind === 1 || ev.kind === 1111 || ev.kind === 1244) {
       handleOpenThread(ev);
       return;
     }
