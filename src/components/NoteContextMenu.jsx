@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { nip19 } from "../utils.js";
+import { nip19, isAddressableKind } from "../utils.js";
 import { broadcastEvent } from "../nostr.js";
 import { useNavigation } from "../context/NavigationContext.jsx";
 import NoteDetailsModal from "./NoteDetailsModal.jsx";
@@ -25,7 +25,14 @@ export default function NoteContextMenu({ event, onClose, onViewJson, publishEve
 
   const copyId = () => {
     let encoded = event.id || "";
-    try { encoded = "nostr:" + nip19.neventEncode({ id: event.id }); } catch {}
+    try {
+      if (isAddressableKind(event.kind)) {
+        const dTag = event.tags?.find(t => t[0] === "d")?.[1] ?? "";
+        encoded = "nostr:" + nip19.naddrEncode({ kind: event.kind, pubkey: event.pubkey, identifier: dTag, relays: [] });
+      } else {
+        encoded = "nostr:" + nip19.neventEncode({ id: event.id });
+      }
+    } catch {}
     navigator.clipboard?.writeText(encoded).catch(() => {});
     onClose();
   };

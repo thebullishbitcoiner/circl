@@ -2,9 +2,11 @@ import { useMemo, useState, useEffect } from "react";
 import Avatar from "./Avatar.jsx";
 import { Bk } from "./icons.jsx";
 import NoteActions from "./NoteActions.jsx";
+import NoteContextMenu from "./NoteContextMenu.jsx";
+import NoteJsonModal from "./NoteJsonModal.jsx";
 import FocusedStatsRow from "./FocusedStatsRow.jsx";
 import {
-  displayName, nip19, addressableCoordinate, replyCount as computeReplyCount,
+  displayName, addressableCoordinate, replyCount as computeReplyCount,
   parseBolt11Msats, zapperPubkeyFromKind9735, zapCommentFromKind9735,
 } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
@@ -24,13 +26,6 @@ export function emojiSetInfo(event) {
   ).values()];
   const aTag = `${EMOJI_SET_KIND}:${event?.pubkey}:${dTag}`;
   return { dTag, title, emojis, aTag };
-}
-
-export function emojiSetNaddr(event) {
-  const { dTag } = emojiSetInfo(event);
-  try {
-    return nip19.naddrEncode({ kind: EMOJI_SET_KIND, pubkey: event.pubkey, identifier: dTag, relays: [] });
-  } catch { return null; }
 }
 
 // Scrollable emoji grid — sets can be large, so cap the height and page the DOM.
@@ -160,7 +155,7 @@ export default function EmojiSetView({
   getLocalReposts, addLocalRepost, getLocalReplies, addLocalReply,
   onRequestModal, onDismissModal, onOpenThread, onOpenZaps, onOpenReactions, onOpenReposts,
   sendZap, defaultZapAmount, defaultZapMsg, onZapFail, onBookmark, isBookmarked,
-  customEmojis, showToast,
+  customEmojis,
 }) {
   const { profiles: localProfiles } = useProfiles({ pubkeys: passedEvent ? [passedEvent.pubkey] : [] });
   const profiles = useMemo(() => ({ ...propProfiles, ...localProfiles }), [propProfiles, localProfiles]);
@@ -189,7 +184,8 @@ export default function EmojiSetView({
   const isMine = event?.pubkey === myPubkey;
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [jsonEvent, setJsonEvent] = useState(null);
 
   useSetInteractions({ coord, eventId: resolved?.id, setLocalReaction, addLocalZap, addLocalRepost, addLocalReply });
 
@@ -200,20 +196,6 @@ export default function EmojiSetView({
       else await onAddSet?.(event);
     } catch (e) { setErr(e?.message || "Could not save — check your signer"); }
     finally { setSaving(false); }
-  };
-
-  const handleShare = async () => {
-    const naddr = emojiSetNaddr(event);
-    const link = naddr ? `nostr:${naddr}` : null;
-    if (!link) return;
-    if (navigator.share) {
-      try { await navigator.share({ title, text: link }); return; } catch { /* fall through to copy */ }
-    }
-    try {
-      await navigator.clipboard.writeText(link);
-      setCopied(true); setTimeout(() => setCopied(false), 1500);
-      showToast?.("Set link copied");
-    } catch { showToast?.("Could not copy link"); }
   };
 
   const zaps = getLocalZaps?.(resolved?.id) ?? [];
@@ -247,11 +229,6 @@ export default function EmojiSetView({
             </span>
           </div>
         </div>
-        <button type="button" className="profile-follow-btn"
-          onClick={handleShare}
-          style={{ flexShrink: 0, background: "none", border: "1px solid var(--border)", color: "var(--text-muted)" }}>
-          {copied ? "Copied" : "Share"}
-        </button>
         {!isMine && (onAddSet || onRemoveSet) && (
           <button type="button"
             className="profile-follow-btn"
@@ -261,14 +238,43 @@ export default function EmojiSetView({
             {saving ? "…" : alreadyAdded ? "Remove" : "Add set"}
           </button>
         )}
+        {resolved?.id && (
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <button type="button" className="note-card-menu-btn" aria-label="Set options"
+              onClick={e => { e.stopPropagation(); setMenuOpen(o => !o); }}>
+              <span /><span /><span />
+            </button>
+            {menuOpen && (
+              <>
+                <div style={{ position: "fixed", inset: 0, zIndex: 19 }} onClick={() => setMenuOpen(false)} />
+                <NoteContextMenu
+                  event={resolved}
+                  onClose={() => setMenuOpen(false)}
+                  onViewJson={ev => setJsonEvent(ev)}
+                  publishEvent={publishEvent}
+                  onDeleted={() => { setMenuOpen(false); onBack?.(); }}
+                />
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {err && (
         <div style={{ padding: "8px 16px", fontSize: 12, color: "#E05C8A", fontFamily: "'DM Sans',sans-serif" }}>{err}</div>
       )}
 
+      {emojis.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-title">No emojis</div>
+          <div className="empty-state-sub">This set doesn&apos;t list any emoji</div>
+        </div>
+      ) : (
+        <EmojiGrid emojis={emojis} minCol={64} maxHeight="44vh" pad="12px 16px" />
+      )}
+
       {resolved?.id && publishEvent && (
-        <div style={{ padding: "4px 16px 8px", borderBottom: "1px solid var(--border)" }}>
+        <div style={{ padding: "4px 16px 8px", borderTop: "1px solid var(--border)" }}>
           <FocusedStatsRow
             eventId={resolved.id}
             allEvents={events}
@@ -309,17 +315,15 @@ export default function EmojiSetView({
             onZapFail={onZapFail}
             customEmojis={customEmojis}
           />
+          <button type="button"
+            onClick={() => onOpenThread?.(resolved)}
+            style={{ marginTop: 6, width: "100%", padding: "8px 0", background: "none", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-muted)", fontFamily: "'DM Sans',sans-serif", fontSize: 13, cursor: "pointer" }}>
+            {rCount > 0 ? `View ${rCount} ${rCount === 1 ? "comment" : "comments"}` : "Open discussion"}
+          </button>
         </div>
       )}
 
-      {emojis.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-state-title">No emojis</div>
-          <div className="empty-state-sub">This set doesn&apos;t list any emoji</div>
-        </div>
-      ) : (
-        <EmojiGrid emojis={emojis} minCol={64} pad="14px 16px 40px" />
-      )}
+      {jsonEvent && <NoteJsonModal event={jsonEvent} onClose={() => setJsonEvent(null)} />}
     </div>
   );
 }
