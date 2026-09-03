@@ -59,7 +59,8 @@ export function EmojiGrid({ emojis, minCol = 56, maxHeight, pad = 0 }) {
 // grid inline, capped to a scrollable max height (the focused row in a set's own
 // thread). Pass `hideHead` when the surrounding card already shows the author.
 // `bookmark` (optional): { saved, saving, onToggle } renders an Add/Remove button.
-export function EmojiSetCard({ event, profiles, onOpenProfile, onOpen, hideHead = false, full = false, bookmark = null }) {
+// `menu` (optional): a node pinned to the right of the header (e.g. a ⋯ menu).
+export function EmojiSetCard({ event, profiles, onOpenProfile, onOpen, hideHead = false, full = false, bookmark = null, menu = null }) {
   const { title, emojis } = emojiSetInfo(event);
   const shown = emojis.slice(0, 8);
   const extra = emojis.length - shown.length;
@@ -91,6 +92,11 @@ export function EmojiSetCard({ event, profiles, onOpenProfile, onOpen, hideHead 
             style={{ marginLeft: "auto", flexShrink: 0, fontSize: 12, ...(bookmark.saved ? { background: "none", border: "1px solid var(--border)", color: "var(--text-muted)" } : {}) }}>
             {bookmark.saving ? "…" : bookmark.saved ? "Remove" : "Add set"}
           </button>
+        )}
+        {menu && (
+          <div style={{ marginLeft: "auto", flexShrink: 0, display: "flex" }} onClick={e => e.stopPropagation()}>
+            {menu}
+          </div>
         )}
       </div>
       <div className="note-embed-text" style={{ fontWeight: 600, marginBottom: emojis.length ? 6 : 0 }}>{title}</div>
