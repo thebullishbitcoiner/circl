@@ -551,6 +551,22 @@ export default function App() {
     }
   };
 
+  const handleFollow = async pk => {
+    try {
+      await followPk(pk);
+    } catch (e) {
+      showToast(e?.message || "Could not update your follow list");
+    }
+  };
+
+  const handleUnfollow = async pk => {
+    try {
+      await unfollowPk(pk);
+    } catch (e) {
+      showToast(e?.message || "Could not update your follow list");
+    }
+  };
+
   const handleMuteUser = async pk => {
     try {
       await muteUser(pk);
@@ -1147,8 +1163,8 @@ export default function App() {
                         onOpenProfile={handleOpenProfile}
                         onBack={handleBack}
                         myFollows={follows}
-                        onFollow={followPk}
-                        onUnfollow={unfollowPk}
+                        onFollow={handleFollow}
+                        onUnfollow={handleUnfollow}
                       />
                     </div>
                   );
@@ -1212,8 +1228,8 @@ export default function App() {
                         onDismissModal={() => setPanelModal(null)}
                         resolveEventById={resolveEventById}
                         onOpenCircle={handleOpenCircle}
-                        onFollow={followPk}
-                        onUnfollow={unfollowPk}
+                        onFollow={handleFollow}
+                        onUnfollow={handleUnfollow}
                         onOpenPollVotes={handleOpenPollVotes}
                         onOpenArticle={handleOpenArticle}
                         onOpenStream={setOpenStreamEvent}
@@ -1337,8 +1353,8 @@ export default function App() {
                         onBack={handleBack}
                         myPubkey={pubkey}
                         myFollows={follows}
-                        onFollow={followPk}
-                        onUnfollow={unfollowPk}
+                        onFollow={handleFollow}
+                        onUnfollow={handleUnfollow}
                       />
                     );
                   }
@@ -1798,8 +1814,8 @@ export default function App() {
                         onBack={handleBack}
                         myPubkey={pubkey}
                         myFollows={follows}
-                        onFollow={followPk}
-                        onUnfollow={unfollowPk}
+                        onFollow={handleFollow}
+                        onUnfollow={handleUnfollow}
                       />
                     );
                   }
