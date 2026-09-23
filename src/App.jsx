@@ -1146,9 +1146,11 @@ export default function App() {
                         profiles={profiles}
                         onOpenProfile={handleOpenProfile}
                         onBack={handleBack}
+                        myPubkey={pubkey}
                         myFollows={follows}
                         onFollow={followPk}
                         onUnfollow={unfollowPk}
+                        isOwnCircle={isOwnCircle}
                       />
                     </div>
                   );
@@ -1339,6 +1341,7 @@ export default function App() {
                         myFollows={follows}
                         onFollow={followPk}
                         onUnfollow={unfollowPk}
+                        isOwnCircle={isOwnCircle}
                       />
                     );
                   }

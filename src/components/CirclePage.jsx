@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, memo, useMemo } from "react";
 import { Bk, Ck } from "./icons.jsx";
-import { displayName, shortNpub } from "../utils.js";
+import { displayName, shortNpub, relativeTime } from "../utils.js";
 import useProfiles from "../hooks/useProfiles.js";
+import useLastInteractions from "../hooks/useLastInteractions.js";
 
 // Persists scroll position across unmount/remount (e.g. navigating to a profile and back)
 const savedScrollPositions = new Map();
 
-export default memo(function CirclePage({ pubkey, follows = [], profiles: profilesProp, onOpenProfile, onBack, myPubkey, myFollows, onFollow, onUnfollow }) {
+export default memo(function CirclePage({ pubkey, follows = [], profiles: profilesProp, onOpenProfile, onBack, myPubkey, myFollows, onFollow, onUnfollow, isOwnCircle = false }) {
+  const { lastInteraction } = useLastInteractions({ myPubkey, pubkeys: follows, active: isOwnCircle });
   // The people shown here (another user's follows) are usually outside the
   // app's global profile cache, so fetch them directly rather than relying
   // on `profilesProp` alone.
@@ -21,11 +23,15 @@ export default memo(function CirclePage({ pubkey, follows = [], profiles: profil
   // Mutuals (people you already follow) first, so they're easy to spot
   const myFollowSet = useMemo(() => new Set(myFollows || []), [myFollows]);
   const orderedFollows = useMemo(() => {
+    // On my own circle, most-recently-interacted-with first (never-interacted last)
+    if (isOwnCircle) {
+      return [...follows].sort((a, b) => (lastInteraction[b] || 0) - (lastInteraction[a] || 0));
+    }
     const mutual = [];
     const rest = [];
     for (const pk of follows) (myFollowSet.has(pk) ? mutual : rest).push(pk);
     return [...mutual, ...rest];
-  }, [follows, myFollowSet]);
+  }, [follows, myFollowSet, isOwnCircle, lastInteraction]);
 
   // Restore scroll position after mount (rAF ensures layout is settled)
   useEffect(() => {
@@ -114,6 +120,11 @@ export default memo(function CirclePage({ pubkey, follows = [], profiles: profil
                       <div className="circle-card-nip05"><Ck s={8} /><span>{fp.nip05}</span></div>
                     )}
                     <div className="circle-card-npub">{shortNpub(pk)}</div>
+                    {isOwnCircle && (
+                      <div className="circle-card-lastseen">
+                        Last Interaction: {lastInteraction[pk] ? `${relativeTime(lastInteraction[pk])} ago` : "Never"}
+                      </div>
+                    )}
                   </div>
                   {pk !== myPubkey && (iFollow
                     ? onUnfollow && (
