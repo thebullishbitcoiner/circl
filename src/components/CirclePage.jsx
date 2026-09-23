@@ -7,6 +7,14 @@ import useLastInteractions from "../hooks/useLastInteractions.js";
 // Persists scroll position across unmount/remount (e.g. navigating to a profile and back)
 const savedScrollPositions = new Map();
 
+// relativeTime() returns short units ("3d") for recent timestamps but falls back to a
+// full locale date string for anything a week+ old — only the former reads well with " ago".
+function lastInteractionLabel(ts) {
+  if (!ts) return "Never";
+  const rel = relativeTime(ts);
+  return /^\d+[smhd]$/.test(rel) ? `${rel} ago` : rel;
+}
+
 export default memo(function CirclePage({ pubkey, follows = [], profiles: profilesProp, onOpenProfile, onBack, myPubkey, myFollows, onFollow, onUnfollow, isOwnCircle = false }) {
   const { lastInteraction } = useLastInteractions({ myPubkey, pubkeys: follows, active: isOwnCircle });
   // The people shown here (another user's follows) are usually outside the
@@ -122,7 +130,7 @@ export default memo(function CirclePage({ pubkey, follows = [], profiles: profil
                     <div className="circle-card-npub">{shortNpub(pk)}</div>
                     {isOwnCircle && (
                       <div className="circle-card-lastseen">
-                        Last Interaction: {lastInteraction[pk] ? `${relativeTime(lastInteraction[pk])} ago` : "Never"}
+                        Last Interaction: {lastInteractionLabel(lastInteraction[pk])}
                       </div>
                     )}
                   </div>

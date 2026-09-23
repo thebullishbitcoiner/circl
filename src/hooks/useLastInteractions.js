@@ -3,7 +3,11 @@ import { isHexPubkey, normPubkey } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
 import { DEFAULT_RELAYS } from "../constants.js";
 
-const FETCH_CHUNK_SIZE = 50; // relay filter size limit, matches useProfiles.js
+// Two filters per contact (my note to them, their note to me), each with its
+// own limit:1 — so one prolific contact in a batch can't crowd a quieter
+// contact's single (possibly old) interaction out of a shared result limit.
+// Kept small since relays cap how many filters a single REQ may carry.
+const CONTACTS_PER_REQUEST = 15;
 
 // Persists across mounts — `${myPubkey}:${contactPubkey}` → last kind-1 created_at (or null if none found)
 const _cache = new Map();
@@ -46,48 +50,47 @@ export default function useLastInteractions({ myPubkey, pubkeys = [], active = f
     const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
     const subs = [];
 
-    for (let i = 0; i < toFetch.length; i += FETCH_CHUNK_SIZE) {
-      const chunk = toFetch.slice(i, i + FETCH_CHUNK_SIZE);
-      const chunkSet = new Set(chunk);
-      let pending = 2;
+    for (let i = 0; i < toFetch.length; i += CONTACTS_PER_REQUEST) {
+      const group = toFetch.slice(i, i + CONTACTS_PER_REQUEST);
+      const groupSet = new Set(group);
+      const filters = [];
+      for (const pk of group) {
+        filters.push({ kinds: [1], authors: [me], "#p": [pk], limit: 1 });
+        filters.push({ kinds: [1], authors: [pk], "#p": [me], limit: 1 });
+      }
 
-      const onEvent = raw => {
-        eventStore.add(raw);
-        let changed = false;
-        const bump = pk => {
-          if (!chunkSet.has(pk)) return;
-          const key = `${me}:${pk}`;
-          const prev = _cache.get(key) || 0;
-          if (raw.created_at > prev) {
-            _cache.set(key, raw.created_at);
-            stateRef.current = { ...stateRef.current, [pk]: raw.created_at };
-            changed = true;
+      const bump = (pk, createdAt) => {
+        const key = `${me}:${pk}`;
+        const prev = _cache.get(key) || 0;
+        if (createdAt > prev) {
+          _cache.set(key, createdAt);
+          stateRef.current = { ...stateRef.current, [pk]: createdAt };
+          return true;
+        }
+        return false;
+      };
+
+      const sub = pool.request(relayUrls, filters).subscribe({
+        next: raw => {
+          eventStore.add(raw);
+          let changed = false;
+          if (raw.pubkey === me) {
+            for (const tag of raw.tags) {
+              if (tag[0] === "p" && groupSet.has(tag[1]) && bump(tag[1], raw.created_at)) changed = true;
+            }
+          } else if (groupSet.has(raw.pubkey)) {
+            changed = bump(raw.pubkey, raw.created_at);
           }
-        };
-        if (raw.pubkey === me) {
-          for (const tag of raw.tags) if (tag[0] === "p") bump(tag[1]);
-        } else {
-          bump(raw.pubkey);
-        }
-        if (changed) setLastInteraction(stateRef.current);
-      };
-
-      const onDone = () => {
-        pending -= 1;
-        if (pending > 0) return;
-        for (const pk of chunk) {
-          const key = `${me}:${pk}`;
-          if (!_cache.has(key)) _cache.set(key, null);
-        }
-      };
-
-      subs.push(pool.request(relayUrls, [
-        { kinds: [1], authors: [me], "#p": chunk, limit: chunk.length * 20 },
-      ]).subscribe({ next: onEvent, complete: onDone, error: onDone }));
-
-      subs.push(pool.request(relayUrls, [
-        { kinds: [1], authors: chunk, "#p": [me], limit: chunk.length * 20 },
-      ]).subscribe({ next: onEvent, complete: onDone, error: onDone }));
+          if (changed) setLastInteraction(stateRef.current);
+        },
+        complete: () => {
+          for (const pk of group) {
+            const key = `${me}:${pk}`;
+            if (!_cache.has(key)) _cache.set(key, null);
+          }
+        },
+      });
+      subs.push(sub);
     }
 
     return () => subs.forEach(s => s.unsubscribe());

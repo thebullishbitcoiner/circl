@@ -60,6 +60,7 @@ export function getNotificationSummary(ev) {
     const unit   = msats === 1000 ? "sat" : "sats";
     return { headline: `zapped you ${amt} ${unit}`, detail: "", kind: "zap" };
   }
+  if (kind === 3) return { headline: "started following you", detail: "", kind: "follow" };
   if (kind === 1018) return { headline: "voted in your poll", detail: "", kind: "poll-vote" };
   if (kind === 6 || kind === 16) return { headline: "Reposted your note", detail: "", kind: "repost" };
   if (kind === 30023) {

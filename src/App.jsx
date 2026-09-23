@@ -19,6 +19,7 @@ import { DEFAULT_RELAYS } from "./constants.js";
 import useFollows from "./hooks/useFollows.js";
 import useFeed from "./hooks/useFeed.js";
 import useNotifications from "./hooks/useNotifications.js";
+import useNewFollowers from "./hooks/useNewFollowers.js";
 import useSpamFilterSettings from "./hooks/useSpamFilterSettings.js";
 import useWebOfTrust from "./hooks/useWebOfTrust.js";
 import { recordFiltered } from "./spamFilterMetrics.js";
@@ -199,7 +200,12 @@ export default function App() {
     addLocalRepost,
     addLocalReply,
   });
-  const { items: notificationEvents, loading: notifLoading } = useNotifications({ pubkey });
+  const { items: notifItems, loading: notifLoading } = useNotifications({ pubkey });
+  const { items: newFollowerEvents } = useNewFollowers({ pubkey });
+  const notificationEvents = useMemo(
+    () => [...notifItems, ...newFollowerEvents].sort((a, b) => b.created_at - a.created_at),
+    [notifItems, newFollowerEvents]
+  );
   const [bookmarkRefreshKey, setBookmarkRefreshKey] = useState(0);
   const { toggle: toggleBm, isBookmarked, bookmarkItems, removeTag: removeBookmarkTag } = useBookmarks({ pubkey, signAndPublish, refreshKey: bookmarkRefreshKey });
   const { togglePin, isPinned, pinnedIds } = usePinnedNotes({ pubkey, signAndPublish });
@@ -480,6 +486,10 @@ export default function App() {
   };
 
   const handleOpenNotification = async ev => {
+    if (ev.kind === 3) {
+      handleOpenProfile(ev.pubkey);
+      return;
+    }
     if (ev.kind === 30023) {
       handleOpenArticle(ev);
       return;

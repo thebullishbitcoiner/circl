@@ -121,7 +121,7 @@ export default function NotificationsFeed({ items, profiles: propProfiles, onOpe
     return (
       <div className="empty-state">
         <div className="empty-state-title">You&apos;re all caught up</div>
-        <div className="empty-state-sub">Mentions, replies, reactions, zaps, and reposts of your notes from the last 30 days show up here</div>
+        <div className="empty-state-sub">Mentions, replies, reactions, zaps, reposts, and new followers show up here</div>
       </div>
     );
   }
