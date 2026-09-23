@@ -1,18 +1,30 @@
 import { useEffect, useRef, useState, memo, useMemo } from "react";
 import { Bk, Ck } from "./icons.jsx";
-import { displayName, shortNpub, relativeTime } from "../utils.js";
+import { displayName, shortNpub } from "../utils.js";
 import useProfiles from "../hooks/useProfiles.js";
 import useLastInteractions from "../hooks/useLastInteractions.js";
 
 // Persists scroll position across unmount/remount (e.g. navigating to a profile and back)
 const savedScrollPositions = new Map();
 
-// relativeTime() returns short units ("3d") for recent timestamps but falls back to a
-// full locale date string for anything a week+ old — only the former reads well with " ago".
+// Always a relative "X ago" string, however old — unlike utils.js's relativeTime()
+// (built for note timestamps), which falls back to a locale date past a week.
+// [seconds-per-unit, upper bound in seconds for using this unit, label]
+const LASTSEEN_UNITS = [
+  [60, 3600, "minute"],
+  [3600, 86400, "hour"],
+  [86400, 604800, "day"],
+  [604800, 2629800, "week"],     // ~30.44 days
+  [2629800, 31557600, "month"],  // ~365.25 days
+  [31557600, Infinity, "year"],
+];
 function lastInteractionLabel(ts) {
   if (!ts) return "Never";
-  const rel = relativeTime(ts);
-  return /^\d+[smhd]$/.test(rel) ? `${rel} ago` : rel;
+  const diff = Math.floor(Date.now() / 1000) - ts;
+  if (diff < 60) return "Just now";
+  const [size, , unit] = LASTSEEN_UNITS.find(([, bound]) => diff < bound);
+  const n = Math.floor(diff / size);
+  return `${n} ${unit}${n === 1 ? "" : "s"} ago`;
 }
 
 export default memo(function CirclePage({ pubkey, follows = [], profiles: profilesProp, onOpenProfile, onBack, myPubkey, myFollows, onFollow, onUnfollow, isOwnCircle = false }) {
