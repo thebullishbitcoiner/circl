@@ -5,13 +5,19 @@ import { DEFAULT_RELAYS, UNFOLLOW_KIND } from "../constants.js";
 
 const REFRESH_MS = 20 * 60 * 1000; // poll on mount, then every 20 min
 const FOLLOWING_KEY = "circl_known_followers_v1"; // ground truth: who currently follows me
-const NOTIFS_KEY = "circl_follow_notifications_v1"; // durable record of surfaced "started following you" items
-const RETENTION_SEC = 60 * 60 * 24 * 30; // keep surfaced follow notifications around as long as the rest of the feed
-// A relay query for any given poll is best-effort — it can transiently miss a real
-// follower's event even though nothing changed. Only treat someone as unfollowed
-// once they've been absent from results for a full day, not just a single poll,
-// so that flakiness doesn't get misread as unfollow-then-refollow.
+const NOTIFS_KEY = "circl_follow_notifications_v1"; // durable record of surfaced follow/unfollow items
+const LASTPOLL_KEY = "circl_follow_lastpoll_v1"; // when the last non-empty poll completed
+const RETENTION_SEC = 60 * 60 * 24 * 30; // keep surfaced notifications around as long as the rest of the feed
+// A relay query is best-effort and can miss a real follower for a poll (or a whole
+// baseline, if relays hadn't connected yet). Only consider someone a possible
+// unfollow after a full day of absence, and then confirm it against their actual
+// latest contact list before notifying.
 const UNFOLLOW_GRACE_SEC = 60 * 60 * 24;
+// A genuine new follow means the follower published a contact list after our last
+// poll. Anyone whose latest list is older than that was already following and was
+// just missed earlier, so they're recorded silently.
+const NEW_FOLLOW_SLACK_SEC = 10 * 60;
+const CONFIRM_TIMEOUT_MS = 8000;
 
 function readJSON(key) {
   try { return JSON.parse(localStorage.getItem(key) || "{}"); } catch { return {}; }
@@ -39,6 +45,16 @@ function writeFollowing(pk, map) {
   writeJSON(FOLLOWING_KEY, all);
 }
 
+function readLastPoll(pk) {
+  const v = readJSON(LASTPOLL_KEY)[pk];
+  return typeof v === "number" ? v : null;
+}
+function writeLastPoll(pk, ts) {
+  const all = readJSON(LASTPOLL_KEY);
+  all[pk] = ts;
+  writeJSON(LASTPOLL_KEY, all);
+}
+
 function dedupeById(list) {
   const seen = new Set();
   const out = [];
@@ -63,6 +79,27 @@ function writeStoredNotifs(pk, list) {
   writeJSON(NOTIFS_KEY, all);
 }
 
+// Resolves to the author's latest kind:3 event, or null if none was found in time.
+function fetchLatestContactList(author, relayUrls) {
+  return new Promise(resolve => {
+    let latest = null, done = false, sub = null, timer = null;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      sub?.unsubscribe();
+      resolve(latest);
+    };
+    sub = pool.request(relayUrls, [{ kinds: [3], authors: [author], limit: 1 }]).subscribe({
+      next: raw => { if (!latest || raw.created_at > latest.created_at) latest = raw; },
+      complete: finish,
+      error: finish,
+    });
+    timer = setTimeout(finish, CONFIRM_TIMEOUT_MS);
+    if (done) sub.unsubscribe();
+  });
+}
+
 export default function useNewFollowers({ pubkey }) {
   const me = normPubkey(pubkey);
   // Minimal event shape is all the notification pipeline needs to render a
@@ -79,6 +116,12 @@ export default function useNewFollowers({ pubkey }) {
     // Re-hydrate from durable storage on every mount, so a page refresh
     // doesn't lose notifications that already surfaced but haven't expired.
     setItems(readStoredNotifs(me));
+
+    function pushNotifs(newItems) {
+      const merged = pruneNotifs([...readStoredNotifs(me), ...newItems]);
+      writeStoredNotifs(me, merged);
+      if (!cancelled) setItems(merged);
+    }
 
     function poll() {
       const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
@@ -101,35 +144,56 @@ export default function useNewFollowers({ pubkey }) {
             // First-ever check for this account: establish the baseline, don't notify.
             following = new Map(currentAuthors.map(a => [a, now]));
             writeFollowing(me, following);
+            if (currentAuthors.length) writeLastPoll(me, now);
             return;
           }
 
-          const newFollows = currentAuthors.filter(a => !following.has(a));
+          // No recorded last poll (upgrade path): treat every already-present follower as silent.
+          const lastPollAt = readLastPoll(me) ?? now;
+          const genuineCutoff = lastPollAt - NEW_FOLLOW_SLACK_SEC;
+          const newFollows = currentAuthors.filter(
+            a => !following.has(a) && latestByAuthor.get(a).created_at >= genuineCutoff
+          );
 
-          // Refresh the "last seen following me" timestamp for everyone this poll confirmed.
+          // Refresh "last seen following me" for everyone this poll confirmed
+          // (this also silently absorbs followers we'd merely missed before).
           for (const a of currentAuthors) following.set(a, now);
-          // Only drop someone once they've been missing long enough to be a real
-          // unfollow rather than a relay query simply not surfacing them this time.
-          const unfollowed = [];
-          for (const [a, lastSeen] of following) {
-            if (!currentSet.has(a) && now - lastSeen > UNFOLLOW_GRACE_SEC) {
-              following.delete(a);
-              unfollowed.push(a);
-            }
-          }
+          const staleAuthors = [...following.keys()].filter(
+            a => !currentSet.has(a) && now - following.get(a) > UNFOLLOW_GRACE_SEC
+          );
           writeFollowing(me, following);
-          if (!newFollows.length && !unfollowed.length) return;
+          // A poll that returned nothing likely means relays weren't reachable, so
+          // don't advance the "since" marker past follows we might have missed.
+          if (currentAuthors.length) writeLastPoll(me, now);
 
-          const fresh = newFollows.map(a => {
-            const ev = latestByAuthor.get(a);
-            return { id: ev.id, pubkey: ev.pubkey, created_at: ev.created_at, kind: 3, tags: [] };
-          });
-          // No real Nostr event represents an unfollow — this is inferred from
-          // absence, so the notification item is synthesized rather than relay-sourced.
-          const gone = unfollowed.map(a => ({ id: `unfollow:${a}:${now}`, pubkey: a, created_at: now, kind: UNFOLLOW_KIND, tags: [] }));
-          const merged = pruneNotifs([...readStoredNotifs(me), ...fresh, ...gone]);
-          writeStoredNotifs(me, merged);
-          setItems(merged);
+          if (newFollows.length) {
+            pushNotifs(newFollows.map(a => {
+              const ev = latestByAuthor.get(a);
+              return { id: ev.id, pubkey: ev.pubkey, created_at: ev.created_at, kind: 3, tags: [] };
+            }));
+          }
+
+          if (staleAuthors.length) {
+            // Absence from the #p query isn't proof of an unfollow — check each
+            // account's actual latest contact list before saying they left.
+            Promise.all(staleAuthors.map(async a => ({ a, latest: await fetchLatestContactList(a, relayUrls) }))).then(results => {
+              if (cancelled) return;
+              const t = Math.floor(Date.now() / 1000);
+              const gone = [];
+              for (const { a, latest } of results) {
+                if (!latest) continue; // couldn't confirm either way — retry next poll
+                const stillFollows = latest.tags?.some(tag => tag[0] === "p" && normPubkey(tag[1]) === me);
+                if (stillFollows) {
+                  following.set(a, t);
+                } else {
+                  following.delete(a);
+                  gone.push({ id: `unfollow:${a}:${t}`, pubkey: a, created_at: t, kind: UNFOLLOW_KIND, tags: [] });
+                }
+              }
+              writeFollowing(me, following);
+              if (gone.length) pushNotifs(gone);
+            });
+          }
         },
       });
     }
