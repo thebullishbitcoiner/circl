@@ -15,7 +15,7 @@ import {
 } from "./utils.js";
 import useAuth from "./hooks/useAuth.js";
 import { nostrSubscribe, eventLoader, eventStore, pool, validRelays } from "./nostr.js";
-import { DEFAULT_RELAYS } from "./constants.js";
+import { DEFAULT_RELAYS, UNFOLLOW_KIND } from "./constants.js";
 import useFollows from "./hooks/useFollows.js";
 import useFeed from "./hooks/useFeed.js";
 import useNotifications from "./hooks/useNotifications.js";
@@ -486,7 +486,7 @@ export default function App() {
   };
 
   const handleOpenNotification = async ev => {
-    if (ev.kind === 3) {
+    if (ev.kind === 3 || ev.kind === UNFOLLOW_KIND) {
       handleOpenProfile(ev.pubkey);
       return;
     }

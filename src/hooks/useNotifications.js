@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { isHexPubkey, normPubkey, parseBolt11Msats, isQuoteRepost, fmtSats, parseArticle } from "../utils.js";
 import { pool, eventStore, eventLoader } from "../nostr.js";
-import { DEFAULT_RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS, UNFOLLOW_KIND } from "../constants.js";
 import useMailboxes from "./useMailboxes.js";
 
 const NOTIF_KINDS = [1, 6, 16, 7, 9735, 30023, 1018, 1111, 1244];
@@ -61,6 +61,7 @@ export function getNotificationSummary(ev) {
     return { headline: `zapped you ${amt} ${unit}`, detail: "", kind: "zap" };
   }
   if (kind === 3) return { headline: "started following you", detail: "", kind: "follow" };
+  if (kind === UNFOLLOW_KIND) return { headline: "unfollowed you", detail: "", kind: "unfollow" };
   if (kind === 1018) return { headline: "voted in your poll", detail: "", kind: "poll-vote" };
   if (kind === 6 || kind === 16) return { headline: "Reposted your note", detail: "", kind: "repost" };
   if (kind === 30023) {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { isHexPubkey, normPubkey } from "../utils.js";
 import { pool, eventStore } from "../nostr.js";
-import { DEFAULT_RELAYS } from "../constants.js";
+import { DEFAULT_RELAYS, UNFOLLOW_KIND } from "../constants.js";
 
 const REFRESH_MS = 20 * 60 * 1000; // poll on mount, then every 20 min
 const FOLLOWING_KEY = "circl_known_followers_v1"; // ground truth: who currently follows me
@@ -110,17 +110,24 @@ export default function useNewFollowers({ pubkey }) {
           for (const a of currentAuthors) following.set(a, now);
           // Only drop someone once they've been missing long enough to be a real
           // unfollow rather than a relay query simply not surfacing them this time.
+          const unfollowed = [];
           for (const [a, lastSeen] of following) {
-            if (!currentSet.has(a) && now - lastSeen > UNFOLLOW_GRACE_SEC) following.delete(a);
+            if (!currentSet.has(a) && now - lastSeen > UNFOLLOW_GRACE_SEC) {
+              following.delete(a);
+              unfollowed.push(a);
+            }
           }
           writeFollowing(me, following);
-          if (!newFollows.length) return;
+          if (!newFollows.length && !unfollowed.length) return;
 
           const fresh = newFollows.map(a => {
             const ev = latestByAuthor.get(a);
             return { id: ev.id, pubkey: ev.pubkey, created_at: ev.created_at, kind: 3, tags: [] };
           });
-          const merged = pruneNotifs([...readStoredNotifs(me), ...fresh]);
+          // No real Nostr event represents an unfollow — this is inferred from
+          // absence, so the notification item is synthesized rather than relay-sourced.
+          const gone = unfollowed.map(a => ({ id: `unfollow:${a}:${now}`, pubkey: a, created_at: now, kind: UNFOLLOW_KIND, tags: [] }));
+          const merged = pruneNotifs([...readStoredNotifs(me), ...fresh, ...gone]);
           writeStoredNotifs(me, merged);
           setItems(merged);
         },

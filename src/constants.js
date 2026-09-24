@@ -8,6 +8,11 @@ export const DEFAULT_RELAYS = [
   "wss://relay.primal.net",
 ];
 
+/** Synthetic notification "kind" for an inferred unfollow — not a real Nostr
+ *  event kind (Nostr has no unfollow event), just a sentinel so it can flow
+ *  through the same notification rendering pipeline as real event kinds. */
+export const UNFOLLOW_KIND = -3;
+
 
 export const ZAP_PRESETS = [
   { sats: 21,    label: "default" },
