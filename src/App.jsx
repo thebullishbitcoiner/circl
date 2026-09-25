@@ -109,8 +109,6 @@ function describeUnresolvedBookmark(tag) {
   return m[2] ? `${label}: ${m[2]}` : label;
 }
 
-const NO_FOLLOWER_EVENTS = [];
-
 export default function App() {
   const { pubkey, status, error, login, logout, signAndPublish, privateRelayUrls } = useAuth();
   const isInnerCircl = useIsInnerCircl(pubkey);
@@ -203,9 +201,7 @@ export default function App() {
     addLocalReply,
   });
   const { items: notifItems, loading: notifLoading } = useNotifications({ pubkey });
-  // TEMP: disabled to test whether follow polling slows the home feed
-  // const { items: newFollowerEvents } = useNewFollowers({ pubkey });
-  const newFollowerEvents = NO_FOLLOWER_EVENTS;
+  const { items: newFollowerEvents } = useNewFollowers({ pubkey });
   const notificationEvents = useMemo(
     () => [...notifItems, ...newFollowerEvents].sort((a, b) => b.created_at - a.created_at),
     [notifItems, newFollowerEvents]

@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { isHexPubkey, normPubkey } from "../utils.js";
-import { pool, eventStore } from "../nostr.js";
+import { pool } from "../nostr.js";
 import { DEFAULT_RELAYS, UNFOLLOW_KIND } from "../constants.js";
 
-const REFRESH_MS = 20 * 60 * 1000; // poll on mount, then every 20 min
+const REFRESH_MS = 20 * 60 * 1000; // re-poll every 20 min
+const FIRST_POLL_DELAY_MS = 30 * 1000;
 const FOLLOWING_KEY = "circl_known_followers_v1"; // ground truth: who currently follows me
 const NOTIFS_KEY = "circl_follow_notifications_v1"; // durable record of surfaced follow/unfollow items
 const LASTPOLL_KEY = "circl_follow_lastpoll_v1"; // when the last non-empty poll completed
@@ -129,7 +130,6 @@ export default function useNewFollowers({ pubkey }) {
 
       pool.request(relayUrls, [{ kinds: [3], "#p": [me] }]).subscribe({
         next: raw => {
-          eventStore.add(raw);
           const author = normPubkey(raw.pubkey);
           const prev = latestByAuthor.get(author);
           if (!prev || raw.created_at > prev.created_at) latestByAuthor.set(author, raw);
@@ -198,9 +198,11 @@ export default function useNewFollowers({ pubkey }) {
       });
     }
 
-    poll();
+    // Contact lists are large and there's one per follower, so hold off the first
+    // poll until the home feed has had the bandwidth to load.
+    const firstPoll = setTimeout(poll, FIRST_POLL_DELAY_MS);
     const interval = setInterval(poll, REFRESH_MS);
-    return () => { cancelled = true; clearInterval(interval); };
+    return () => { cancelled = true; clearTimeout(firstPoll); clearInterval(interval); };
   }, [me]);
 
   return { items };
