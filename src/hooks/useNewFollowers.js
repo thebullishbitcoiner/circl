@@ -19,6 +19,22 @@ const UNFOLLOW_GRACE_SEC = 60 * 60 * 24;
 // just missed earlier, so they're recorded silently.
 const NEW_FOLLOW_SLACK_SEC = 10 * 60;
 const CONFIRM_TIMEOUT_MS = 8000;
+const MIN_HEALTHY_POLL_RATIO = 0.5;
+const CLEANUP_KEY = "circl_follow_cleanup_v1";
+
+// One-time purge of "unfollowed you" items generated before unfollows required
+// proof of a newer contact list — those were largely false positives.
+function purgeLegacyUnfollows(pk) {
+  const flags = readJSON(CLEANUP_KEY);
+  if (flags[pk]) return;
+  const all = readJSON(NOTIFS_KEY);
+  if (Array.isArray(all[pk])) {
+    all[pk] = all[pk].filter(e => e.kind !== UNFOLLOW_KIND);
+    writeJSON(NOTIFS_KEY, all);
+  }
+  flags[pk] = true;
+  writeJSON(CLEANUP_KEY, flags);
+}
 
 function readJSON(key) {
   try { return JSON.parse(localStorage.getItem(key) || "{}"); } catch { return {}; }
@@ -106,13 +122,18 @@ export default function useNewFollowers({ pubkey }) {
   // Minimal event shape is all the notification pipeline needs to render a
   // "started following you" row — no need to persist the full (potentially
   // huge) contact-list event just to keep this notification alive.
-  const [items, setItems] = useState(() => (isHexPubkey(me) ? readStoredNotifs(me) : []));
+  const [items, setItems] = useState(() => {
+    if (!isHexPubkey(me)) return [];
+    purgeLegacyUnfollows(me);
+    return readStoredNotifs(me);
+  });
 
   useEffect(() => {
     if (!isHexPubkey(me)) { setItems([]); return; }
 
     let cancelled = false;
     let following = readFollowing(me); // Map<hex, lastSeenAt> | null
+    purgeLegacyUnfollows(me);
 
     // Re-hydrate from durable storage on every mount, so a page refresh
     // doesn't lose notifications that already surfaced but haven't expired.
@@ -158,9 +179,13 @@ export default function useNewFollowers({ pubkey }) {
           // Refresh "last seen following me" for everyone this poll confirmed
           // (this also silently absorbs followers we'd merely missed before).
           for (const a of currentAuthors) following.set(a, now);
-          const staleAuthors = [...following.keys()].filter(
-            a => !currentSet.has(a) && now - following.get(a) > UNFOLLOW_GRACE_SEC
-          );
+          // If this poll returned far fewer followers than we know about, the query
+          // itself was degraded (e.g. only some relays connected yet) — don't read
+          // mass absence as mass unfollows.
+          const degraded = currentAuthors.length < following.size * MIN_HEALTHY_POLL_RATIO;
+          const staleAuthors = degraded ? [] : [...following.entries()]
+            .filter(([a, seen]) => !currentSet.has(a) && now - seen > UNFOLLOW_GRACE_SEC)
+            .map(([a, seen]) => ({ a, seen }));
           writeFollowing(me, following);
           // A poll that returned nothing likely means relays weren't reachable, so
           // don't advance the "since" marker past follows we might have missed.
@@ -176,18 +201,21 @@ export default function useNewFollowers({ pubkey }) {
           if (staleAuthors.length) {
             // Absence from the #p query isn't proof of an unfollow — check each
             // account's actual latest contact list before saying they left.
-            Promise.all(staleAuthors.map(async a => ({ a, latest: await fetchLatestContactList(a, relayUrls) }))).then(results => {
+            Promise.all(staleAuthors.map(async ({ a, seen }) => ({ a, seen, latest: await fetchLatestContactList(a, relayUrls) }))).then(results => {
               if (cancelled) return;
               const t = Math.floor(Date.now() / 1000);
               const gone = [];
-              for (const { a, latest } of results) {
+              for (const { a, seen, latest } of results) {
                 if (!latest) continue; // couldn't confirm either way — retry next poll
                 const stillFollows = latest.tags?.some(tag => tag[0] === "p" && normPubkey(tag[1]) === me);
                 if (stillFollows) {
                   following.set(a, t);
-                } else {
+                } else if (latest.created_at > seen) {
+                  // Only a list published after we last saw them following is evidence
+                  // of an unfollow — relays often keep older copies from before they
+                  // followed, which also lack us.
                   following.delete(a);
-                  gone.push({ id: `unfollow:${a}:${t}`, pubkey: a, created_at: t, kind: UNFOLLOW_KIND, tags: [] });
+                  gone.push({ id: `unfollow:${a}:${latest.created_at}`, pubkey: a, created_at: latest.created_at, kind: UNFOLLOW_KIND, tags: [] });
                 }
               }
               writeFollowing(me, following);
