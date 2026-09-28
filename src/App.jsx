@@ -109,8 +109,6 @@ function describeUnresolvedBookmark(tag) {
   return m[2] ? `${label}: ${m[2]}` : label;
 }
 
-const EMPTY_ARRAY = [];
-
 export default function App() {
   const { pubkey, status, error, login, logout, signAndPublish, privateRelayUrls } = useAuth();
   const isInnerCircl = useIsInnerCircl(pubkey);
@@ -203,9 +201,7 @@ export default function App() {
     addLocalReply,
   });
   const { items: notifItems, loading: notifLoading } = useNotifications({ pubkey });
-  // TEMP: disabled entirely to test a "no note" rendering issue in the feed
-  // const { items: newFollowerEvents } = useNewFollowers({ pubkey });
-  const newFollowerEvents = EMPTY_ARRAY;
+  const { items: newFollowerEvents } = useNewFollowers({ pubkey });
   const notificationEvents = useMemo(
     () => [...notifItems, ...newFollowerEvents].sort((a, b) => b.created_at - a.created_at),
     [notifItems, newFollowerEvents]

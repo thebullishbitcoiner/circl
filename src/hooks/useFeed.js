@@ -37,7 +37,12 @@ export default function useFeed({ follows, feedKinds, setLocalReaction, addLocal
   const subKinds = [...new Set([...enabledKinds, 1, 1111])];
   const subKindsKey = subKinds.join(",");
   const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(false);
+  // `follows` starts empty regardless of any cache (App mounts once before
+  // useFollows's own state has a chance to resolve), so an initializer keyed
+  // off it here would still race the same way. Default to loading and only
+  // clear it once the effect below has an actual answer — either events
+  // start arriving, or `authors` turns out to be genuinely empty.
+  const [loading, setLoading] = useState(true);
   const seen = useRef(new Set());
   // pubkey → { ids: Set<eventId>, addrs: Set<"kind:pubkey:d"> }
   const [deletionMap, setDeletionMap] = useState(new Map());
@@ -47,7 +52,13 @@ export default function useFeed({ follows, feedKinds, setLocalReaction, addLocal
 
   useEffect(() => {
     const authors = (follows || []).filter(isHexPubkey);
-    if (!authors.length) return;
+    if (!authors.length) {
+      // Genuinely nothing to fetch for (e.g. a brand new account that follows
+      // no one yet) — resolve loading instead of leaving it stuck forever.
+      setLoading(false);
+      setEvents([]);
+      return;
+    }
     setLoading(true);
     setEvents([]);
     setDeletionMap(new Map());
