@@ -15,6 +15,7 @@ import { DEFAULT_RELAYS } from "../constants.js";
 import { useNavigation } from "../context/NavigationContext.jsx";
 import useContentSettings from "../hooks/useContentSettings.js";
 import { EmojiSetCard } from "./EmojiSet.jsx";
+import MutedNoteGate from "./MutedNoteGate.jsx";
 
 function ZapEmbed({ event, profiles, onOpenProfile }) {
   const [liveEvent, setLiveEvent]     = useState(null);
@@ -714,18 +715,23 @@ export default function NoteContent({
       if (ref.type === "naddr") {
         const refEvent = resolvedNaddrRefs[ref.value];
         if (!refEvent) return <EmbeddedNaddrRef key={`bot-${i}`} naddr={ref.value} />;
-        return <EmbeddedEvent key={`bot-${i}`} event={refEvent} profiles={profiles} onOpenProfile={onOpenProfile} />;
+        return (
+          <MutedNoteGate key={`bot-${i}`} event={refEvent} profiles={profiles} onOpenProfile={onOpenProfile}>
+            <EmbeddedEvent event={refEvent} profiles={profiles} onOpenProfile={onOpenProfile} />
+          </MutedNoteGate>
+        );
       }
       const id = resolveNeventToId(ref.value);
       const refEvent = id ? (allEvents.find(e => e.id === id) || resolvedRefs[id]) : null;
       if (!refEvent) return <EmbeddedEventRef key={`bot-${i}`} nevent={ref.value} />;
       return (
-        <EmbeddedEvent
-          key={`bot-${i}`}
-          event={refEvent}
-          profiles={profiles}
-          onOpenProfile={onOpenProfile}
-        />
+        <MutedNoteGate key={`bot-${i}`} event={refEvent} profiles={profiles} onOpenProfile={onOpenProfile}>
+          <EmbeddedEvent
+            event={refEvent}
+            profiles={profiles}
+            onOpenProfile={onOpenProfile}
+          />
+        </MutedNoteGate>
       );
     })}
 
