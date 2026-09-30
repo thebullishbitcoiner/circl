@@ -716,7 +716,7 @@ export default function NoteContent({
         const refEvent = resolvedNaddrRefs[ref.value];
         if (!refEvent) return <EmbeddedNaddrRef key={`bot-${i}`} naddr={ref.value} />;
         return (
-          <MutedNoteGate key={`bot-${i}`} event={refEvent} profiles={profiles} onOpenProfile={onOpenProfile}>
+          <MutedNoteGate key={`bot-${i}`} event={refEvent} profiles={profiles} onOpenProfile={onOpenProfile} embedded>
             <EmbeddedEvent event={refEvent} profiles={profiles} onOpenProfile={onOpenProfile} />
           </MutedNoteGate>
         );
@@ -725,7 +725,7 @@ export default function NoteContent({
       const refEvent = id ? (allEvents.find(e => e.id === id) || resolvedRefs[id]) : null;
       if (!refEvent) return <EmbeddedEventRef key={`bot-${i}`} nevent={ref.value} />;
       return (
-        <MutedNoteGate key={`bot-${i}`} event={refEvent} profiles={profiles} onOpenProfile={onOpenProfile}>
+        <MutedNoteGate key={`bot-${i}`} event={refEvent} profiles={profiles} onOpenProfile={onOpenProfile} embedded>
           <EmbeddedEvent
             event={refEvent}
             profiles={profiles}

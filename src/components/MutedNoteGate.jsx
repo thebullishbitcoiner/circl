@@ -3,7 +3,7 @@ import { useNavigation } from "../context/NavigationContext.jsx";
 import Avatar from "./Avatar.jsx";
 import { displayName, nip05OrNpub, relativeTime } from "../utils.js";
 
-export default function MutedNoteGate({ event, children, profiles, skipUserMute = false, skipThreadMute = false, onOpenProfile }) {
+export default function MutedNoteGate({ event, children, profiles, skipUserMute = false, skipThreadMute = false, onOpenProfile, embedded = false }) {
   const { isMuted, isContentMuted } = useNavigation();
   const [revealed, setRevealed] = useState(false);
   const contentReason = isContentMuted?.(event);
@@ -12,6 +12,36 @@ export default function MutedNoteGate({ event, children, profiles, skipUserMute 
     (!skipUserMute && isMuted?.(event?.pubkey) ? "user" : null)
   );
   if (!reason) return children;
+  // Inside a quote/reference embed, EmbeddedEvent normally supplies the
+  // bordered ".note-embed" box itself — since we're standing in for it
+  // rather than nesting inside it, carry that styling here instead of the
+  // flat, bottom-border-only ".note-card" list-row look.
+  if (embedded) {
+    return (
+      <div className="note-embed">
+        <div className="note-embed-head">
+          <div style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }}>
+            <Avatar pk={event.pubkey} profiles={profiles} size={20} />
+          </div>
+          <span className="note-embed-name" style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); onOpenProfile?.(event.pubkey); }}>
+            {displayName(event.pubkey, profiles)}
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "'DM Sans', sans-serif" }}>
+            {reason === "user" ? "Muted user" : reason === "thread" ? "Muted thread" : <>Muted · <span style={{ color: "var(--text-faint)" }}>{reason}</span></>}
+          </span>
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); setRevealed(true); }}
+            style={{ flexShrink: 0, fontSize: 11, fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: "var(--primary)", background: "transparent", border: "1px solid var(--primary)", borderRadius: 20, padding: "2px 10px", cursor: "pointer" }}
+          >
+            Show
+          </button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="note-card">
       {event.kind === 6 ? (
