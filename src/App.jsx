@@ -109,6 +109,34 @@ function describeUnresolvedBookmark(tag) {
   return m[2] ? `${label}: ${m[2]}` : label;
 }
 
+// A shareable "nostr:" reference for an unresolved bookmark tag, so it can be
+// pasted into another client/relay explorer to track the original note down —
+// the whole point of surfacing these rows is that we couldn't find it ourselves.
+function unresolvedBookmarkRef(tag) {
+  try {
+    if (tag[0] === "e" && tag[1]) return "nostr:" + nip19.neventEncode({ id: tag[1] });
+    const m = typeof tag[1] === "string" && tag[1].match(/^(\d+):([0-9a-fA-F]{64}):([\s\S]*)$/);
+    if (m) {
+      return "nostr:" + nip19.naddrEncode({ kind: parseInt(m[1], 10), pubkey: m[2], identifier: m[3] });
+    }
+  } catch {}
+  return tag[1] || "";
+}
+
+function CopyBookmarkRefButton({ tag }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        navigator.clipboard?.writeText(unresolvedBookmarkRef(tag)).catch(() => {});
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+      style={{ padding: "3px 9px", borderRadius: 6, border: "1px solid var(--border)", background: "transparent", color: "var(--text-faint)", fontSize: 12, fontFamily: "'DM Sans',sans-serif", cursor: "pointer", flexShrink: 0 }}
+    >{copied ? "Copied" : "Copy ID"}</button>
+  );
+}
+
 export default function App() {
   const { pubkey, status, error, login, logout, signAndPublish, privateRelayUrls } = useAuth();
   const isInnerCircl = useIsInnerCircl(pubkey);
@@ -980,6 +1008,7 @@ export default function App() {
                               : "Couldn't load from your relays — may still exist elsewhere"}
                           </div>
                         </div>
+                        <CopyBookmarkRefButton tag={tag} />
                         <button
                           onClick={async () => {
                             try { await removeBookmarkTag(tag); showToast("Removed from bookmarks"); }
