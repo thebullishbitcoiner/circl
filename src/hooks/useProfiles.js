@@ -1,13 +1,20 @@
 import { useState, useEffect, useMemo } from "react";
 import { isHexPubkey, normPubkey, nip19 } from "../utils.js";
-import { pool, eventStore } from "../nostr.js";
-import { DEFAULT_RELAYS } from "../constants.js";
+import { pool, eventStore, relayUrls$ } from "../nostr.js";
 
 const PRIORITY_COUNT = 32; // self + notification actors + first feed authors
 const REST_DELAY_MS = 600;
+// A profile fetch can miss even when the author really has one published —
+// most often because it ran before our outbox relays finished connecting
+// (the same relay-bootstrap race `useFollows`/`useFeed` guard against).
+// Retry a bounded number of times with backoff instead of giving up for
+// the rest of the session after a single attempt.
+const MAX_ATTEMPTS = 3;
+const RETRY_DELAYS_MS = [5000, 20000];
 
-// Module-scope: pubkeys marked here are never re-fetched on remount
-const _fetched = new Set();
+// Module-scope: pubkey → attempt count so far (persists across remounts,
+// reset only on a full page reload)
+const _attempts = new Map();
 
 // Module-scope: pending "rest" pubkeys batch, debounced
 const _pendingRest = new Set();
@@ -65,14 +72,38 @@ function toProfileShape(k, data) {
 
 const FETCH_CHUNK_SIZE = 50;
 
+function scheduleRetry(pk) {
+  const attempts = _attempts.get(pk) || 1;
+  if (attempts >= MAX_ATTEMPTS) return;
+  _attempts.set(pk, attempts + 1);
+  const delay = RETRY_DELAYS_MS[attempts - 1] ?? RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1];
+  setTimeout(() => {
+    if (profileFromStore(pk)) return; // resolved via some other path meanwhile
+    fetchBatch([pk]);
+  }, delay);
+}
+
 function fetchBatch(pubkeys) {
   if (!pubkeys.length) return;
-  const relayUrls = pool.relays.size > 0 ? [...pool.relays.keys()] : DEFAULT_RELAYS;
-  // Chunk to stay within relay filter size limits
+  // Chunk to stay within relay filter size limits. Uses the same reactive
+  // relay-list pattern as useFollows/useFeed/useBookmarkedEvents — a static
+  // snapshot of pool.relays here would miss outbox relays that connect a
+  // moment later, which is exactly the class of bug this hook was hitting.
   for (let i = 0; i < pubkeys.length; i += FETCH_CHUNK_SIZE) {
     const chunk = pubkeys.slice(i, i + FETCH_CHUNK_SIZE);
-    pool.request(relayUrls, [{ kinds: [0], authors: chunk }]).subscribe({
-      next: event => eventStore.add(event),
+    const found = new Set();
+    pool.group(relayUrls$, false).request([{ kinds: [0], authors: chunk }]).subscribe({
+      next: event => {
+        eventStore.add(event);
+        const k = normalizeProfilePubkey(event.pubkey);
+        if (k) found.add(k);
+      },
+      complete: () => {
+        for (const pk of chunk) if (!found.has(pk)) scheduleRetry(pk);
+      },
+      error: () => {
+        for (const pk of chunk) scheduleRetry(pk);
+      },
     });
   }
 }
@@ -137,8 +168,8 @@ export default function useProfiles({ pubkeys }) {
 
     for (let i = 0; i < list.length; i++) {
       const k = normalizeProfilePubkey(list[i]);
-      if (!k || _fetched.has(k)) continue;
-      _fetched.add(k);
+      if (!k || _attempts.has(k)) continue;
+      _attempts.set(k, 1);
 
       if (i < PRIORITY_COUNT) {
         priorityNew.push(k);

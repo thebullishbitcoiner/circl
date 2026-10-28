@@ -61,7 +61,14 @@ export default function useRichTextEditor({ profiles, myPubkey, onTextChange, on
           if (pk === myPubkey) return false;
           const name = (p.display_name || p.name || "").toLowerCase();
           const nip05 = (p.nip05 || "").toLowerCase().split("@")[0];
-          return !query || name.startsWith(query) || nip05.startsWith(query);
+          if (!query) return true;
+          // The typed query can never contain a space, but a display name
+          // routinely does ("The Fishcake") — compare against both the name
+          // with spaces collapsed out ("@thefishcake") and each individual
+          // word ("@fishcake"), not just a literal prefix of the raw name.
+          if (nip05.startsWith(query)) return true;
+          if (name.replace(/\s+/g, "").startsWith(query)) return true;
+          return name.split(/\s+/).some(word => word.startsWith(query));
         })
         .slice(0, 6)
         .map(([pk]) => pk);
