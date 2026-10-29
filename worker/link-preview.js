@@ -30,6 +30,7 @@ export default {
       return json(null, 400);
     }
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return json(null, 400);
+    if (isBlockedHost(parsed.hostname)) return json(null, 400);
 
     try {
       const res = await fetch(target, {
@@ -90,6 +91,43 @@ function meta(html, ...props) {
     }
   }
   return null;
+}
+
+// `target` is attacker-controlled (any URL found in a note). Block literal
+// loopback/private/link-local/metadata addresses so a note can't make this
+// worker fetch internal infrastructure on the poster's behalf (SSRF). This
+// catches IP-literal targets; it does not re-resolve hostnames after DNS,
+// so it isn't a defense against DNS rebinding — out of scope for the blast
+// radius here (Workers egress is already isolated from our own infra).
+function isBlockedHost(hostname) {
+  const host = (hostname || "").toLowerCase().replace(/^\[|\]$/g, "");
+  if (!host) return true;
+  if (host === "localhost" || host.endsWith(".localhost")) return true;
+  if (host === "metadata.google.internal" || host === "metadata") return true;
+
+  const v4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) {
+    const [a, b] = v4.slice(1, 3).map(Number);
+    if (a === 0) return true;                          // 0.0.0.0/8
+    if (a === 10) return true;                          // 10.0.0.0/8
+    if (a === 127) return true;                         // 127.0.0.0/8 (loopback)
+    if (a === 169 && b === 254) return true;             // 169.254.0.0/16 (incl. cloud metadata)
+    if (a === 172 && b >= 16 && b <= 31) return true;    // 172.16.0.0/12
+    if (a === 192 && b === 168) return true;             // 192.168.0.0/16
+    if (a === 192 && b === 0) return true;                // 192.0.0.0/24
+    if (a === 100 && b >= 64 && b <= 127) return true;    // 100.64.0.0/10 (CGNAT)
+    if (a === 198 && (b === 18 || b === 19)) return true; // 198.18.0.0/15
+    if (a >= 224) return true;                            // multicast/reserved
+    return false;
+  }
+
+  if (host.includes(":")) {
+    if (host === "::1" || host === "::") return true;     // loopback / unspecified
+    if (host.startsWith("fe80:") || host.startsWith("fc") || host.startsWith("fd")) return true; // link-local / unique-local
+    const mapped = host.match(/::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+    if (mapped) return isBlockedHost(mapped[1]);
+  }
+  return false;
 }
 
 function resolveUrl(base, url) {

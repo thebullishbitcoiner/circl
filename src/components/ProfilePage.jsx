@@ -8,7 +8,7 @@ import NoteActions from "./NoteActions.jsx";
 import ProfileText from "./ProfileText.jsx";
 import { Bk, CkC, AlC } from "./icons.jsx";
 import ProfileContextMenu from "./ProfileContextMenu.jsx";
-import { displayName, nip05OrNpub, relativeTime, shortNpub, truncNpub, avatarUrl, isQuoteRepost, isHexPubkey, replyCount, repostAndQuoteCount, normPubkey, directReplyParentId, parseKind6EmbeddedEvent, nip19, parseNoteMediaSegments, zapperPubkeyFromKind9735, collapseEventRevisions } from "../utils.js";
+import { displayName, nip05OrNpub, relativeTime, shortNpub, truncNpub, avatarUrl, safeImageUrl, isQuoteRepost, isHexPubkey, replyCount, repostAndQuoteCount, normPubkey, directReplyParentId, parseKind6EmbeddedEvent, nip19, parseNoteMediaSegments, zapperPubkeyFromKind9735, collapseEventRevisions } from "../utils.js";
 import useProfiles from "../hooks/useProfiles.js";
 import NoteContextMenu from "./NoteContextMenu.jsx";
 import NoteJsonModal from "./NoteJsonModal.jsx";
@@ -319,8 +319,10 @@ export default function ProfilePage({
   const { profiles: ownFetchedProfiles } = useProfiles({ pubkeys: ownProfilePks });
   const profiles = useMemo(() => ({ ...ownFetchedProfiles, ...profilesProp }), [profilesProp, ownFetchedProfiles]);
 
-  const p    = profiles?.[pubkey] || {};
-  const name = displayName(pubkey, profiles);
+  const p      = profiles?.[pubkey] || {};
+  const name   = displayName(pubkey, profiles);
+  const pictureUrl = safeImageUrl(p.picture);
+  const bannerUrl  = safeImageUrl(p.banner);
   const websiteHref = normalizeWebsite(p.website);
   const websiteLabel = websiteHref ? websiteHref.replace(/^https?:\/\//, "").replace(/\/$/, "") : "";
   const nip05Parsed = useMemo(() => parseNip05(p.nip05), [p.nip05]);
@@ -1060,12 +1062,12 @@ export default function ProfilePage({
     <div ref={scrollRef} className="slide-panel-scroll" onScroll={handleProfileScroll}>
       <div
         className="profile-banner"
-        style={{ position: "relative", cursor: p.banner ? "pointer" : undefined }}
-        onClick={p.banner ? () => setLightboxUrl(p.banner) : undefined}
+        style={{ position: "relative", cursor: bannerUrl ? "pointer" : undefined }}
+        onClick={bannerUrl ? () => setLightboxUrl(bannerUrl) : undefined}
       >
-        {p.banner ? (
+        {bannerUrl ? (
           <>
-            <img className="profile-banner-image" src={p.banner} alt="" onError={e => { e.target.style.display = "none"; }} />
+            <img className="profile-banner-image" src={bannerUrl} alt="" referrerPolicy="no-referrer" onError={e => { e.target.style.display = "none"; }} />
             <div className="profile-banner-overlay" />
           </>
         ) : (
@@ -1106,11 +1108,11 @@ export default function ProfilePage({
                 <div
                   ref={avatarRef}
                   className={`profile-av${activeStream ? " profile-av-live" : ""}${isInnerCircl ? " profile-av-inner-circl" : ""}`}
-                  onClick={activeStream ? () => onOpenStream?.(activeStream) : (p.picture ? () => setLightboxUrl(p.picture) : undefined)}
-                  style={(activeStream || p.picture) ? { cursor: "pointer" } : undefined}
+                  onClick={activeStream ? () => onOpenStream?.(activeStream) : (pictureUrl ? () => setLightboxUrl(pictureUrl) : undefined)}
+                  style={(activeStream || pictureUrl) ? { cursor: "pointer" } : undefined}
                 >
-                  {p.picture
-                    ? <img src={p.picture} alt={name} onError={e => { e.target.style.display = "none"; }} />
+                  {pictureUrl
+                    ? <img src={pictureUrl} alt={name} referrerPolicy="no-referrer" onError={e => { e.target.style.display = "none"; }} />
                     : name[0]?.toUpperCase()}
                 </div>
               );

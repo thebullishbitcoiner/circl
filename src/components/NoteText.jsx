@@ -5,6 +5,18 @@ function trimUrlToken(url) {
   return url.replace(/(?:[),.;:!?*»\]}]|[^\x00-\x7F])+$/, "");
 }
 
+// Explicit scheme allowlist (mirrors ProfileText.jsx's toHref) rather than relying
+// only on the regexes above happening to never match a dangerous scheme — keeps
+// this safe even if SPLIT_RE/BARE_URL_RE are ever loosened later.
+function safeHref(url) {
+  try {
+    const u = new URL(url);
+    return (u.protocol === "http:" || u.protocol === "https:") ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 // Matches garbage left behind when the bech32 regex stops at a non-bech32 char that
 // was actually part of a corrupted nostr entity HRP (e.g. "ofile1qqs8…" from a
 // mangled "nprofile1qqs8…"). Pattern: up to 12 non-whitespace non-separator chars,
@@ -120,28 +132,34 @@ export default function NoteText({ content, profiles, onOpenProfile, onOpenHasht
       prevWasDecodedNostr = false;
 
     } else if (/^https?:\/\//i.test(part)) {
-      const href = trimUrlToken(part);
-      const trailing = part.slice(href.length);
+      const token = trimUrlToken(part);
+      const trailing = part.slice(token.length);
+      const href = safeHref(token);
       elements.push(
-        <Fragment key={i}>
-          <a className="note-link" href={href} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-            {href.replace(/^https?:\/\//, "")}
-          </a>
-          {trailing}
-        </Fragment>
+        href ? (
+          <Fragment key={i}>
+            <a className="note-link" href={href} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+              {token.replace(/^https?:\/\//, "")}
+            </a>
+            {trailing}
+          </Fragment>
+        ) : part
       );
       prevWasDecodedNostr = false;
 
     } else if (BARE_URL_RE.test(part)) {
       const display = trimUrlToken(part);
       const trailing = part.slice(display.length);
+      const href = safeHref(`https://${display}`);
       elements.push(
-        <Fragment key={i}>
-          <a className="note-link" href={`https://${display}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-            {display}
-          </a>
-          {trailing}
-        </Fragment>
+        href ? (
+          <Fragment key={i}>
+            <a className="note-link" href={href} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+              {display}
+            </a>
+            {trailing}
+          </Fragment>
+        ) : part
       );
       prevWasDecodedNostr = false;
 

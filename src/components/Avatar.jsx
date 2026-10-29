@@ -8,7 +8,7 @@ function Avatar({ pk, profiles, size = 36, className = "" }) {
   const isInnerCircl = useIsInnerCircl(pk);
 
   const content = url
-    ? <img src={url} alt={init} onError={e => { e.target.style.display = "none"; }} />
+    ? <img src={url} alt={init} referrerPolicy="no-referrer" onError={e => { e.target.style.display = "none"; }} />
     : init;
 
   if (!isInnerCircl) {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { Bk, Ck } from "./icons.jsx";
-import { displayName, shortNpub } from "../utils.js";
+import { displayName, shortNpub, safeImageUrl } from "../utils.js";
 import { useNip05DomainMembers } from "../hooks/useNip05DomainMembers.js";
 import useProfiles from "../hooks/useProfiles.js";
 
@@ -100,8 +100,8 @@ export default function Nip05DomainMembers({ domain, profiles: profilesProp, onO
               >
                 <div className="circle-card-inner">
                   <div className="circle-card-av">
-                    {fp.picture
-                      ? <img src={fp.picture} alt={fn} onError={e => { e.target.style.display = "none"; }} />
+                    {safeImageUrl(fp.picture)
+                      ? <img src={safeImageUrl(fp.picture)} alt={fn} referrerPolicy="no-referrer" onError={e => { e.target.style.display = "none"; }} />
                       : fn[0]?.toUpperCase()}
                   </div>
                   <div className="circle-card-info">

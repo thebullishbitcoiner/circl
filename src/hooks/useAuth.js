@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { DEFAULT_RELAYS, NOSTR_CLIENT_TAG } from "../constants.js";
-import { isHexPubkey, normPubkey } from "../utils.js";
+import { isHexPubkey, normPubkey, clearSensitiveAccountCache } from "../utils.js";
 import { pool, validRelays, publishWithStatus, eventStore, setActivePubkey } from "../nostr.js";
 import { isReplaceable, getReplaceableIdentifier } from "applesauce-core/helpers/event";
 import useMailboxes from "./useMailboxes.js";
@@ -59,11 +59,12 @@ export default function useAuth() {
     for (const url of [...pool.relays.keys()]) {
       try { pool.remove(url); } catch {}
     }
+    clearSensitiveAccountCache(pubkey);
     setPubkey(null);
     setActivePubkey(null);
     setStatus("idle");
     sessionStorage.removeItem("circl_pk");
-  }, []);
+  }, [pubkey]);
 
   // Keep the pool's blocked-relay set in sync (NIP-51 kind 10006)
   useBlockedRelays(pubkey);

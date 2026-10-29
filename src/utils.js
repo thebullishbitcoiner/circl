@@ -186,10 +186,45 @@ export const avatarInitial = (pk, p) => {
   const n = p?.[k]?.display_name || p?.[k]?.name;
   return n ? n[0].toUpperCase() : (k?.[0]?.toUpperCase() ?? "?");
 };
+// Profile picture/banner URLs are relay-controlled (set by whoever owns the
+// profile being viewed) and were being passed straight into <img src> with
+// no scheme check, unlike note media (parseNoteMediaSegments). javascript:/data:
+// aren't script-executable from <img src>, but validate explicitly anyway for
+// defense-in-depth and consistency with note media handling.
+export const safeImageUrl = url => {
+  if (typeof url !== "string" || !url) return null;
+  try {
+    const u = new URL(url);
+    return (u.protocol === "http:" || u.protocol === "https:") ? url : null;
+  } catch {
+    return null;
+  }
+};
 export const avatarUrl = (pk, p) => {
   const k = normPubkey(pk);
-  return p?.[k]?.picture || null;
+  return safeImageUrl(p?.[k]?.picture);
 };
+
+// Decrypted-at-rest localStorage caches (NIP-51 lists decrypted via the NIP-07
+// extension, then cached as plaintext JSON for speed). Unlike circl_wallet
+// (self NIP-44-encrypted before it ever touches localStorage) these are plain
+// text, so on logout we clear this account's slice rather than leaving it
+// readable to the next person who opens the browser. Each key is shared
+// across accounts as { [pubkey]: data }, so only the logged-out pubkey's
+// entry is removed -- other accounts cached on the same device are untouched.
+const SENSITIVE_CACHE_KEYS = ["circl_mutes", "circl_bookmarks", "circl_circles", "circl_custom_emoji"];
+export function clearSensitiveAccountCache(pubkey) {
+  if (!pubkey) return;
+  for (const key of SENSITIVE_CACHE_KEYS) {
+    try {
+      const store = JSON.parse(localStorage.getItem(key) ?? "{}");
+      if (!(pubkey in store)) continue;
+      delete store[pubkey];
+      if (Object.keys(store).length) localStorage.setItem(key, JSON.stringify(store));
+      else localStorage.removeItem(key);
+    } catch { /* leave as-is rather than risk corrupting another account's entry */ }
+  }
+}
 
 export const fmtSatsVal = sats => {
   if (sats >= 1_000_000) return `${(sats / 1_000_000).toFixed(1)}M`;
