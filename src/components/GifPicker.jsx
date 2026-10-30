@@ -23,18 +23,21 @@ export default function GifPicker({ picker, variant = "sheet", closeClassName })
   return (
     <div className={cls.root}>
       <div className={`${cls.row} gif-picker-head`}>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input
-            className={cls.input}
-            placeholder="Search GIFs…"
-            value={gifQuery}
-            onChange={e => setGifQuery(e.target.value)}
-            autoFocus
-          />
-          {closeClassName && (
-            <button type="button" className={closeClassName} onClick={() => setShowGif(false)} aria-label="Close GIF picker">✕</button>
-          )}
+        <div className="gif-picker-title">
+          <span className="gif-attrib">
+            {isNb
+              ? <a href="https://nostr.build" target="_blank" rel="noopener noreferrer">GIFs from nostr.build</a>
+              : <a href="https://giphy.com" target="_blank" rel="noopener noreferrer">Powered by GIPHY</a>}
+          </span>
+          <button type="button" className={closeClassName || "gif-close-btn"} onClick={() => setShowGif(false)} aria-label="Close GIF picker">✕</button>
         </div>
+        <input
+          className={cls.input}
+          placeholder="Search GIFs…"
+          value={gifQuery}
+          onChange={e => setGifQuery(e.target.value)}
+          autoFocus
+        />
         {isNb && suggestions.length > 0 && (
           <div className="gif-chips">
             {suggestions.map(term => (
@@ -98,12 +101,6 @@ export default function GifPicker({ picker, variant = "sheet", closeClassName })
           )}
         </>
       )}
-
-      <div className="gif-attrib">
-        {isNb
-          ? <a href="https://nostr.build" target="_blank" rel="noopener noreferrer">GIFs from nostr.build</a>
-          : <a href="https://giphy.com" target="_blank" rel="noopener noreferrer">Powered by GIPHY</a>}
-      </div>
     </div>
   );
 }
