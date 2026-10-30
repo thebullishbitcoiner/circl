@@ -7,7 +7,11 @@ import { GIPHY_KEY } from "../constants.js";
 const NB_BASE = "https://gifs.nostr.build/api/v1";
 const GIPHY_BASE = "https://api.giphy.com/v1/gifs";
 
-export const GIF_PAGE_SIZE = 24;
+// nostr.build: one request per query for up to 200, no paging (the grid
+// virtualises media itself). Giphy is the temporary fallback only.
+const NB_LIMIT = 200;
+const GIPHY_LIMIT = 24;
+const TIMEOUT_MS = 15_000;
 export const GIF_KINDS = [
   ["reaction", "Reactions"],
   ["meme", "Memes"],
@@ -27,13 +31,25 @@ export class GifApiError extends Error {
 
 const _cache = new Map();
 
+const timeoutSignal = () =>
+  typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(TIMEOUT_MS) : undefined;
+
 async function getJson(url, cacheKey) {
   if (cacheKey && _cache.has(cacheKey)) return _cache.get(cacheKey);
+  const ask = () => fetch(url, { signal: timeoutSignal() });
   let res;
   try {
-    res = await fetch(url);
-  } catch {
-    throw new GifApiError("unavailable", 0);
+    try {
+      res = await ask();
+    } catch (e) {
+      // Not reached at all (TypeError): once more, a second later. A timeout
+      // may have reached the API and been counted, so it isn't retried.
+      if (!(e instanceof TypeError)) throw e;
+      await new Promise(r => setTimeout(r, 1000));
+      res = await ask();
+    }
+  } catch (e) {
+    throw new GifApiError(e?.name === "TimeoutError" ? "timeout" : "unavailable", 0);
   }
   let body = null;
   try { body = await res.json(); } catch {}
@@ -63,6 +79,7 @@ function normalizeNb(item) {
     bytes: item.bytes ?? null,
     mime: item.format ? `image/${item.format}` : null,
     alt: item.title || null,
+    raw: item, // what gifGrid renders from (mp4, lqip, previews)
   };
 }
 
@@ -83,22 +100,20 @@ function normalizeGiphy(g) {
   };
 }
 
-/** @returns {{ items, count, version }} — `version` is the build/day marker used to detect reshuffles between pages. */
-export async function nbSearch({ q, offset = 0, limit = GIF_PAGE_SIZE }) {
-  const url = nbUrl("/search", { q, offset, limit });
-  const j = await getJson(url, `nb|search|${q.toLowerCase()}|${offset}|${limit}`);
-  return { items: (j.items || []).map(normalizeNb), count: j.count ?? 0, version: j.build };
+/** `q` must already be normalised (normaliseGifQuery): one spelling, one cache key. */
+export async function nbSearch(q) {
+  const j = await getJson(nbUrl("/search", { q, limit: NB_LIMIT }), `nb|search|${q}`);
+  return (j.items || []).map(normalizeNb);
 }
 
-export async function nbBrowse({ kind, offset = 0, limit = GIF_PAGE_SIZE }) {
-  const url = nbUrl("/gifs", { kind, offset, limit });
-  const j = await getJson(url, `nb|browse|${kind}|${offset}|${limit}`);
-  return { items: (j.items || []).map(normalizeNb), count: j.count ?? 0, version: j.day };
+export async function nbBrowse(kind) {
+  const j = await getJson(nbUrl("/gifs", { kind, limit: NB_LIMIT }), `nb|browse|${kind}`);
+  return (j.items || []).map(normalizeNb);
 }
 
 export async function nbSuggest(q) {
   const url = nbUrl("/suggest", { q, limit: 6 });
-  const j = await getJson(url, `nb|suggest|${q.toLowerCase()}`);
+  const j = await getJson(url, `nb|suggest|${q}`);
   const terms = j.terms || [];
   const exact = terms.filter(t => !t.fuzzy);
   return (exact.length ? exact : terms).map(t => t.term);
@@ -113,13 +128,13 @@ export function nbReport(id, reason) {
 }
 
 export async function giphySearch(q) {
-  const url = `${GIPHY_BASE}/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(q)}&limit=${GIF_PAGE_SIZE}&rating=g`;
-  const j = await getJson(url, `giphy|search|${q.toLowerCase()}`);
-  return { items: (j.data || []).map(normalizeGiphy), count: 0, version: null };
+  const url = `${GIPHY_BASE}/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(q)}&limit=${GIPHY_LIMIT}&rating=g`;
+  const j = await getJson(url, `giphy|search|${q}`);
+  return (j.data || []).map(normalizeGiphy);
 }
 
 export async function giphyTrending() {
-  const url = `${GIPHY_BASE}/trending?api_key=${GIPHY_KEY}&limit=${GIF_PAGE_SIZE}&rating=g`;
+  const url = `${GIPHY_BASE}/trending?api_key=${GIPHY_KEY}&limit=${GIPHY_LIMIT}&rating=g`;
   const j = await getJson(url, "giphy|trending");
-  return { items: (j.data || []).map(normalizeGiphy), count: 0, version: null };
+  return (j.data || []).map(normalizeGiphy);
 }

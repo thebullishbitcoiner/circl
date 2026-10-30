@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
-  GIF_PAGE_SIZE, GifApiError,
-  nbSearch, nbBrowse, nbSuggest, nbReport, giphySearch, giphyTrending,
+  GifApiError, nbSearch, nbBrowse, nbSuggest, nbReport, giphySearch, giphyTrending,
 } from "../utils/gifProviders.js";
+import { normaliseGifQuery, isSearchableGifQuery } from "../utils/gifGrid.js";
 
 const HIDDEN_KEY = "circl_gif_hidden_v1";
 const HIDDEN_MAX = 500;
@@ -14,18 +14,19 @@ function writeHidden(set) {
   try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...set].slice(-HIDDEN_MAX))); } catch {}
 }
 
-// Once nostr.build fails for any reason other than a bad query (unregistered
-// origin, outage, network), stay on Giphy for the rest of the session rather
-// than re-failing on every keystroke.
+// Once nostr.build can't be reached (unregistered origin, outage) even after
+// the client's one retry, stay on Giphy for the rest of the session rather
+// than re-failing on every keystroke. A bad query, a rate limit or a timeout
+// is an answer, not an outage, so it doesn't switch.
 let _sessionProvider = "nostrbuild";
+const NO_FALLBACK = new Set(["validation", "rate_limited", "timeout"]);
 
-// A single Latin letter is too broad to be a useful search (per nostr.build's
-// picker guidance); other scripts and emoji can be meaningful on their own.
-const isSearchable = q => q.length > 1 || !/^[a-z]$/i.test(q);
+const isRateLimited = e => e instanceof GifApiError && (e.code === "rate_limited" || e.status === 429);
 
 function errorMessage(e) {
-  if (e instanceof GifApiError && e.code === "rate_limited") return "Too many requests — try again in a minute";
-  return "Could not load GIFs";
+  if (isRateLimited(e)) return "Too many searches for now: give it a minute.";
+  if (e instanceof GifApiError && e.code === "timeout") return "The search took too long.";
+  return "Could not load GIFs.";
 }
 
 export default function useGifPicker({ onPick }) {
@@ -34,108 +35,82 @@ export default function useGifPicker({ onPick }) {
   const [kind, setKind]               = useState("reaction");
   const [items, setItems]             = useState([]);
   const [gifLoading, setGifLoading]   = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [gifError, setGifError]       = useState("");
   const [provider, setProvider]       = useState(_sessionProvider);
-  const [hasMore, setHasMore]         = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [hidden, setHidden]           = useState(readHidden);
   const [retryKey, setRetryKey]       = useState(0);
 
+  // Only the latest request's answer lands; nothing is ever cancelled (a
+  // cancelled request still counts against the reader's budget).
   const seqRef = useRef(0);
-  const pageRef = useRef({ offset: 0, version: null });
 
-  const query = gifQuery.trim();
+  const query = normaliseGifQuery(gifQuery);
+  const searching = !!query && isSearchableGifQuery(query);
 
-  const fetchPage = useCallback(async (offset, prov) => {
-    if (prov === "giphy") {
-      return query && isSearchable(query) ? giphySearch(query) : giphyTrending();
-    }
-    return query && isSearchable(query)
-      ? nbSearch({ q: query, offset })
-      : nbBrowse({ kind, offset });
-  }, [query, kind]);
+  const fetchItems = useCallback(prov => {
+    if (prov === "giphy") return searching ? giphySearch(query) : giphyTrending();
+    return searching ? nbSearch(query) : nbBrowse(kind);
+  }, [query, searching, kind]);
 
-  const runFirstPage = useCallback(async () => {
+  const run = useCallback(async () => {
     const seq = ++seqRef.current;
-    setGifLoading(true);
-    setGifError("");
-    const apply = (page, prov) => {
-      if (seq !== seqRef.current) return;
-      pageRef.current = { offset: 0, version: page.version };
-      setItems(page.items);
-      setHasMore(prov === "nostrbuild" && page.items.length === GIF_PAGE_SIZE && GIF_PAGE_SIZE < page.count);
-      setGifLoading(false);
-    };
+    const current = () => seq === seqRef.current;
     try {
-      apply(await fetchPage(0, _sessionProvider), _sessionProvider);
+      const got = await fetchItems(_sessionProvider);
+      if (!current()) return;
+      setItems(got);
+      setGifError("");
     } catch (e) {
-      if (seq !== seqRef.current) return;
-      const fallback = _sessionProvider === "nostrbuild"
-        && !(e instanceof GifApiError && (e.code === "validation" || e.code === "rate_limited"));
-      if (fallback) {
+      if (!current()) return;
+      if (_sessionProvider === "nostrbuild" && !(e instanceof GifApiError && NO_FALLBACK.has(e.code)) && !isRateLimited(e)) {
         _sessionProvider = "giphy";
         setProvider("giphy");
         setSuggestions([]);
-        try { apply(await fetchPage(0, "giphy"), "giphy"); return; } catch (e2) { e = e2; }
-        if (seq !== seqRef.current) return;
+        try {
+          const got = await fetchItems("giphy");
+          if (!current()) return;
+          setItems(got);
+          setGifError("");
+          setGifLoading(false);
+          return;
+        } catch (e2) { e = e2; }
+        if (!current()) return;
       }
-      setItems([]);
-      setHasMore(false);
+      setItems([]); // old results never show under an error
       setGifError(errorMessage(e));
-      setGifLoading(false);
     }
-  }, [fetchPage]);
+    if (current()) setGifLoading(false);
+  }, [fetchItems]);
 
-  // First page: on open, on category change, and (debounced) on query change.
+  // On open, on category change, and (debounced) on query change. Loading
+  // shows from the first keystroke, not after the debounce.
   useEffect(() => {
     if (!showGif) return;
-    if (query && !isSearchable(query)) return;
-    const t = setTimeout(runFirstPage, query ? 250 : 0);
+    if (query && !searching) { seqRef.current++; setGifLoading(false); return; } // keep what's shown
+    setGifLoading(true);
+    const t = setTimeout(run, query ? 250 : 0);
     return () => clearTimeout(t);
-  }, [showGif, query, kind, retryKey, runFirstPage]);
+  }, [showGif, query, searching, kind, retryKey, run]);
 
   // Autocomplete (nostr.build only).
   useEffect(() => {
-    if (!showGif || provider !== "nostrbuild" || !query || !isSearchable(query)) { setSuggestions([]); return; }
+    if (!showGif || provider !== "nostrbuild" || !searching) { setSuggestions([]); return; }
     let cancelled = false;
     const t = setTimeout(() => {
       nbSuggest(query)
-        .then(terms => { if (!cancelled) setSuggestions(terms.filter(t => t.toLowerCase() !== query.toLowerCase())); })
+        .then(terms => { if (!cancelled) setSuggestions(terms.filter(t => t.toLowerCase() !== query)); })
         .catch(() => { if (!cancelled) setSuggestions([]); });
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [showGif, provider, query]);
-
-  const loadMore = async () => {
-    if (loadingMore || !hasMore || provider !== "nostrbuild") return;
-    const seq = seqRef.current;
-    const offset = pageRef.current.offset + GIF_PAGE_SIZE;
-    setLoadingMore(true);
-    try {
-      const page = await fetchPage(offset, "nostrbuild");
-      if (seq !== seqRef.current) return;
-      // The index was rebuilt / browse order reshuffled since page one: offsets
-      // no longer line up, so start over rather than show duplicates or gaps.
-      if (page.version !== pageRef.current.version) { runFirstPage(); return; }
-      pageRef.current = { offset, version: page.version };
-      setItems(prev => {
-        const seen = new Set(prev.map(i => i.id));
-        return [...prev, ...page.items.filter(i => !seen.has(i.id))];
-      });
-      setHasMore(page.items.length === GIF_PAGE_SIZE && offset + GIF_PAGE_SIZE < page.count);
-    } catch (e) {
-      if (seq === seqRef.current) setGifError(errorMessage(e));
-    } finally {
-      setLoadingMore(false);
-    }
-  };
+  }, [showGif, provider, query, searching]);
 
   const close = () => {
     seqRef.current++;
     setShowGif(false);
     setGifQuery("");
     setSuggestions([]);
+    setGifLoading(false);
   };
 
   const selectKind = k => {
@@ -143,14 +118,14 @@ export default function useGifPicker({ onPick }) {
     setGifQuery("");
   };
 
-  const reportGif = (item, reason) => {
+  const reportGif = (id, reason) => {
     setHidden(prev => {
       const next = new Set(prev);
-      next.add(item.id);
+      next.add(id);
       writeHidden(next);
       return next;
     });
-    if (item.provider === "nostrbuild") nbReport(item.id, reason);
+    nbReport(id, reason);
   };
 
   const pickGif = item => {
@@ -173,10 +148,11 @@ export default function useGifPicker({ onPick }) {
       if (next) setShowGif(true); else close();
     },
     gifQuery, setGifQuery,
+    query: searching ? query : "",
     kind, selectKind,
     gifs: items.filter(i => !hidden.has(i.id)),
-    gifLoading, loadingMore, gifError,
-    provider, hasMore, loadMore,
+    gifLoading, gifError,
+    provider,
     suggestions,
     retry: () => setRetryKey(k => k + 1),
     reportGif,

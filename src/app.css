@@ -1101,7 +1101,7 @@
   /* GIF picker */
   .gif-picker{
     flex-shrink:0;border-top:1px solid var(--border);
-    background:var(--surface);max-height:300px;overflow-y:auto;
+    background:var(--surface);max-height:380px;overflow-y:auto;
   }
   .gif-picker-head{display:flex;flex-direction:column;align-items:stretch;gap:8px;}
   .gif-picker-head input{flex:none;width:100%;box-sizing:border-box;}
@@ -1110,33 +1110,56 @@
   .gif-chip{flex-shrink:0;padding:4px 10px;border:1px solid var(--border);border-radius:999px;background:var(--bg);color:var(--text-muted, var(--text));font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;white-space:nowrap;}
   .gif-chip:hover{border-color:var(--primary);}
   .gif-chip.active{background:var(--primary);border-color:var(--primary);color:#fff;}
-  .gif-item{position:relative;}
-  .gif-skeleton{animation:gif-pulse 1.2s ease-in-out infinite;cursor:default;}
+  .gif-field{position:relative;}
+  .gif-field input{padding-right:52px;}
+  .gif-spinner{position:absolute;right:32px;top:50%;width:12px;height:12px;margin-top:-6px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:gif-spin .7s linear infinite;}
+  @keyframes gif-spin{to{transform:rotate(360deg)}}
+  .gif-clear-btn{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:22px;height:22px;border:none;border-radius:50%;background:none;color:var(--text-faint);font-size:12px;line-height:1;padding:0;cursor:pointer;}
+  .gif-clear-btn:hover{color:var(--text);background:var(--surface2);}
+  .gif-skeleton-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;padding:0 8px 8px;}
+  .gif-skeleton{height:110px;border-radius:10px;background:var(--surface2);animation:gif-pulse 1.2s ease-in-out infinite;}
   @keyframes gif-pulse{0%,100%{opacity:1}50%{opacity:.5}}
-  @media (prefers-reduced-motion: reduce){.gif-skeleton{animation:none;}}
-  .gif-report-btn{position:absolute;top:4px;right:4px;width:22px;height:22px;border:none;border-radius:6px;background:rgba(0,0,0,.45);color:#fff;font-size:11px;line-height:22px;padding:0;cursor:pointer;opacity:0;transition:opacity .15s;}
-  .gif-item:hover .gif-report-btn{opacity:1;}
-  @media (hover: none){.gif-report-btn{opacity:.85;}}
-  .gif-report-panel{margin:0 8px 8px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);}
+  .gif-report-panel{padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);}
   .gif-report-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px;font-family:'DM Sans',sans-serif;}
   .gif-status{display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px;text-align:center;font-size:12px;color:var(--text-faint);}
-  .gif-more{display:block;margin:0 auto 8px;padding:6px 14px;border:1px solid var(--border);border-radius:999px;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;}
-  .gif-more:disabled{opacity:.6;cursor:default;}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
+
+  /* nostr.build masonry (utils/gifGrid.js positions the cells). Isolated so
+     the tiles' focus rings never stack above the sticky header. */
+  .gif-masonry{position:relative;isolation:isolate;margin:0 8px 8px;}
+  .gif-cell{position:absolute;}
+  .gif-tile{position:absolute;inset:0;overflow:hidden;border:0;border-radius:10px;padding:0;background:var(--surface2) center / cover no-repeat;cursor:pointer;}
+  .gif-tile:has(> video[data-shown]){background-color:transparent;}
+  .gif-tile img,.gif-tile video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;pointer-events:none;user-select:none;-webkit-user-drag:none;}
+  .gif-tile img:not([src]){display:none;}
+  .gif-tile video{opacity:0;transition:opacity .35s ease-out;}
+  .gif-tile video[data-shown]{opacity:1;}
+  .gif-tile video[data-at-once]{transition:none;}
+  .gif-tile:focus-visible{outline:none;}
+  .gif-tile:focus-visible::after{content:"";position:absolute;inset:0;z-index:1;border-radius:inherit;box-shadow:inset 0 0 0 3px var(--primary);}
+  .gif-report-btn{position:absolute;top:4px;right:4px;z-index:2;width:22px;height:22px;border:none;border-radius:6px;background:rgba(0,0,0,.45);color:#fff;font-size:11px;line-height:22px;padding:0;cursor:pointer;opacity:0;transition:opacity .15s;}
+  .gif-cell:hover .gif-report-btn,.gif-report-btn:focus-visible{opacity:1;}
+  @media (hover: none){.gif-report-btn{opacity:.85;}}
+  @media (prefers-reduced-motion: reduce){
+    .gif-skeleton,.gif-spinner{animation:none;}
+    .gif-tile video{transition:none;}
+  }
   .gif-picker-title{display:flex;align-items:center;justify-content:space-between;gap:8px;}
   .gif-attrib{font-size:12px;font-weight:600;font-family:'DM Sans',sans-serif;}
   .gif-close-btn{border:none;background:none;color:var(--text-faint);font-size:14px;line-height:1;padding:4px 6px;border-radius:6px;cursor:pointer;}
   .gif-close-btn:hover{color:var(--text);background:var(--surface2);}
   .gif-attrib a{color:var(--text-faint);text-decoration:none;}
   .gif-attrib a:hover{color:var(--primary);text-decoration:underline;}
-  .gif-search-row{display:flex;gap:8px;padding:10px 12px;position:sticky;top:0;background:var(--surface);z-index:1;}
+  .gif-search-row{display:flex;gap:8px;padding:10px 12px;position:sticky;top:0;background:var(--surface);z-index:3;}
   .gif-search-input{
     flex:1;padding:7px 12px;border:1.5px solid var(--border);border-radius:10px;
     background:var(--bg);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);
     outline:none;transition:border-color .15s;
   }
   .gif-search-input:focus{border-color:var(--primary);}
-  .gif-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:4px;padding:0 8px 8px;}
-  .gif-item{border-radius:8px;overflow:hidden;cursor:pointer;aspect-ratio:1;background:var(--surface2);}
+  /* Giphy fallback only */
+  .gif-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:0 8px 8px;}
+  .gif-item{display:block;border:0;padding:0;border-radius:8px;overflow:hidden;cursor:pointer;aspect-ratio:1;background:var(--surface2);}
   .gif-item img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .15s;}
   .gif-item:hover img{transform:scale(1.05);}
 
@@ -1465,8 +1488,8 @@
   .cal-inline-media-remove{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;border:none;cursor:pointer;font-size:9px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;}
   .cal-inline-emoji-wrap{border-top:1px solid var(--border);}
   .cal-inline-emoji-wrap em-emoji-picker{--border-radius:0px;}
-  .cal-inline-gif-picker{border-top:1px solid var(--border);max-height:280px;overflow-y:auto;}
-  .cal-inline-gif-search{padding:8px 10px;position:sticky;top:0;background:var(--surface);z-index:1;}
+  .cal-inline-gif-picker{border-top:1px solid var(--border);max-height:340px;overflow-y:auto;}
+  .cal-inline-gif-search{padding:8px 10px;position:sticky;top:0;background:var(--surface);z-index:3;}
   .cal-inline-gif-input{width:100%;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;transition:border-color .15s;box-sizing:border-box;}
   .cal-inline-gif-input:focus{border-color:var(--primary);}
   .cal-inline-gif-status{padding:16px;text-align:center;font-size:12px;color:var(--text-faint);}
