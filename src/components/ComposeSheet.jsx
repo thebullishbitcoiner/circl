@@ -16,6 +16,7 @@ import { uploadFileWithMeta } from "../utils/upload.js";
 import { VoiceRecorderBody } from "./VoiceRecorderSheet.jsx";
 import useRichTextEditor from "../hooks/useRichTextEditor.js";
 import useGifPicker from "../hooks/useGifPicker.js";
+import GifPicker from "./GifPicker.jsx";
 
 const TAGGING_FONT = "12.5px 'DM Sans', sans-serif";
 let _measureCanvas = null;
@@ -99,8 +100,8 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
     onFilesDropped: files => uploadFiles(files),
   });
   const editorRef = richText.editorRef;
-  const gifPicker = useGifPicker({ onPick: url => setMedia(m => [...m, { url, type: "gif" }]) });
-  const { showGif, setShowGif, gifQuery, setGifQuery, gifs, gifLoading, gifError, pickGif } = gifPicker;
+  const gifPicker = useGifPicker({ onPick: item => setMedia(m => [...m, item]) });
+  const { showGif, setShowGif } = gifPicker;
 
   const thisDraftId = computeDraftId(replyTo, quotedEvent);
   const draft = getDraft(thisDraftId);
@@ -604,29 +605,7 @@ export default function ComposeSheet({ replyTo, quotedEvent, profiles, myPubkey,
           </div>
         )}
 
-        {showGif && (
-          <div className="gif-picker">
-            <div className="gif-search-row">
-              <input className="gif-search-input" placeholder="Search GIFs…" value={gifQuery} onChange={e => setGifQuery(e.target.value)} autoFocus />
-              <button type="button" className="compose-media-btn" onClick={() => setShowGif(false)}>✕</button>
-            </div>
-            {gifLoading
-              ? <div style={{ padding: "20px", textAlign: "center", fontSize: 12, color: "var(--text-faint)" }}>Loading…</div>
-              : gifError
-                ? <div style={{ padding: "20px", textAlign: "center", fontSize: 12, color: "var(--text-faint)" }}>{gifError}</div>
-                : <div className="gif-grid">
-                    {gifs.map((g, i) => {
-                      const thumb = g.images?.fixed_height_small?.url || g.images?.fixed_height?.url;
-                      return (
-                        <div key={i} className="gif-item" onClick={() => pickGif(g)}>
-                          {thumb && <img src={thumb} alt="" loading="lazy" />}
-                        </div>
-                      );
-                    })}
-                  </div>
-            }
-          </div>
-        )}
+        {showGif && <GifPicker picker={gifPicker} variant="sheet" closeClassName="compose-media-btn" />}
 
         {showCirclePicker && circles.length > 0 && (
           <div style={{ borderTop: "1px solid var(--border)", background: "var(--bg)", padding: "8px 0" }}>

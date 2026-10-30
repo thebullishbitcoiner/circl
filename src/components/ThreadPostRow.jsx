@@ -4,6 +4,7 @@ import { avatarInitial, videoPosterUrl } from "../utils.js";
 import EmojiPicker from "./EmojiPicker.jsx";
 import useRichTextEditor from "../hooks/useRichTextEditor.js";
 import useGifPicker from "../hooks/useGifPicker.js";
+import GifPicker from "./GifPicker.jsx";
 import { uploadFileWithMeta } from "../utils/upload.js";
 
 const CHAR_LIMIT = 280;
@@ -40,7 +41,7 @@ export default function ThreadPostRow({
     onTextChange: content => onChange({ ...post, content }),
     onFilesDropped: uploadFiles,
   });
-  const gifPicker = useGifPicker({ onPick: url => setMedia(m => [...m, { url, type: "gif" }]) });
+  const gifPicker = useGifPicker({ onPick: item => setMedia(m => [...m, item]) });
 
   // contentEditable is uncontrolled — seed it from restored draft content once on mount.
   useEffect(() => {
@@ -138,29 +139,7 @@ export default function ThreadPostRow({
               <EmojiPicker customEmojis={customEmojis} height={240} onSelect={emoji => { insertEmoji(emoji); setShowEmoji(false); }} />
             )}
 
-            {gifPicker.showGif && (
-              <div className="gif-picker">
-                <div className="gif-search-row">
-                  <input className="gif-search-input" placeholder="Search GIFs…" value={gifPicker.gifQuery} onChange={e => gifPicker.setGifQuery(e.target.value)} autoFocus />
-                  <button type="button" className="compose-thread-btn" onClick={() => gifPicker.setShowGif(false)}>✕</button>
-                </div>
-                {gifPicker.gifLoading
-                  ? <div style={{ padding: "20px", textAlign: "center", fontSize: 12, color: "var(--text-faint)" }}>Loading…</div>
-                  : gifPicker.gifError
-                    ? <div style={{ padding: "20px", textAlign: "center", fontSize: 12, color: "var(--text-faint)" }}>{gifPicker.gifError}</div>
-                    : <div className="gif-grid">
-                        {gifPicker.gifs.map((g, i) => {
-                          const thumb = g.images?.fixed_height_small?.url || g.images?.fixed_height?.url;
-                          return (
-                            <div key={i} className="gif-item" onClick={() => gifPicker.pickGif(g)}>
-                              {thumb && <img src={thumb} alt="" loading="lazy" />}
-                            </div>
-                          );
-                        })}
-                      </div>
-                }
-              </div>
-            )}
+            {gifPicker.showGif && <GifPicker picker={gifPicker} variant="sheet" closeClassName="compose-thread-btn" />}
 
             <div className="compose-thread-toolbar">
               <input id={fileInputId} type="file" accept="image/*,video/*" multiple style={{ display: "none" }} onChange={handleFileChange} />

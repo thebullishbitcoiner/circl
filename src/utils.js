@@ -585,6 +585,8 @@ export function imetaTagForMedia(m) {
   if (m.dim) parts.push(`dim ${m.dim}`);
   if (m.thumb) parts.push(`thumb ${m.thumb}`);
   if (m.image) parts.push(`image ${m.image}`);
+  if (m.size) parts.push(`size ${m.size}`);
+  if (m.alt) parts.push(`alt ${m.alt}`);
   return ["imeta", ...parts];
 }
 

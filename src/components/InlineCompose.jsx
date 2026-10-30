@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import Avatar from "./Avatar.jsx";
 import EmojiPicker from "./EmojiPicker.jsx";
 import { replyTagsForPublish, kind1111TagsForPublish, videoPosterUrl, imetaTagForMedia } from "../utils.js";
-import { GIPHY_KEY } from "../constants.js";
+import useGifPicker from "../hooks/useGifPicker.js";
+import GifPicker from "./GifPicker.jsx";
 import { uploadFileWithMeta } from "../utils/upload.js";
 
 const isAddressableKind = k => k >= 30000 && k <= 39999;
@@ -17,11 +18,9 @@ export default function InlineCompose({
   const [media, setMedia] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
-  const [showGif, setShowGif] = useState(false);
-  const [gifQuery, setGifQuery] = useState("");
-  const [gifs, setGifs] = useState([]);
-  const [gifLoading, setGifLoading] = useState(false);
   const [emojiTags, setEmojiTags] = useState([]);
+  const gifPicker = useGifPicker({ onPick: item => setMedia(m => [...m, item]) });
+  const { showGif, setShowGif } = gifPicker;
   const textareaRef = useRef(null);
   const fileRef = useRef(null);
 
@@ -54,35 +53,6 @@ export default function InlineCompose({
       setEmojiTags(prev => prev.some(t => t[1] === picked.emojiTag[1]) ? prev : [...prev, picked.emojiTag]);
     }
   }
-
-  const fetchGifs = async url => {
-    setGifLoading(true);
-    try {
-      const res = await fetch(url);
-      const json = await res.json();
-      setGifs(json.data || []);
-    } catch {}
-    setGifLoading(false);
-  };
-
-  useEffect(() => {
-    if (!showGif) { setGifs([]); setGifQuery(""); return; }
-    if (!gifQuery.trim()) {
-      fetchGifs(`https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=18&rating=g`);
-      return;
-    }
-    const t = setTimeout(() => fetchGifs(
-      `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(gifQuery)}&limit=18&rating=g`
-    ), 400);
-    return () => clearTimeout(t);
-  }, [showGif, gifQuery]);
-
-  const pickGif = gif => {
-    const url = gif.images?.original?.url || gif.images?.downsized?.url;
-    if (!url) return;
-    setMedia(m => [...m, { url, type: "gif" }]);
-    setShowGif(false);
-  };
 
   const handleFileChange = async e => {
     const files = Array.from(e.target.files || []);
@@ -159,34 +129,7 @@ export default function InlineCompose({
           </div>
         )}
 
-        {showGif && (
-          <div className="cal-inline-gif-picker">
-            <div className="cal-inline-gif-search">
-              <input
-                className="cal-inline-gif-input"
-                placeholder="Search GIFs…"
-                value={gifQuery}
-                onChange={e => setGifQuery(e.target.value)}
-                autoFocus
-              />
-            </div>
-            {gifLoading
-              ? <div className="cal-inline-gif-status">Loading…</div>
-              : (
-                <div className="gif-grid">
-                  {gifs.map((g, i) => {
-                    const thumb = g.images?.fixed_height_small?.url || g.images?.fixed_height?.url;
-                    return (
-                      <div key={i} className="gif-item" onClick={() => pickGif(g)}>
-                        {thumb && <img src={thumb} alt="" loading="lazy" />}
-                      </div>
-                    );
-                  })}
-                </div>
-              )
-            }
-          </div>
-        )}
+        {showGif && <GifPicker picker={gifPicker} variant="inline" />}
 
         <div className="cal-inline-compose-footer">
           <input ref={fileRef} type="file" accept="image/*,video/*" multiple style={{ display: "none" }} onChange={handleFileChange} />
