@@ -544,8 +544,21 @@ const AUDIO_EXT_RE = /\.(mp3|m4a|wav|flac|aac|opus|oga|wma)(\?|#|$)/i;
 const WAVLAKE_RE   = /(?:^|[./])wavlake\.com\/track\//i;
 
 /** Hosts that commonly serve images without a file extension in the path. */
-const IMAGE_HOST_RE =
-  /(pbs\.twimg\.com|imagedelivery\.net|nostr\.build|void\.cat|cdn\.void\.cat|i\.imgur\.com)/i;
+const IMAGE_HOSTS = new Set(["pbs.twimg.com", "imagedelivery.net", "void.cat", "cdn.void.cat", "i.imgur.com"]);
+const HASH_SEGMENT_RE = /\/[0-9a-f]{32,}$/i;
+
+function isExtensionlessImageUrl(url) {
+  let u;
+  try { u = new URL(url); } catch { return false; }
+  const host = u.hostname.toLowerCase();
+  if (IMAGE_HOSTS.has(host)) return true;
+  // nostr.build also hosts regular pages (e.g. gifs.nostr.build/developers);
+  // its extensionless media URLs are content-hash named.
+  if (host === "nostr.build" || host.endsWith(".nostr.build")) {
+    return HASH_SEGMENT_RE.test(u.pathname.replace(/\/+$/, ""));
+  }
+  return false;
+}
 
 const NOSTR_BUILD_HOST_RE = /nostr\.build/i;
 const BLOSSOM_BAND_HOST_RE = /blossom\.band/i;
@@ -588,7 +601,7 @@ export function classifyMediaUrl(url) {
   if (IMAGE_EXT_RE.test(path)) return "image";
   if (VIDEO_EXT_RE.test(path)) return "video";
   if (AUDIO_EXT_RE.test(path)) return "audio";
-  if (IMAGE_HOST_RE.test(url)) return "image";
+  if (isExtensionlessImageUrl(url)) return "image";
   if (WAVLAKE_RE.test(url)) return "wavlake";
   return null;
 }
