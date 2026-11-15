@@ -7,8 +7,18 @@ function readStore() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) ?? {}; } catch { return {}; }
 }
 
+// Browsers word a full localStorage differently (Safari/Firefox: "The quota has
+// been exceeded."), none of it actionable — say what to do instead.
+const isQuotaError = e =>
+  e?.name === "QuotaExceededError" || e?.name === "NS_ERROR_DOM_QUOTA_REACHED" || e?.code === 22 || e?.code === 1014;
+
 function writeStore(store) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  } catch (e) {
+    if (isQuotaError(e)) throw new Error("Browser storage is full. Clear the profile cache in Settings → Storage, then try again.");
+    throw e;
+  }
 }
 
 // Pre-namespacing installs stored a single flat, plaintext
