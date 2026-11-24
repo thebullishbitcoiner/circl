@@ -1064,6 +1064,8 @@ export default function App() {
                 <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
                   <SearchPage
                     pubkey={pubkey}
+                    follows={follows}
+                    isTrusted={wot.isTrusted}
                     profiles={profiles}
                     onOpenProfile={handleOpenProfile}
                     onOpenThread={handleOpenThread}
@@ -1154,6 +1156,8 @@ export default function App() {
                       <div key="hidden-muted" style={{ display: "none", height: "100%" }}>
                         <MutedPage
                           pubkey={pubkey}
+                          follows={follows}
+                          isTrusted={wot.isTrusted}
                           mutes={mutes}
                           hashtags={mutedHashtags}
                           words={mutedWords}
@@ -1307,6 +1311,8 @@ export default function App() {
                       <MutedPage
                         key="muted"
                         pubkey={pubkey}
+                        follows={follows}
+                        isTrusted={wot.isTrusted}
                         mutes={mutes}
                         hashtags={mutedHashtags}
                         words={mutedWords}

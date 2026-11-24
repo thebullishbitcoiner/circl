@@ -2,14 +2,9 @@ import { useState, useCallback, useRef, useMemo } from "react";
 import useProfiles from "../hooks/useProfiles.js";
 import useSearchRelays from "../hooks/useSearchRelays.js";
 import { pool, eventStore } from "../nostr.js";
+import { DEFAULT_SEARCH_RELAYS } from "../constants.js";
 import { displayName, normPubkey, isHexPubkey } from "../utils.js";
 import { NoteResult } from "./SearchPage.jsx";
-
-const DEFAULT_SEARCH_RELAYS = [
-  "wss://relay.primal.net",
-  "wss://search.nos.today",
-  "wss://nostr.wine",
-];
 
 const NOTE_LIMIT = 30;
 const MAX_RECENT = 10;

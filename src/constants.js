@@ -8,6 +8,13 @@ export const DEFAULT_RELAYS = [
   "wss://relay.primal.net",
 ];
 
+/** NIP-50 search relays used when the user hasn't configured their own (kind 10007).
+ *  relay.primal.net isn't here: it rejects `search` filters. */
+export const DEFAULT_SEARCH_RELAYS = [
+  "wss://search.nos.today",
+  "wss://nostr.wine",
+];
+
 /** Synthetic notification "kind" for an inferred unfollow — not a real Nostr
  *  event kind (Nostr has no unfollow event), just a sentinel so it can flow
  *  through the same notification rendering pipeline as real event kinds. */

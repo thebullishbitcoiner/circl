@@ -2,8 +2,8 @@ import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import useProfiles from "../hooks/useProfiles.js";
 import useSearchRelays from "../hooks/useSearchRelays.js";
 import { pool, eventStore } from "../nostr.js";
-import { DEFAULT_RELAYS } from "../constants.js";
-import { displayName, relativeTime, nip19, normPubkey, isHexPubkey, truncNpub } from "../utils.js";
+import { DEFAULT_RELAYS, DEFAULT_SEARCH_RELAYS } from "../constants.js";
+import { displayName, relativeTime, nip19, normPubkey, isHexPubkey, truncNpub, rankPeopleResults } from "../utils.js";
 import Avatar from "./Avatar.jsx";
 import NoteContent from "./NoteContent.jsx";
 import MutedNoteGate from "./MutedNoteGate.jsx";
@@ -25,12 +25,6 @@ function parseNostrIdentifier(raw) {
   } catch {}
   return null;
 }
-
-const DEFAULT_SEARCH_RELAYS = [
-  "wss://relay.primal.net",
-  "wss://search.nos.today",
-  "wss://nostr.wine",
-];
 
 const SUGGEST_LIMIT = 8;
 const NOTE_LIMIT    = 30;
@@ -134,12 +128,6 @@ function RecentSearchItem({ item, profiles, onSelect, onDelete }) {
   );
 }
 
-function fmtFollowers(n) {
-  if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${+(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
-
 function ProfileSuggestion({ ev, onOpenProfile }) {
   let meta = {};
   try { meta = JSON.parse(ev.content); } catch {}
@@ -159,11 +147,6 @@ function ProfileSuggestion({ ev, onOpenProfile }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="search-result-name" style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name || sub}</span>
-          {ev.follower_count != null && (
-            <span style={{ flexShrink: 0, fontSize: "calc(var(--font-base) - 4px)", fontWeight: 600, color: "var(--text-faint)", background: "var(--surface2, var(--border))", borderRadius: 99, padding: "1px 6px", fontFamily: "'DM Sans',sans-serif", letterSpacing: "0.02em" }}>
-              {fmtFollowers(ev.follower_count)} followers
-            </span>
-          )}
         </div>
         {name && sub && <div className="search-result-sub">{sub}</div>}
       </div>
@@ -257,7 +240,7 @@ function Spinner() {
   );
 }
 
-export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThread, onOpenHashtag, onOpenArticle, resolveEventById }) {
+export default function SearchPage({ pubkey, follows = [], isTrusted, profiles, onOpenProfile, onOpenThread, onOpenHashtag, onOpenArticle, resolveEventById }) {
   const configuredRelays = useSearchRelays(pubkey);
   const searchRelays = configuredRelays.length > 0 ? configuredRelays.map(r => r.url) : DEFAULT_SEARCH_RELAYS;
   const [query,          setQuery]          = useState("");
@@ -286,7 +269,6 @@ export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThre
   const suggestSeenRef = useRef(new Set());
   const noteSeenRef    = useRef(new Set());
   const debounceRef    = useRef(null);
-  const abortRef       = useRef(null);
 
   const addRecent = useCallback((entry) => {
     setRecentSearches(prev => {
@@ -310,43 +292,12 @@ export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThre
     });
   }, [pubkey]);
 
-  const runPeopleSearch = useCallback(async q => {
-    abortRef.current?.abort();
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
-
+  const runPeopleSearch = useCallback(q => {
     suggestSubRef.current?.unsubscribe();
     suggestSeenRef.current = new Set();
     setSuggestions([]);
     setLoadingSuggest(true);
 
-    // Try nostrarchives suggest API first — faster and follower-count ranked
-    try {
-      const res = await fetch(
-        `https://api.nostrarchives.com/v1/search/suggest?q=${encodeURIComponent(q)}&limit=${SUGGEST_LIMIT}`,
-        { signal: ctrl.signal },
-      );
-      if (ctrl.signal.aborted) return;
-      if (res.ok) {
-        const data = await res.json();
-        if (ctrl.signal.aborted) return;
-        if (data.suggestions?.length > 0) {
-          setSuggestions(data.suggestions.map(s => ({
-            pubkey: s.pubkey,
-            content: JSON.stringify({ name: s.name, display_name: s.display_name, picture: s.picture }),
-            id: `api-${s.pubkey}`,
-            follower_count: s.follower_count ?? null,
-            _fromApi: true,
-          })));
-          setLoadingSuggest(false);
-          return;
-        }
-      }
-    } catch (e) {
-      if (e.name === "AbortError") return;
-    }
-
-    // Fall back to NIP-50 relay search
     const sub = pool.request(searchRelays, [{ kinds: [0], search: q, limit: SUGGEST_LIMIT }]).subscribe({
       next: ev => {
         if (!ev?.id || suggestSeenRef.current.has(ev.id)) return;
@@ -488,7 +439,6 @@ export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThre
 
   const handleClear = () => {
     clearTimeout(debounceRef.current);
-    abortRef.current?.abort();
     suggestSubRef.current?.unsubscribe();
     noteSubRef.current?.unsubscribe();
     setQuery(""); setSuggestions([]); setNoteResults([]);
@@ -513,7 +463,12 @@ export default function SearchPage({ pubkey, profiles, onOpenProfile, onOpenThre
   };
 
   const loading = mode === "suggest" ? (identifier ? resolvingIdent : loadingSuggest) : loadingNotes;
-  const results = mode === "suggest" ? suggestions    : noteResults;
+  const followSet = useMemo(() => new Set(follows.map(normPubkey)), [follows]);
+  const rankedSuggestions = useMemo(
+    () => rankPeopleResults(suggestions, followSet, isTrusted),
+    [suggestions, followSet, isTrusted],
+  );
+  const results = mode === "suggest" ? rankedSuggestions : noteResults;
   const showRecent = !query && recentSearches.length > 0;
 
   return (

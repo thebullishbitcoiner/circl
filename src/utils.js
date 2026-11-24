@@ -840,3 +840,18 @@ export async function decryptListContent(pubkey, content) {
   }
   return plain;
 }
+
+/** Orders people-search results: people you follow first, then your web of
+ *  trust, then everyone else. Stable, so relay order is kept within each group. */
+export function rankPeopleResults(results, followSet, isTrusted) {
+  const tier = ev => {
+    const pk = normPubkey(ev.pubkey);
+    if (followSet?.has(pk)) return 0;
+    if (isTrusted?.(pk)) return 1;
+    return 2;
+  };
+  return results
+    .map((ev, i) => [tier(ev), i, ev])
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1])
+    .map(r => r[2]);
+}

@@ -2,12 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import useMailboxes from "../hooks/useMailboxes.js";
 import useSearchRelays from "../hooks/useSearchRelays.js";
 import { pool } from "../nostr.js";
-
-const DEFAULT_SEARCH_RELAYS = [
-  "wss://relay.primal.net",
-  "wss://search.nos.today",
-  "wss://nostr.wine",
-];
+import { DEFAULT_SEARCH_RELAYS } from "../constants.js";
 
 const isValidRelay = url => /^wss?:\/\/[^\s]+$/.test(url) && !/wss?:\/\//i.test(url.slice(6));
 const fmtUrl = url => url.replace(/^wss?:\/\//, "").replace(/\/$/, "");

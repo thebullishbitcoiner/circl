@@ -3,7 +3,8 @@ import Avatar from "./Avatar.jsx";
 import useSearchRelays from "../hooks/useSearchRelays.js";
 import useProfiles from "../hooks/useProfiles.js";
 import { pool, eventStore } from "../nostr.js";
-import { displayName, shortNpub, normPubkey, isHexPubkey, truncNpub, relativeTime } from "../utils.js";
+import { DEFAULT_SEARCH_RELAYS } from "../constants.js";
+import { displayName, shortNpub, normPubkey, isHexPubkey, truncNpub, relativeTime, rankPeopleResults } from "../utils.js";
 
 const TABS = [
   { id: "users",    label: "Users" },
@@ -12,20 +13,8 @@ const TABS = [
   { id: "threads",  label: "Threads" },
 ];
 
-const DEFAULT_SEARCH_RELAYS = [
-  "wss://relay.primal.net",
-  "wss://search.nos.today",
-  "wss://nostr.wine",
-];
-
 const SUGGEST_LIMIT = 8;
 const SUGGEST_DEBOUNCE_MS = 350;
-
-function fmtFollowers(n) {
-  if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${+(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
 
 function UserSearchResult({ ev, isMuted, onMute, onOpenProfile }) {
   let meta = {};
@@ -46,11 +35,6 @@ function UserSearchResult({ ev, isMuted, onMute, onOpenProfile }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="search-result-name" style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name || sub}</span>
-          {ev.follower_count != null && (
-            <span style={{ flexShrink: 0, fontSize: "calc(var(--font-base) - 4px)", fontWeight: 600, color: "var(--text-faint)", background: "var(--surface2, var(--border))", borderRadius: 99, padding: "1px 6px", fontFamily: "'DM Sans',sans-serif", letterSpacing: "0.02em" }}>
-              {fmtFollowers(ev.follower_count)} followers
-            </span>
-          )}
         </div>
         {name && sub && <div className="search-result-sub">{sub}</div>}
       </div>
@@ -76,7 +60,7 @@ function Spinner() {
 }
 
 export default function MutedPage({
-  pubkey,
+  pubkey, follows = [], isTrusted,
   mutes = [], hashtags = [], words = [], threads = [],
   profiles,
   onUnmute, onMuteUser, onMuteHashtag, onUnmuteHashtag, onMuteWord, onUnmuteWord, onUnmuteThread,
@@ -96,41 +80,12 @@ export default function MutedPage({
   const userSubRef  = useRef(null);
   const userSeenRef = useRef(new Set());
   const userDebounceRef = useRef(null);
-  const userAbortRef = useRef(null);
 
-  const runUserSearch = useCallback(async q => {
-    userAbortRef.current?.abort();
-    const ctrl = new AbortController();
-    userAbortRef.current = ctrl;
-
+  const runUserSearch = useCallback(q => {
     userSubRef.current?.unsubscribe();
     userSeenRef.current = new Set();
     setUserResults([]);
     setUserSearchLoading(true);
-
-    try {
-      const res = await fetch(
-        `https://api.nostrarchives.com/v1/search/suggest?q=${encodeURIComponent(q)}&limit=${SUGGEST_LIMIT}`,
-        { signal: ctrl.signal },
-      );
-      if (ctrl.signal.aborted) return;
-      if (res.ok) {
-        const data = await res.json();
-        if (ctrl.signal.aborted) return;
-        if (data.suggestions?.length > 0) {
-          setUserResults(data.suggestions.map(s => ({
-            pubkey: s.pubkey,
-            content: JSON.stringify({ name: s.name, display_name: s.display_name, picture: s.picture }),
-            id: `api-${s.pubkey}`,
-            follower_count: s.follower_count ?? null,
-          })));
-          setUserSearchLoading(false);
-          return;
-        }
-      }
-    } catch (e) {
-      if (e.name === "AbortError") return;
-    }
 
     const sub = pool.request(searchRelays, [{ kinds: [0], search: q, limit: SUGGEST_LIMIT }]).subscribe({
       next: ev => {
@@ -164,16 +119,20 @@ export default function MutedPage({
     userDebounceRef.current = setTimeout(() => runUserSearch(q.trim()), SUGGEST_DEBOUNCE_MS);
   };
 
+  const followSet = useMemo(() => new Set(follows.map(normPubkey)), [follows]);
+  const rankedUserResults = useMemo(
+    () => rankPeopleResults(userResults, followSet, isTrusted),
+    [userResults, followSet, isTrusted],
+  );
+
   const handleUserSearchClear = () => {
     clearTimeout(userDebounceRef.current);
-    userAbortRef.current?.abort();
     userSubRef.current?.unsubscribe();
     setUserQuery(""); setUserResults([]); setUserSearchLoading(false);
   };
 
   useEffect(() => () => {
     clearTimeout(userDebounceRef.current);
-    userAbortRef.current?.abort();
     userSubRef.current?.unsubscribe();
   }, []);
 
@@ -267,7 +226,7 @@ export default function MutedPage({
                   <div className="empty-state-sub">Try a different search term</div>
                 </div>
               )}
-              {!userSearchLoading && userResults.map(ev => (
+              {!userSearchLoading && rankedUserResults.map(ev => (
                 <UserSearchResult
                   key={ev.pubkey}
                   ev={ev}
